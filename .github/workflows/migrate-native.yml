@@ -1,0 +1,53 @@
+name: Migrate REBOOT native iOS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/migrate-native.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch native SwiftUI source snapshot
+        run: |
+          git clone --depth 1 --branch codex/ios-native https://github.com/kenatst/depth-builder-app.git /tmp/reboot-source
+
+      - name: Replace repository with native iOS project only
+        run: |
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a /tmp/reboot-source/ios/. .
+          cat > README.md <<'EOF'
+          # REBOOT iOS
+
+          Native SwiftUI application for REBOOT (iOS 17+).
+
+          This repository contains only the native iOS product: the REBOOT app, Xcode project, Screen Time extensions, bundled resources, and native assets. The former web/Lovable project is intentionally not included.
+
+          Open `REBOOT.xcodeproj` in Xcode and use the `REBOOT` scheme.
+          EOF
+          cat > .gitignore <<'EOF'
+          .DS_Store
+          DerivedData/
+          *.xcuserstate
+          xcuserdata/
+          build/
+          EOF
+
+      - name: Commit native-only repository
+        run: |
+          git config user.name "REBOOT Migration"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -m "Import native REBOOT SwiftUI app" || exit 0
+          git push origin main
