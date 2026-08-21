@@ -70,6 +70,11 @@ final class AppState: ObservableObject {
     }
 
     private static func load() -> (phase: Phase, screen: Int, step: Int, answers: Answers) {
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-qaToday") {
+            return (.today, 0, 0, [:])
+        }
+#endif
         // QA state override for simulator screenshot runs: `-qaState <json file path>`.
         if let path = ProcessInfo.processInfo.arguments.valueAfter("-qaState"),
            let data = try? Data(contentsOf: URL(fileURLWithPath: path)),

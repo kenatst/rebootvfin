@@ -31,6 +31,12 @@ struct RealWorldActionCard: View {
         .sheet(isPresented: $showPicker) {
             ActivitySelectionSheet(environmentStore: environmentStore, onStateChanged: syncDeviceFacts)
         }
+        .onAppear {
+            if let preparation = product.environmentPreparation {
+                resolved = preparation.outcome == .completed || preparation.outcome == .fallback
+                showFallback = preparation.outcome == .fallback || preparation.outcome == .declined
+            }
+        }
     }
 
     // MARK: - Manual friction (unchanged gentle behaviour)
@@ -58,11 +64,24 @@ struct RealWorldActionCard: View {
                         }
                         if !showFallback {
                             TonalPillButton(title: "I can't do this") {
+                                product.setEnvironmentPreparation(
+                                    EnvironmentPreparation(
+                                        action: prescription.action,
+                                        fallback: prescription.actionFallback,
+                                        outcome: .declined
+                                    )
+                                )
                                 withAnimation(.easeOut(duration: 0.25)) { showFallback = true }
                             }
                         } else {
                             TonalPillButton(title: "Use the fallback", isSelected: resolved) {
-                                product.setEnvironmentActionDone(true)
+                                product.setEnvironmentPreparation(
+                                    EnvironmentPreparation(
+                                        action: prescription.action,
+                                        fallback: prescription.actionFallback,
+                                        outcome: .fallback
+                                    )
+                                )
                                 withAnimation(.easeOut(duration: 0.25)) { resolved = true }
                             }
                         }
@@ -156,8 +175,15 @@ struct RealWorldActionCard: View {
             protectionActivated: applied,
             phoneLocationSelfReport: nil
         )
+        product.setEnvironmentPreparation(
+            EnvironmentPreparation(
+                action: envAction?.title ?? "Protect this session",
+                fallback: nil,
+                outcome: applied ? .completed : .declined,
+                arm: arm
+            )
+        )
         withAnimation(.easeOut(duration: 0.25)) { resolved = true }
-        product.beginSession(environment: arm)
     }
 
     private func syncDeviceFacts() {

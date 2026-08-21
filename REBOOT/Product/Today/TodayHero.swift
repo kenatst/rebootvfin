@@ -28,10 +28,15 @@ struct TodayHero: View {
                     .foregroundStyle(AppColors.inkSoft)
                     .padding(.top, 8)
 
-                PrimaryPillButton(title: "Start \(prescription.minutes) min", symbol: "play.fill") {
-                    product.beginSession()
+                if product.hasCompletedCurrentProtocol {
+                    GlassPill(text: "Today complete", symbol: "checkmark", tint: AppColors.coral)
+                        .padding(.top, 22)
+                } else {
+                    PrimaryPillButton(title: "Start \(prescription.minutes) min", symbol: "play.fill") {
+                        product.prepareProtocolSession()
+                    }
+                    .padding(.top, 22)
                 }
-                .padding(.top, 22)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

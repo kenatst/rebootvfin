@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// Root of the product world: Today (signature), session flow, and the empty
-/// Train / Program / Profile shells behind the floating glass tab bar.
+/// Root of the product world. Today and Train both enter the same session lifecycle.
 struct ProductRootView: View {
     @ObservedObject var product: ProductStore
     @ObservedObject var environmentStore: EnvironmentStore
@@ -12,8 +11,14 @@ struct ProductRootView: View {
             case .today:
                 tabContent
                     .transition(.opacity)
+            case .preparing(let request):
+                SessionPreparationView(product: product, environmentStore: environmentStore, request: request)
+                    .transition(.opacity)
             case .running:
                 SessionView(product: product)
+                    .transition(.opacity)
+            case .recovery(let record):
+                SessionRecoveryView(product: product, environmentStore: environmentStore, record: record)
                     .transition(.opacity)
             case .done:
                 SessionDoneView(product: product)
@@ -67,7 +72,7 @@ struct ProductRootView: View {
             case .today:
                 TodayView(product: product, environmentStore: environmentStore)
             case .train:
-                TrainTab()
+                TrainTab(product: product)
             case .program:
                 ProgramTab(product: product)
             case .profile:

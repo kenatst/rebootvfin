@@ -70,6 +70,7 @@
 		093D5F0A36D25FBC318D2CF7 /* DeviceActivityMonitorDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EB49221AA555E4904107F6B /* DeviceActivityMonitorDataSource.swift */; };
 		591E266FCF600B9EC766004F /* ShieldConfigurationExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 14C8C96450CDC5AB23DC9488 /* ShieldConfigurationExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C0186F0BE3A2B43BAEE1CD02 /* DeviceActivityMonitorExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 44247DB7F317C90753A2D25F /* DeviceActivityMonitorExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		9A0000000000000000000001 /* REBOOTTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000002 /* REBOOTTests.swift */; };
 	/* End PBXBuildFile section */
 
 	/* Begin PBXContainerItemProxy section */
@@ -87,6 +88,13 @@
 			remoteGlobalIDString = 20483AE6F93A9E760D2C2872;
 			remoteInfo = DeviceActivityMonitorExtension;
 		};
+		9A0000000000000000000004 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 46F86FAA6BBF9AC94A7E4595 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4E28A19C9BE33B80EA8912FF;
+			remoteInfo = REBOOT;
+		};
 	/* End PBXContainerItemProxy section */
 
 	/* Begin PBXTargetDependency section */
@@ -99,6 +107,11 @@
 			isa = PBXTargetDependency;
 			target = 20483AE6F93A9E760D2C2872 /* DeviceActivityMonitorExtension */;
 			targetProxy = BADCBA594DD6A9B56A49DA34 /* PBXContainerItemProxy */;
+		};
+		9A0000000000000000000005 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4E28A19C9BE33B80EA8912FF /* REBOOT */;
+			targetProxy = 9A0000000000000000000004 /* PBXContainerItemProxy */;
 		};
 	/* End PBXTargetDependency section */
 
@@ -174,6 +187,8 @@
 		790F122BAC078323AF3AC2E6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E7BD56B9BEF90815FC798FB1 /* DeviceActivityMonitorExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = DeviceActivityMonitorExtension.entitlements; sourceTree = "<group>"; };
 		6EB49221AA555E4904107F6B /* DeviceActivityMonitorDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceActivityMonitorDataSource.swift; sourceTree = "<group>"; };
+		9A0000000000000000000002 /* REBOOTTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = REBOOTTests.swift; sourceTree = "<group>"; };
+		9A0000000000000000000003 /* REBOOTTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = REBOOTTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 	/* End PBXFileReference section */
 
 	/* Begin PBXGroup section */
@@ -181,6 +196,7 @@
 			isa = PBXGroup;
 			children = (
 				1B64AD7E8A8DAAB00C6B661B /* REBOOT */,
+				9A0000000000000000000006 /* REBOOTTests */,
 				2988E5D8F15CE36D04E76C8E /* ShieldConfigurationExtension */,
 				DC859ACDFC883E98C5BA15B4 /* DeviceActivityMonitorExtension */,
 				86024CAD1E83101D97359D73 /* Products */,
@@ -193,6 +209,7 @@
 				6EB217A58DDE83AA01E37A79 /* REBOOT.app */,
 				14C8C96450CDC5AB23DC9488 /* ShieldConfigurationExtension.appex */,
 				44247DB7F317C90753A2D25F /* DeviceActivityMonitorExtension.appex */,
+				9A0000000000000000000003 /* REBOOTTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -423,6 +440,14 @@
 			path = DeviceActivityMonitorExtension;
 			sourceTree = "<group>";
 		};
+		9A0000000000000000000006 /* REBOOTTests */ = {
+			isa = PBXGroup;
+			children = (
+				9A0000000000000000000002 /* REBOOTTests.swift */,
+			);
+			path = REBOOTTests;
+			sourceTree = "<group>";
+		};
 	/* End PBXGroup section */
 
 	/* Begin PBXCopyFilesBuildPhase section */
@@ -470,6 +495,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		79BCC8CB66312B6697ECC075 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9A0000000000000000000009 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -548,6 +580,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9A0000000000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9A0000000000000000000001 /* REBOOTTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 	/* End PBXSourcesBuildPhase section */
 
 	/* Begin PBXFrameworksBuildPhase section */
@@ -566,6 +606,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		0A65D6B562BFBE2B80756874 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9A0000000000000000000008 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -629,6 +676,24 @@
 			productReference = 44247DB7F317C90753A2D25F /* DeviceActivityMonitorExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		9A000000000000000000000A /* REBOOTTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9A000000000000000000000D /* Build configuration list for PBXNativeTarget "REBOOTTests" */;
+			buildPhases = (
+				9A0000000000000000000007 /* Sources */,
+				9A0000000000000000000008 /* Frameworks */,
+				9A0000000000000000000009 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				9A0000000000000000000005 /* PBXTargetDependency */,
+			);
+			name = REBOOTTests;
+			productName = REBOOTTests;
+			productReference = 9A0000000000000000000003 /* REBOOTTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 	/* End PBXNativeTarget section */
 
 	/* Begin PBXProject section */
@@ -648,6 +713,10 @@
 					20483AE6F93A9E760D2C2872 = {
 						CreatedOnToolsVersion = 15.0;
 					};
+					9A000000000000000000000A = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = 4E28A19C9BE33B80EA8912FF;
+					};
 				};
 			};
 			buildConfigurationList = 1E2EF4F27A9C5D42CF8A02FE /* Build configuration list for PBXProject "REBOOT" */;
@@ -666,6 +735,7 @@
 				4E28A19C9BE33B80EA8912FF /* REBOOT */,
 				1F72699EE546ACCAD7A90F22 /* ShieldConfigurationExtension */,
 				20483AE6F93A9E760D2C2872 /* DeviceActivityMonitorExtension */,
+				9A000000000000000000000A /* REBOOTTests */,
 			);
 		};
 	/* End PBXProject section */
@@ -846,6 +916,44 @@
 			};
 			name = Release;
 		};
+		9A000000000000000000000B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kenatst.rebootTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = (iphoneos, iphonesimulator);
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/REBOOT.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/REBOOT";
+			};
+			name = Debug;
+		};
+		9A000000000000000000000C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kenatst.rebootTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = (iphoneos, iphonesimulator);
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/REBOOT.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/REBOOT";
+			};
+			name = Release;
+		};
 	/* End XCBuildConfiguration section */
 
 	/* Begin XCConfigurationList section */
@@ -881,6 +989,15 @@
 			buildConfigurations = (
 				DF63E21BAA24C0D19E7E4DD4 /* Debug */,
 				BA0264C2E230C91CD75D7AC6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9A000000000000000000000D /* Build configuration list for PBXNativeTarget "REBOOTTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9A000000000000000000000B /* Debug */,
+				9A000000000000000000000C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

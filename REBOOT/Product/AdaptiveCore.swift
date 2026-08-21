@@ -77,12 +77,14 @@ struct AttentionProfile: Codable, Equatable {
 
 // MARK: - Training Modes
 
-enum TrainingMode: String, Codable, CaseIterable, Equatable {
+enum TrainingMode: String, Codable, CaseIterable, Equatable, Identifiable {
     case stay = "STAY"
     case recall = "RECALL"
     case explain = "EXPLAIN"
     case nothing = "NOTHING"
     case observe = "OBSERVE"
+
+    var id: String { rawValue }
 
     var display: String {
         switch self {
@@ -103,17 +105,230 @@ enum TrainingMode: String, Codable, CaseIterable, Equatable {
         case .observe: return "Baseline"
         }
     }
+
+    var libraryDescription: String {
+        switch self {
+        case .stay: return "Hold one task."
+        case .recall: return "Read. Close. Reconstruct."
+        case .explain: return "Learn. Close. Teach."
+        case .nothing: return "No new stimulus."
+        case .observe: return "Notice before reacting."
+        }
+    }
+
+    var trains: String {
+        switch self {
+        case .stay: return "Sustaining attention and returning after a switch."
+        case .recall: return "Bringing material back without keeping it visible."
+        case .explain: return "Turning material into an idea you can teach."
+        case .nothing: return "Tolerating a short period without new input."
+        case .observe: return "Noticing the moment attention changes direction."
+        }
+    }
+
+    var freeDurations: [Int] {
+        switch self {
+        case .stay: return [10, 15, 20, 30, 45]
+        case .recall: return [10, 15, 20, 30]
+        case .explain: return [10, 15, 20, 30]
+        case .nothing: return [3, 5, 10]
+        case .observe: return [5, 10, 15]
+        }
+    }
+
+    var usesStrictTimer: Bool {
+        self == .stay || self == .nothing || self == .observe
+    }
 }
 
 // MARK: - Session
 
+enum SessionOrigin: String, Codable, CaseIterable, Equatable {
+    case `protocol`
+    case freeTraining
+    case flow
+    case experiment
+
+    var advancesProgram: Bool { self == .protocol }
+}
+
+enum FirstSwitchTiming: String, Codable, CaseIterable, Equatable {
+    case underFive
+    case fiveToTen
+    case tenToTwenty
+    case twentyPlus
+    case notSure
+
+    var label: String {
+        switch self {
+        case .underFive: return "Under 5 min"
+        case .fiveToTen: return "5–10 min"
+        case .tenToTwenty: return "10–20 min"
+        case .twentyPlus: return "20+ min"
+        case .notSure: return "Not sure"
+        }
+    }
+
+    static func from(legacyMinute: Int?) -> FirstSwitchTiming? {
+        guard let legacyMinute else { return nil }
+        if legacyMinute < 5 { return .underFive }
+        if legacyMinute < 10 { return .fiveToTen }
+        if legacyMinute < 20 { return .tenToTwenty }
+        return .twentyPlus
+    }
+}
+
+enum RecallSelfAssessment: String, Codable, Equatable {
+    case little
+    case some
+    case most
+}
+
+enum ExplanationMethod: String, Codable, Equatable {
+    case spoken
+    case written
+}
+
+enum ExplanationSelfAssessment: String, Codable, Equatable {
+    case yes
+    case partly
+    case notYet
+}
+
+enum NothingDifficulty: String, Codable, Equatable {
+    case urgeToCheck
+    case restlessness
+    case thoughts
+    case nothingInParticular
+}
+
+struct StayEvidence: Codable, Equatable {
+    var task: String
+    var completionDefinition: String?
+    var switchTimestamps: [Int] = []
+    var firstSwitchTiming: FirstSwitchTiming?
+    var returnNote: String?
+}
+
+struct RecallEvidence: Codable, Equatable {
+    var source: String
+    var reconstruction: String
+    var selfAssessment: RecallSelfAssessment?
+    var missedIdea: String?
+}
+
+struct ExplainEvidence: Codable, Equatable {
+    var topic: String
+    var source: String?
+    var method: ExplanationMethod?
+    var response: String?
+    var selfAssessment: ExplanationSelfAssessment?
+    var breakdown: String?
+}
+
+struct NothingEvidence: Codable, Equatable {
+    var difficulty: NothingDifficulty?
+}
+
+struct ObserveEvidence: Codable, Equatable {
+    var mission: String
+    var observation: String?
+    var firstSwitchTiming: FirstSwitchTiming?
+}
+
+struct SessionEvidence: Codable, Equatable {
+    var stay: StayEvidence?
+    var recall: RecallEvidence?
+    var explain: ExplainEvidence?
+    var nothing: NothingEvidence?
+    var observe: ObserveEvidence?
+}
+
+enum EnvironmentPreparationOutcome: String, Codable, Equatable {
+    case pending
+    case completed
+    case fallback
+    case declined
+}
+
+struct EnvironmentPreparation: Codable, Equatable {
+    var action: String
+    var fallback: String?
+    var outcome: EnvironmentPreparationOutcome
+    var arm: SessionEnvironmentArm?
+
+    var actionWasDone: Bool? {
+        switch outcome {
+        case .completed, .fallback: return true
+        case .declined: return false
+        case .pending: return nil
+        }
+    }
+}
+
+struct TrainingSessionRequest: Codable, Identifiable, Equatable {
+    var id = UUID()
+    var origin: SessionOrigin
+    var mode: TrainingMode
+    var programDay: Int?
+    var targetMinutes: Int
+    var goal: String
+    var task: String?
+    var completionDefinition: String?
+    var source: String?
+    var topic: String?
+    var observationMission: String?
+    var environmentPreparation: EnvironmentPreparation?
+    var createdAt = Date()
+
+    static func protocolRequest(
+        prescription: DailyPrescription,
+        day: Int,
+        environmentPreparation: EnvironmentPreparation?
+    ) -> TrainingSessionRequest {
+        TrainingSessionRequest(
+            origin: .protocol,
+            mode: prescription.mode,
+            programDay: day,
+            targetMinutes: prescription.minutes,
+            goal: prescription.goal,
+            observationMission: prescription.mode == .observe ? "Work normally." : nil,
+            environmentPreparation: environmentPreparation
+        )
+    }
+
+    static func freeTraining(mode: TrainingMode) -> TrainingSessionRequest {
+        TrainingSessionRequest(
+            origin: .freeTraining,
+            mode: mode,
+            programDay: nil,
+            targetMinutes: mode.freeDurations.first ?? 10,
+            goal: mode.libraryDescription,
+            observationMission: mode == .observe ? ObservationMission.all.first : nil,
+            environmentPreparation: nil
+        )
+    }
+}
+
+enum ObservationMission {
+    static let all = [
+        "Notice what you reach for when attention breaks.",
+        "Notice the moment you decide to switch tasks.",
+        "Notice what happens just before you unlock your phone.",
+        "Notice what makes returning easier.",
+    ]
+}
+
 struct SessionRecord: Codable, Identifiable, Equatable {
     var id = UUID()
+    var origin: SessionOrigin = .protocol
+    var requestID: UUID?
     var day: Int
     var date: Date
     var mode: TrainingMode
     var targetMinutes: Int
     var actualMinutes: Int
+    var elapsedSeconds: Int = 0
     var completed: Bool
     var endedEarly: Bool = false
     var firstDistraction: String?
@@ -125,8 +340,108 @@ struct SessionRecord: Codable, Identifiable, Equatable {
     /// Minutes into the session when the first switch was noticed, if remembered.
     var firstSwitchMinute: Int?
 
+    /// Categorical estimate preserves the precision the user actually supplied.
+    var firstSwitchTiming: FirstSwitchTiming?
+
+    var evidence: SessionEvidence?
+
     /// What actually happened in the digital environment during the session.
     var environment: EnvironmentSnapshot?
+
+    init(
+        id: UUID = UUID(),
+        origin: SessionOrigin = .protocol,
+        requestID: UUID? = nil,
+        day: Int,
+        date: Date,
+        mode: TrainingMode,
+        targetMinutes: Int,
+        actualMinutes: Int,
+        elapsedSeconds: Int = 0,
+        completed: Bool,
+        endedEarly: Bool = false,
+        firstDistraction: String? = nil,
+        switches: Int? = nil,
+        difficulty: Int? = nil,
+        energy: Int? = nil,
+        environmentActionDone: Bool? = nil,
+        firstSwitchMinute: Int? = nil,
+        firstSwitchTiming: FirstSwitchTiming? = nil,
+        evidence: SessionEvidence? = nil,
+        environment: EnvironmentSnapshot? = nil
+    ) {
+        self.id = id
+        self.origin = origin
+        self.requestID = requestID
+        self.day = day
+        self.date = date
+        self.mode = mode
+        self.targetMinutes = targetMinutes
+        self.actualMinutes = actualMinutes
+        self.elapsedSeconds = elapsedSeconds
+        self.completed = completed
+        self.endedEarly = endedEarly
+        self.firstDistraction = firstDistraction
+        self.switches = switches
+        self.difficulty = difficulty
+        self.energy = energy
+        self.environmentActionDone = environmentActionDone
+        self.firstSwitchMinute = firstSwitchMinute
+        self.firstSwitchTiming = firstSwitchTiming ?? FirstSwitchTiming.from(legacyMinute: firstSwitchMinute)
+        self.evidence = evidence
+        self.environment = environment
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, origin, requestID, day, date, mode, targetMinutes, actualMinutes
+        case elapsedSeconds, completed, endedEarly, firstDistraction, switches, difficulty
+        case energy, environmentActionDone, firstSwitchMinute, firstSwitchTiming, evidence, environment
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        origin = try values.decodeIfPresent(SessionOrigin.self, forKey: .origin) ?? .protocol
+        requestID = try values.decodeIfPresent(UUID.self, forKey: .requestID)
+        day = try values.decode(Int.self, forKey: .day)
+        date = try values.decode(Date.self, forKey: .date)
+        mode = try values.decode(TrainingMode.self, forKey: .mode)
+        targetMinutes = try values.decode(Int.self, forKey: .targetMinutes)
+        actualMinutes = try values.decode(Int.self, forKey: .actualMinutes)
+        elapsedSeconds = try values.decodeIfPresent(Int.self, forKey: .elapsedSeconds) ?? actualMinutes * 60
+        completed = try values.decode(Bool.self, forKey: .completed)
+        endedEarly = try values.decodeIfPresent(Bool.self, forKey: .endedEarly) ?? false
+        firstDistraction = try values.decodeIfPresent(String.self, forKey: .firstDistraction)
+        switches = try values.decodeIfPresent(Int.self, forKey: .switches)
+        difficulty = try values.decodeIfPresent(Int.self, forKey: .difficulty)
+        energy = try values.decodeIfPresent(Int.self, forKey: .energy)
+        environmentActionDone = try values.decodeIfPresent(Bool.self, forKey: .environmentActionDone)
+        firstSwitchMinute = try values.decodeIfPresent(Int.self, forKey: .firstSwitchMinute)
+        firstSwitchTiming = try values.decodeIfPresent(FirstSwitchTiming.self, forKey: .firstSwitchTiming)
+            ?? FirstSwitchTiming.from(legacyMinute: firstSwitchMinute)
+        evidence = try values.decodeIfPresent(SessionEvidence.self, forKey: .evidence)
+        environment = try values.decodeIfPresent(EnvironmentSnapshot.self, forKey: .environment)
+    }
+
+    var targetReached: Bool {
+        elapsedSeconds >= targetMinutes * 60
+    }
+}
+
+struct SessionReflection: Equatable {
+    var difficulty: Int
+    var energy: Int? = nil
+    var firstDistraction: String? = nil
+    var switches: Int? = nil
+    var firstSwitchTiming: FirstSwitchTiming? = nil
+    var startedEasier: Bool? = nil
+    var protectionExitReason: String? = nil
+    var recallAssessment: RecallSelfAssessment? = nil
+    var missedIdea: String? = nil
+    var explanationAssessment: ExplanationSelfAssessment? = nil
+    var explanationBreakdown: String? = nil
+    var nothingDifficulty: NothingDifficulty? = nil
+    var observation: String? = nil
 }
 
 // MARK: - Prescription
@@ -304,8 +619,8 @@ enum PrescriptionEngine {
         let focus = profile.focusWindowMinutes ?? 15
         let last = sessions.last
 
-        // 1. Baseline
-        if sessions.isEmpty {
+        // 1. Day 1 remains the natural baseline until one protocol baseline is complete.
+        if day == 1, !sessions.contains(where: { $0.day == 1 && $0.completed }) {
             return baseline(day: day, focus: focus)
         }
 
@@ -513,8 +828,8 @@ enum ProfileUpdater {
     static func apply(session: SessionRecord, sessionCount: Int, to profile: inout AttentionProfile) {
         let src: EvidenceSource = sessionCount >= 2 ? .repeated : .session
 
-        // Stability: inferred from switches + difficulty
-        if let switches = session.switches {
+        // Switch counts are useful evidence even when a session ended early.
+        if let switches = session.switches, session.mode == .stay || session.mode == .observe {
             let level: StabilityLevel = switches <= 1 ? .high : (switches <= 3 ? .medium : .low)
             if let current = profile.attentionStability.value {
                 let merged = merge(current, with: level)
@@ -524,15 +839,17 @@ enum ProfileUpdater {
             }
         }
 
-        // Reflex: first distraction presence
-        if let first = session.firstDistraction, first != "none" {
+        if let first = session.firstDistraction,
+           first != "none",
+           session.mode == .stay || session.mode == .observe {
             if let current = profile.reflex.value {
                 let merged = current == .high || session.switches ?? 0 >= 4 ? ReflexLevel.high : current
                 profile.reflex = .known(merged, source: src)
             } else {
                 profile.reflex = .known(session.switches ?? 0 >= 4 ? .high : .medium, source: src)
             }
-        } else if session.firstDistraction == "none" {
+        } else if session.firstDistraction == "none",
+                  session.mode == .stay || session.mode == .observe {
             if let current = profile.reflex.value {
                 profile.reflex = .known(current == .low ? .low : .medium, source: src)
             } else {
@@ -540,9 +857,11 @@ enum ProfileUpdater {
             }
         }
 
-        // Return: completed with few switches → fair/strong
-        if session.completed {
-            let level: ReturnLevel = (session.switches ?? 9) <= 1 ? .strong : ((session.switches ?? 9) <= 4 ? .fair : .weak)
+        // Return is only inferred when switching was actually reported.
+        if session.completed,
+           let switches = session.switches,
+           session.mode == .stay || session.mode == .observe {
+            let level: ReturnLevel = switches <= 1 ? .strong : (switches <= 4 ? .fair : .weak)
             if let current = profile.returnAfterDistraction.value {
                 profile.returnAfterDistraction = .known(merge(current, with: level), source: src)
             } else {
@@ -550,8 +869,8 @@ enum ProfileUpdater {
             }
         }
 
-        // Depth: completed + low difficulty suggests fair depth
-        if let difficulty = session.difficulty, session.completed {
+        // Difficulty is not a universal depth score. Restrict this signal to STAY.
+        if let difficulty = session.difficulty, session.completed, session.mode == .stay {
             let level: DepthLevel = difficulty <= 2 ? .deep : (difficulty <= 3 ? .fair : .shallow)
             if let current = profile.depth.value {
                 profile.depth = .known(merge(current, with: level), source: src)
@@ -560,16 +879,24 @@ enum ProfileUpdater {
             }
         }
 
-        // Recall: a completed RECALL session is real evidence
-        if session.mode == .recall, session.completed {
-            profile.recall = .known(.fair, source: src)
+        if session.mode == .recall,
+           session.completed,
+           let assessment = session.evidence?.recall?.selfAssessment {
+            let level: RecallLevel
+            switch assessment {
+            case .little: level = .weak
+            case .some: level = .fair
+            case .most: level = sessionCount >= 2 ? .strong : .fair
+            }
+            profile.recall = .known(level, source: src)
         }
 
-        // Focus window: actual duration is observed evidence
-        if let window = profile.focusWindowMinutes {
-            profile.focusWindowMinutes = max(window, session.actualMinutes)
-        } else {
-            profile.focusWindowMinutes = session.actualMinutes
+        if session.completed, session.actualMinutes > 0 {
+            if let window = profile.focusWindowMinutes {
+                profile.focusWindowMinutes = max(window, session.actualMinutes)
+            } else {
+                profile.focusWindowMinutes = session.actualMinutes
+            }
         }
     }
 
@@ -612,7 +939,9 @@ enum InsightEngine {
             }
         }
 
-        let earlySwitches = sessions.filter { ($0.firstSwitchMinute ?? 99) <= 5 }
+        let earlySwitches = sessions.filter {
+            $0.firstSwitchTiming == .underFive || ($0.firstSwitchMinute ?? 99) < 5
+        }
         if earlySwitches.count >= 2, sessions.count >= 2 {
             out.append("Your first switches usually happen early.")
         }
