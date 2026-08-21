@@ -90,7 +90,9 @@ struct SessionPreparationView: View {
         case .recall: return "What do you want to remember?"
         case .explain: return "What are you learning?"
         case .nothing: return "For a few minutes, add nothing."
-        case .observe: return request.origin == .protocol ? "Work normally." : "Choose what to notice."
+        case .observe:
+            if request.origin == .protocol, request.programDay == 1 { return "Work normally." }
+            return request.origin == .protocol ? "Notice one real condition." : "Choose what to notice."
         }
     }
 
@@ -127,7 +129,13 @@ struct SessionPreparationView: View {
         case .observe:
             if request.origin == .protocol {
                 PaperCard(radius: 26, padding: 20) {
-                    Text("Do one normal focus block. Nothing about your environment needs to change.", style: .heroGoal)
+                    Text(
+                        request.observationMission
+                            ?? (request.programDay == 1
+                                ? "Do one normal focus block. Nothing about your environment needs to change."
+                                : "Notice what happens just before attention changes direction."),
+                        style: .heroGoal
+                    )
                         .foregroundStyle(AppColors.ink)
                 }
             } else {

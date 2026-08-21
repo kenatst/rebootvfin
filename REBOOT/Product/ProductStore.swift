@@ -6,6 +6,9 @@ enum ProductPhase: Equatable {
     case running(SessionRecord)
     case recovery(SessionRecord)
     case done(SessionRecord)
+    case weeklyReview(Int)
+    case phaseTransition(ProgramPhaseID)
+    case programCompletion
 }
 
 enum ProductTab: String, CaseIterable, Identifiable {
@@ -30,14 +33,15 @@ enum ProductTab: String, CaseIterable, Identifiable {
 final class ProductStore: ObservableObject {
     @Published var profile: AttentionProfile
     @Published private(set) var sessions: [SessionRecord]
-    @Published private(set) var day: Int
+    @Published private(set) var programState: ProgramState
     @Published private(set) var environmentPreparation: EnvironmentPreparation?
     @Published var tab: ProductTab = .today
     @Published var phase: ProductPhase = .today
 
     var onObservationSaved: ((EnvironmentObservation) -> Void)?
 
-    private static let storageKey = "reboot.product.v3"
+    private static let storageKey = "reboot.product.v4"
+    private static let v3StorageKey = "reboot.product.v3"
     private static let v2StorageKey = "reboot.product.v2"
     private static let v1StorageKey = "reboot.product.v1"
     private let defaults: UserDefaults
@@ -46,15 +50,42 @@ final class ProductStore: ObservableObject {
     var protocolSessions: [SessionRecord] { sessions.filter { $0.origin == .protocol } }
     var freeTrainingSessions: [SessionRecord] { sessions.filter { $0.origin == .freeTraining } }
     var completedProtocolSessions: [SessionRecord] { protocolSessions.filter(\.completed) }
-
-    var prescription: DailyPrescription {
-        PrescriptionEngine.prescription(profile: profile, sessions: protocolSessions, day: day)
+    var completedProtocolDays: Int {
+        min(90, Set(completedProtocolSessions.map(\.day).filter { (1...90).contains($0) }).count)
+    }
+    var programProgress: Double { Double(completedProtocolDays) / 90.0 }
+    var day: Int { programState.currentDay }
+    var programStatus: ProgramStatus { programState.status }
+    var currentProgramDefinition: ProgramDayDefinition {
+        CurriculumEngine.definition(
+            for: day,
+            profile: profile,
+            protocolHistory: protocolSessions,
+            reviews: programState.reviews
+        )
+    }
+    var currentProgramPhase: ProgramPhase { currentProgramDefinition.phase }
+    var programInsights: [ProgramInsight] { ProgramInsightEngine.insights(from: protocolSessions) }
+    var nextCheckpointDay: Int? {
+        ProgramCheckpointSchedule.nextCheckpointDay(after: completedProtocolDays)
+    }
+    var sessionsUntilNextCheckpoint: Int? {
+        ProgramCheckpointSchedule.sessionsUntilNextCheckpoint(after: completedProtocolDays)
     }
 
-    var isCalibrating: Bool { completedProtocolSessions.count < 3 }
+    var prescription: DailyPrescription {
+        PrescriptionEngine.prescription(
+            profile: profile,
+            sessions: protocolSessions,
+            day: day,
+            reviews: programState.reviews
+        )
+    }
+
+    var isCalibrating: Bool { completedProtocolDays < 3 }
 
     var hasCompletedCurrentProtocol: Bool {
-        protocolSessions.contains { $0.day == day && $0.completed }
+        programStatus == .completed || protocolSessions.contains { $0.day == day && $0.completed }
     }
 
     var insights: [String] {
@@ -75,18 +106,21 @@ final class ProductStore: ObservableObject {
         if let stored = loaded.state {
             profile = stored.profile
             sessions = stored.sessions
-            day = min(90, max(1, stored.day))
+            programState = stored.programState
             environmentPreparation = stored.preparation
             if let active = stored.activeSession {
                 phase = .recovery(active)
             }
             if loaded.migrated {
                 persist()
+                defaults.removeObject(forKey: Self.v3StorageKey)
+                defaults.removeObject(forKey: Self.v2StorageKey)
+                defaults.removeObject(forKey: Self.v1StorageKey)
             }
         } else {
             profile = ProfileBuilder.build(from: diagnosisAnswers)
             sessions = []
-            day = 1
+            programState = .fresh
             environmentPreparation = nil
             persist()
         }
@@ -108,6 +142,9 @@ final class ProductStore: ObservableObject {
             prepareFreeTraining(qaMode)
         }
 #endif
+        if case .today = phase {
+            routePendingProgramFlow()
+        }
     }
 
     // MARK: - QA seeding
@@ -115,7 +152,11 @@ final class ProductStore: ObservableObject {
     func apply(_ seed: QASeed) {
         if let profile = seed.profile { self.profile = profile }
         if let sessions = seed.sessions { self.sessions = sessions }
-        if let day = seed.day { self.day = min(90, max(1, day)) }
+        if let programState = seed.programState {
+            self.programState = programState
+        } else if let day = seed.day {
+            self.programState = .migrated(day: day, sessions: seed.sessions ?? sessions)
+        }
         switch seed.phase {
         case "running":
             if let record = seed.record { phase = .running(record) }
@@ -125,6 +166,9 @@ final class ProductStore: ObservableObject {
             phase = .today
         }
         tab = .today
+        if case .today = phase {
+            routePendingProgramFlow()
+        }
     }
 
     private static func loadQASeed() -> QASeed? {
@@ -138,11 +182,13 @@ final class ProductStore: ObservableObject {
     // MARK: - Canonical session requests
 
     func protocolRequest() -> TrainingSessionRequest? {
-        guard !hasCompletedCurrentProtocol else { return nil }
+        guard programStatus == .active,
+              !programState.hasPendingRequiredFlow,
+              !hasCompletedCurrentProtocol else { return nil }
         return .protocolRequest(
             prescription: prescription,
             day: day,
-            environmentPreparation: environmentPreparation
+            environmentPreparation: day == 1 ? nil : environmentPreparation
         )
     }
 
@@ -165,7 +211,7 @@ final class ProductStore: ObservableObject {
     }
 
     func setEnvironmentPreparation(_ preparation: EnvironmentPreparation?) {
-        environmentPreparation = preparation
+        environmentPreparation = day == 1 ? nil : preparation
         persist()
     }
 
@@ -175,14 +221,32 @@ final class ProductStore: ObservableObject {
     }
 
     func begin(request: TrainingSessionRequest, environment arm: SessionEnvironmentArm? = nil) {
+        var request = request
         if request.origin == .protocol {
-            guard request.programDay == day, !hasCompletedCurrentProtocol else { return }
+            guard programStatus == .active,
+                  !programState.hasPendingRequiredFlow,
+                  request.programDay == day,
+                  !hasCompletedCurrentProtocol else { return }
+            if day == 1 {
+                let requestID = request.id
+                let createdAt = request.createdAt
+                request = .protocolRequest(
+                    prescription: prescription,
+                    day: 1,
+                    environmentPreparation: nil
+                )
+                request.id = requestID
+                request.createdAt = createdAt
+            }
         }
 
-        let capturedPreparation = request.origin == .protocol
-            ? (request.environmentPreparation ?? environmentPreparation)
-            : request.environmentPreparation
-        let capturedArm = arm ?? capturedPreparation?.arm
+        let isNaturalBaseline = request.origin == .protocol && request.programDay == 1
+        let capturedPreparation = isNaturalBaseline
+            ? nil
+            : (request.origin == .protocol
+                ? (request.environmentPreparation ?? environmentPreparation)
+                : request.environmentPreparation)
+        let capturedArm = isNaturalBaseline ? nil : (arm ?? capturedPreparation?.arm)
         var evidence = SessionEvidence()
         switch request.mode {
         case .stay:
@@ -213,7 +277,10 @@ final class ProductStore: ObservableObject {
             actualMinutes: 0,
             completed: false,
             environmentActionDone: capturedPreparation?.actionWasDone,
-            evidence: evidence
+            evidence: evidence,
+            programPhase: request.programPhase,
+            curriculumIntent: request.curriculumIntent,
+            adaptationReason: request.adaptationReason
         )
         if let capturedArm {
             record.environment = EnvironmentSnapshot(
@@ -320,8 +387,12 @@ final class ProductStore: ObservableObject {
 
     func saveDoneSession(_ reflection: SessionReflection) {
         guard case .done(var record) = phase else { return }
-        guard !sessions.contains(where: { $0.id == record.id }) else {
-            phase = .today
+        let alreadySaved = sessions.contains { saved in
+            saved.id == record.id
+                || (record.requestID != nil && saved.requestID == record.requestID)
+        }
+        guard !alreadySaved else {
+            routePendingProgramFlow()
             return
         }
 
@@ -362,10 +433,15 @@ final class ProductStore: ObservableObject {
         }
         record.evidence = evidence
 
-        sessions.append(record)
-        if record.origin.advancesProgram, record.completed, record.day == day, day < 90 {
-            day += 1
+        if record.origin.advancesProgram, record.completed {
+            let outcome = programState.registerCompletedProtocolSession(id: record.id, day: record.day)
+            guard outcome != .ignored else {
+                routePendingProgramFlow()
+                return
+            }
         }
+
+        sessions.append(record)
 
         if let observation = EnvironmentObservationFactory.observation(from: record) {
             EnvironmentUpdater.apply(session: record, observation: observation, to: &profile.environmentEvidence)
@@ -377,7 +453,59 @@ final class ProductStore: ObservableObject {
         environmentPreparation = nil
         tab = record.origin == .freeTraining ? .train : .today
         persist(activeSession: nil)
+        if record.origin == .freeTraining || !record.completed {
+            phase = .today
+        } else {
+            routePendingProgramFlow()
+        }
+    }
+
+    func saveWeeklyReview(_ answers: WeeklyReviewAnswers) {
+        guard case .weeklyReview(let checkpointDay) = phase,
+              programState.pendingReviewDay == checkpointDay else { return }
+        let insights = ProgramInsightEngine.insights(
+            from: protocolSessions.filter { $0.day <= checkpointDay }
+        )
+        .map(\.text)
+        let review = WeeklyReviewRecord(
+            programDay: checkpointDay,
+            date: Date(),
+            shownInsights: Array(insights.prefix(2)),
+            answers: answers
+        )
+        programState.recordReview(review)
+        persist(activeSession: nil)
+        routePendingProgramFlow()
+    }
+
+    func skipWeeklyReviewQuestions() {
+        saveWeeklyReview(.empty)
+    }
+
+    func acknowledgePhaseTransition() {
+        guard case .phaseTransition(let phaseID) = phase else { return }
+        programState.acknowledgePhaseTransition(phaseID)
+        persist(activeSession: nil)
+        routePendingProgramFlow()
+    }
+
+    func acknowledgeProgramCompletion() {
+        guard case .programCompletion = phase else { return }
+        programState.acknowledgeCompletion()
+        persist(activeSession: nil)
         phase = .today
+    }
+
+    private func routePendingProgramFlow() {
+        if let reviewDay = programState.pendingReviewDay {
+            phase = .weeklyReview(reviewDay)
+        } else if let transition = programState.pendingPhaseTransition {
+            phase = .phaseTransition(transition)
+        } else if programState.pendingCompletion {
+            phase = .programCompletion
+        } else {
+            phase = .today
+        }
     }
 
     /// Compatibility wrapper for deterministic QA seeds.
@@ -392,7 +520,8 @@ final class ProductStore: ObservableObject {
         protectionExitReason: String? = nil
     ) {
         if case .done(var record) = phase {
-            record.environmentActionDone = environmentActionDone
+            let isNaturalBaseline = record.origin == .protocol && record.day == 1
+            record.environmentActionDone = isNaturalBaseline ? nil : environmentActionDone
             record.firstSwitchMinute = firstSwitchMinute
             record.firstSwitchTiming = FirstSwitchTiming.from(legacyMinute: firstSwitchMinute)
             phase = .done(record)
@@ -443,7 +572,7 @@ final class ProductStore: ObservableObject {
     func reset() {
         profile = AttentionProfile()
         sessions = []
-        day = 1
+        programState = .fresh
         environmentPreparation = nil
         tab = .today
         phase = .today
@@ -465,6 +594,7 @@ final class ProductStore: ObservableObject {
             "profile": (try? JSONEncoder().encode(profile)) ?? Data(),
             "sessions": (try? JSONEncoder().encode(sessions)) ?? Data(),
             "day": day,
+            "programState": (try? JSONEncoder().encode(programState)) ?? Data(),
             "preparation": (try? JSONEncoder().encode(environmentPreparation)) ?? Data(),
             "activeSession": (try? JSONEncoder().encode(active)) ?? Data(),
         ]
@@ -474,25 +604,47 @@ final class ProductStore: ObservableObject {
     private typealias StoredState = (
         profile: AttentionProfile,
         sessions: [SessionRecord],
-        day: Int,
+        programState: ProgramState,
         preparation: EnvironmentPreparation?,
         activeSession: SessionRecord?
     )
 
     private static func load(defaults: UserDefaults) -> (state: StoredState?, migrated: Bool) {
-        if let state = decode(from: storageKey, defaults: defaults, includesV3Fields: true) {
-            return (state, false)
+        if defaults.object(forKey: storageKey) != nil {
+            return (decodeV4(defaults: defaults), false)
         }
-        if let state = decode(from: v2StorageKey, defaults: defaults, includesV3Fields: false) {
+        if let state = decodeLegacy(from: v3StorageKey, defaults: defaults, includesV3Fields: true) {
             return (state, true)
         }
-        if let state = decode(from: v1StorageKey, defaults: defaults, includesV3Fields: false) {
+        if let state = decodeLegacy(from: v2StorageKey, defaults: defaults, includesV3Fields: false) {
+            return (state, true)
+        }
+        if let state = decodeLegacy(from: v1StorageKey, defaults: defaults, includesV3Fields: false) {
             return (state, true)
         }
         return (nil, false)
     }
 
-    private static func decode(
+    private static func decodeV4(defaults: UserDefaults) -> StoredState? {
+        guard let raw = defaults.dictionary(forKey: storageKey),
+              let profileData = raw["profile"] as? Data,
+              let sessionsData = raw["sessions"] as? Data,
+              let programData = raw["programState"] as? Data,
+              let profile = try? JSONDecoder().decode(AttentionProfile.self, from: profileData),
+              let sessions = try? JSONDecoder().decode([SessionRecord].self, from: sessionsData),
+              let programState = try? JSONDecoder().decode(ProgramState.self, from: programData) else {
+            return nil
+        }
+        let preparation = (raw["preparation"] as? Data).flatMap {
+            try? JSONDecoder().decode(EnvironmentPreparation?.self, from: $0)
+        } ?? nil
+        let active = (raw["activeSession"] as? Data).flatMap {
+            try? JSONDecoder().decode(SessionRecord?.self, from: $0)
+        } ?? nil
+        return (profile, sessions, programState, preparation, active)
+    }
+
+    private static func decodeLegacy(
         from key: String,
         defaults: UserDefaults,
         includesV3Fields: Bool
@@ -517,7 +669,14 @@ final class ProductStore: ObservableObject {
             preparation = nil
             active = nil
         }
-        return (profile, sessions, (raw["day"] as? Int) ?? 1, preparation, active)
+        let legacyDay = (raw["day"] as? Int) ?? 1
+        return (
+            profile,
+            sessions,
+            ProgramState.migrated(day: legacyDay, sessions: sessions),
+            preparation,
+            active
+        )
     }
 
     private func timing(forElapsedSeconds elapsed: Int) -> FirstSwitchTiming {

@@ -13,7 +13,7 @@ struct ProgressRing: View {
             Circle()
                 .stroke(AppColors.hairline, lineWidth: lineWidth)
             Circle()
-                .trim(from: 0, to: max(0.004, min(1, progress)))
+                .trim(from: 0, to: max(0, min(1, progress)))
                 .stroke(
                     progress > 0 ? AppColors.coral : AppColors.inkFaint.opacity(0.5),
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)

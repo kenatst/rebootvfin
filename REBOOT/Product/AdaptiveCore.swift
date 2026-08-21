@@ -279,6 +279,9 @@ struct TrainingSessionRequest: Codable, Identifiable, Equatable {
     var topic: String?
     var observationMission: String?
     var environmentPreparation: EnvironmentPreparation?
+    var programPhase: ProgramPhaseID?
+    var curriculumIntent: CurriculumIntentKind?
+    var adaptationReason: String?
     var createdAt = Date()
 
     static func protocolRequest(
@@ -292,8 +295,13 @@ struct TrainingSessionRequest: Codable, Identifiable, Equatable {
             programDay: day,
             targetMinutes: prescription.minutes,
             goal: prescription.goal,
-            observationMission: prescription.mode == .observe ? "Work normally." : nil,
-            environmentPreparation: environmentPreparation
+            observationMission: prescription.mode == .observe
+                ? (prescription.observationMission ?? "Work normally.")
+                : nil,
+            environmentPreparation: environmentPreparation,
+            programPhase: prescription.programPhase,
+            curriculumIntent: prescription.curriculumIntent,
+            adaptationReason: prescription.adaptationReason
         )
     }
 
@@ -345,6 +353,11 @@ struct SessionRecord: Codable, Identifiable, Equatable {
 
     var evidence: SessionEvidence?
 
+    /// Curriculum context captured when the protocol request was created.
+    var programPhase: ProgramPhaseID?
+    var curriculumIntent: CurriculumIntentKind?
+    var adaptationReason: String?
+
     /// What actually happened in the digital environment during the session.
     var environment: EnvironmentSnapshot?
 
@@ -368,6 +381,9 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         firstSwitchMinute: Int? = nil,
         firstSwitchTiming: FirstSwitchTiming? = nil,
         evidence: SessionEvidence? = nil,
+        programPhase: ProgramPhaseID? = nil,
+        curriculumIntent: CurriculumIntentKind? = nil,
+        adaptationReason: String? = nil,
         environment: EnvironmentSnapshot? = nil
     ) {
         self.id = id
@@ -389,13 +405,17 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         self.firstSwitchMinute = firstSwitchMinute
         self.firstSwitchTiming = firstSwitchTiming ?? FirstSwitchTiming.from(legacyMinute: firstSwitchMinute)
         self.evidence = evidence
+        self.programPhase = programPhase
+        self.curriculumIntent = curriculumIntent
+        self.adaptationReason = adaptationReason
         self.environment = environment
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, origin, requestID, day, date, mode, targetMinutes, actualMinutes
         case elapsedSeconds, completed, endedEarly, firstDistraction, switches, difficulty
-        case energy, environmentActionDone, firstSwitchMinute, firstSwitchTiming, evidence, environment
+        case energy, environmentActionDone, firstSwitchMinute, firstSwitchTiming, evidence
+        case programPhase, curriculumIntent, adaptationReason, environment
     }
 
     init(from decoder: Decoder) throws {
@@ -420,6 +440,9 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         firstSwitchTiming = try values.decodeIfPresent(FirstSwitchTiming.self, forKey: .firstSwitchTiming)
             ?? FirstSwitchTiming.from(legacyMinute: firstSwitchMinute)
         evidence = try values.decodeIfPresent(SessionEvidence.self, forKey: .evidence)
+        programPhase = try values.decodeIfPresent(ProgramPhaseID.self, forKey: .programPhase)
+        curriculumIntent = try values.decodeIfPresent(CurriculumIntentKind.self, forKey: .curriculumIntent)
+        adaptationReason = try values.decodeIfPresent(String.self, forKey: .adaptationReason)
         environment = try values.decodeIfPresent(EnvironmentSnapshot.self, forKey: .environment)
     }
 
@@ -460,6 +483,12 @@ struct DailyPrescription: Codable, Equatable {
     var adaptationReason: String
     /// Optional environment intervention (friction ladder 0–4).
     var environmentAction: EnvironmentAction?
+    var programPhase: ProgramPhaseID? = nil
+    var curriculumIntent: CurriculumIntentKind? = nil
+    var curriculumReason: String? = nil
+    var recentEvidenceReason: String? = nil
+    var observationMission: String? = nil
+    var requiresEnvironmentPreparation: Bool = true
 
     static let empty = DailyPrescription(
         day: 1,
@@ -612,188 +641,378 @@ enum ProfileBuilder {
 // MARK: - Prescription Engine
 
 enum PrescriptionEngine {
-    static func prescription(profile: AttentionProfile, sessions: [SessionRecord], day: Int) -> DailyPrescription {
-        let day = min(day, 90)
-        let goal = profile.primaryGoal.value
-        let distractors = profile.distractors.value ?? []
-        let focus = profile.focusWindowMinutes ?? 15
-        let last = sessions.last
-
-        // 1. Day 1 remains the natural baseline until one protocol baseline is complete.
-        if day == 1, !sessions.contains(where: { $0.day == 1 && $0.completed }) {
-            return baseline(day: day, focus: focus)
-        }
-
-        // 2. Recovery after a hard session (never twice in a row)
-        let previousWasRest = sessions.dropLast().last?.mode == .nothing
-        if let difficulty = last?.difficulty, difficulty >= 4, !previousWasRest {
-            return rest(day: day)
-        }
-
-        // 3. Memory goals rotate between RECALL / EXPLAIN / STAY
-        let memoryGoals: Set<String> = ["read_more", "remember_more", "study_better"]
-        if let goal, memoryGoals.contains(goal) {
-            return memoryPrescription(goal: goal, profile: profile, sessions: sessions, day: day)
-        }
-
-        // 4. Distraction-led STAY with environment change
-        if !distractors.isEmpty {
-            return stayPrescription(profile: profile, sessions: sessions, day: day, distractors: distractors)
-        }
-
-        // 5. Flow goal
-        if goal == "build_flow" {
-            return flowPrescription(profile: profile, sessions: sessions, day: day)
-        }
-
-        // 6. Default STAY
-        return stayPrescription(profile: profile, sessions: sessions, day: day, distractors: [])
+    static func prescription(
+        profile: AttentionProfile,
+        sessions: [SessionRecord],
+        day: Int,
+        reviews: [WeeklyReviewRecord] = []
+    ) -> DailyPrescription {
+        let definition = CurriculumEngine.definition(
+            for: day,
+            profile: profile,
+            protocolHistory: sessions,
+            reviews: reviews
+        )
+        return prescription(
+            profile: profile,
+            protocolHistory: sessions,
+            definition: definition,
+            reviews: reviews
+        )
     }
 
-    private static func baseline(day: Int, focus: Int) -> DailyPrescription {
-        DailyPrescription(
-            day: day,
+    static func prescription(
+        profile: AttentionProfile,
+        protocolHistory: [SessionRecord],
+        definition: ProgramDayDefinition,
+        reviews: [WeeklyReviewRecord] = []
+    ) -> DailyPrescription {
+        if definition.day == 1,
+           !protocolHistory.contains(where: { $0.day == 1 && $0.completed }) {
+            return baseline(definition: definition)
+        }
+
+        if let last = protocolHistory.last,
+           last.mode != .nothing,
+           last.endedEarly || (last.difficulty ?? 0) >= 4 {
+            return recovery(profile: profile, history: protocolHistory, definition: definition)
+        }
+
+        let mode = selectMode(
+            profile: profile,
+            history: protocolHistory,
+            definition: definition,
+            reviews: reviews
+        )
+        return makePrescription(
+            mode: mode,
+            profile: profile,
+            history: protocolHistory,
+            definition: definition
+        )
+    }
+
+    private static func baseline(definition: ProgramDayDefinition) -> DailyPrescription {
+        return DailyPrescription(
+            day: 1,
             mode: .observe,
             minutes: 15,
             headline: "Work normally.",
-            sentence: "We're measuring how you work today — nothing to change yet.",
+            sentence: "Notice what happens before changing the conditions.",
             goal: "One normal focus block.",
             reason: "A real baseline comes before any change.",
             action: "Work normally today — this is your baseline.",
             actionFallback: "If you can't work normally, just do 5 focused minutes.",
             environmentChange: nil,
-            adaptationReason: "No sessions yet — first observation.",
+            adaptationReason: "Day 1 protects a natural baseline before any intervention.",
             environmentAction: nil,
+            programPhase: definition.phase.id,
+            curriculumIntent: definition.intent.kind,
+            curriculumReason: definition.intent.editorialReason,
+            recentEvidenceReason: "No protocol evidence exists yet.",
+            observationMission: definition.intent.observationMission,
+            requiresEnvironmentPreparation: false
         )
     }
 
-    private static func rest(day: Int) -> DailyPrescription {
-        DailyPrescription(
-            day: day,
+    private static func recovery(
+        profile: AttentionProfile,
+        history: [SessionRecord],
+        definition: ProgramDayDefinition
+    ) -> DailyPrescription {
+        let recommendation = AdaptiveDurationEngine.recommendation(
             mode: .nothing,
-            minutes: 10,
+            profile: profile,
+            protocolHistory: history,
+            phase: definition.phase
+        )
+        return DailyPrescription(
+            day: definition.day,
+            mode: .nothing,
+            minutes: recommendation.minutes,
             headline: "Give your mind less to react to.",
-            sentence: "Yesterday felt hard. Recovery is part of the plan.",
+            sentence: "Your last session felt hard. Recovery is still real protocol work.",
             goal: "A short, easy block.",
-            reason: "Your last session was demanding — we're lowering the load.",
-            action: "A short walk, or 10 easy minutes on one thing.",
+            reason: "The last protocol attempt was demanding, so the load is lower today.",
+            action: "Choose a quiet place with no new input.",
             actionFallback: "If even that feels like too much, skip it — the program waits.",
             environmentChange: nil,
-            adaptationReason: "Difficulty ≥ 4 on the previous session.",
-            environmentAction: nil
+            adaptationReason: "Recovery override from the most recent protocol evidence.",
+            environmentAction: nil,
+            programPhase: definition.phase.id,
+            curriculumIntent: .tolerateLessStimulus,
+            curriculumReason: definition.intent.editorialReason,
+            recentEvidenceReason: "The last protocol session was difficult or ended early.",
+            observationMission: nil,
+            requiresEnvironmentPreparation: false
         )
     }
 
-    private static func memoryPrescription(goal: String, profile: AttentionProfile, sessions: [SessionRecord], day: Int) -> DailyPrescription {
-        let focus = profile.focusWindowMinutes ?? 15
-        let slot = day % 3
-        let recallKnown = profile.recall.isKnown
-        let recall = profile.recall.value
-
-        // EXPLAIN once recall has a fair footing and on slot 2.
-        if slot == 2, sessions.count >= 3, recall != .weak {
-            return DailyPrescription(
-                day: day,
-                mode: .explain,
-                minutes: focus,
-                headline: "Explain it simply.",
-                sentence: "Teaching it out loud is the fastest way to keep it.",
-                goal: "Explain one idea from what you're studying.",
-                reason: "You wanted to hold on to more — explaining builds memory.",
-                action: "After the block, explain one idea out loud for 2 minutes.",
-                actionFallback: "If explaining feels strange, write three sentences instead.",
-                environmentChange: environmentChange(for: profile),
-                adaptationReason: "Memory goal + three completed sessions.",
-                environmentAction: nil
-            )
-        }
-
-        if slot == 1 || !recallKnown || recall == .weak {
-            return DailyPrescription(
-                day: day,
-                mode: .recall,
-                minutes: focus,
-                headline: "Close it. Recall it.",
-                sentence: "Finishing is only half of memory — bringing it back is the rest.",
-                goal: "Read, then recall without looking.",
-                reason: "You told us recall matters most to you right now.",
-                action: "Close the source and write down what you remember.",
-                actionFallback: "If nothing comes back, one sentence is enough.",
-                environmentChange: environmentChange(for: profile),
-                adaptationReason: "Primary goal targets reading and memory.",
-                environmentAction: nil
-            )
-        }
-
-        return stayPrescription(profile: profile, sessions: sessions, day: day, distractors: profile.distractors.value ?? [])
+    private static func makePrescription(
+        mode: TrainingMode,
+        profile: AttentionProfile,
+        history: [SessionRecord],
+        definition: ProgramDayDefinition
+    ) -> DailyPrescription {
+        let duration = AdaptiveDurationEngine.recommendation(
+            mode: mode,
+            profile: profile,
+            protocolHistory: history,
+            phase: definition.phase
+        )
+        let copy = copy(for: mode, profile: profile, minutes: duration.minutes, definition: definition)
+        let environment = environmentPlan(
+            mode: mode,
+            profile: profile,
+            minutes: duration.minutes,
+            phase: definition.phase
+        )
+        return DailyPrescription(
+            day: definition.day,
+            mode: mode,
+            minutes: duration.minutes,
+            headline: copy.headline,
+            sentence: copy.sentence,
+            goal: copy.goal,
+            reason: copy.reason,
+            action: environment.action,
+            actionFallback: environment.fallback,
+            environmentChange: environmentChange(for: profile),
+            adaptationReason: adaptationReason(duration.reason, definition: definition),
+            environmentAction: environment.environmentAction,
+            programPhase: definition.phase.id,
+            curriculumIntent: definition.intent.kind,
+            curriculumReason: definition.intent.editorialReason,
+            recentEvidenceReason: recentEvidenceReason(profile: profile, history: history),
+            observationMission: definition.intent.observationMission,
+            requiresEnvironmentPreparation:
+                definition.phase.environmentIntensity.rawValue >= ProgramEnvironmentIntensity.intentional.rawValue
+                    && mode != .observe
+                    && mode != .nothing
+        )
     }
 
-    private static func stayPrescription(profile: AttentionProfile, sessions: [SessionRecord], day: Int, distractors: [String]) -> DailyPrescription {
-        let focus = profile.focusWindowMinutes ?? 15
-        let reflex = profile.reflex.value
-        let stability = profile.attentionStability.value
+    private static func selectMode(
+        profile: AttentionProfile,
+        history: [SessionRecord],
+        definition: ProgramDayDefinition,
+        reviews: [WeeklyReviewRecord]
+    ) -> TrainingMode {
+        if definition.intent.kind == .naturalBaseline { return .observe }
+        var candidates = definition.phase.allowedModes
+        if candidates.isEmpty { candidates = TrainingMode.allCases }
+        var scores = Dictionary(uniqueKeysWithValues: candidates.map { ($0, 0) })
+
+        addPreference(definition.phase.preferredModes, weight: 5, to: &scores)
+        addPreference(definition.intent.preferredModes, weight: 8, to: &scores)
+
+        let goal = profile.primaryGoal.value ?? ""
+        let memoryGoals: Set<String> = ["read_more", "remember_more", "study_better"]
+        let controlGoals: Set<String> = ["scroll_less", "phone_less"]
+        if memoryGoals.contains(goal) {
+            scores[.recall, default: 0] += 16
+            scores[.explain, default: 0] += 8
+            scores[.stay, default: 0] += 4
+        } else if controlGoals.contains(goal) {
+            scores[.stay, default: 0] += 12
+            scores[.observe, default: 0] += 5
+            scores[.nothing, default: 0] += 3
+        } else if goal == "deep_work" || goal == "focus_better" {
+            scores[.stay, default: 0] += 12
+            scores[.observe, default: 0] += 3
+            scores[.explain, default: 0] += goal == "deep_work" ? 3 : 0
+        } else if goal == "build_flow" {
+            scores[.stay, default: 0] += 10
+            scores[.observe, default: 0] += 9
+        }
+
+        if profile.recall.value == .weak || (memoryGoals.contains(goal) && !profile.recall.isKnown) {
+            scores[.recall, default: 0] += 5
+        }
+        if profile.depth.value == .shallow, definition.phase.id == .deepen {
+            scores[.explain, default: 0] += 5
+        }
+        if !(profile.distractors.value ?? []).isEmpty {
+            scores[.stay, default: 0] += 4
+        }
+
+        if let preference = reviews.last?.answers.nextTestPreference?.lowercased() {
+            if preference.contains("memory") || preference.contains("recall") || preference.contains("read") {
+                scores[.recall, default: 0] += 3
+            } else if preference.contains("phone") || preference.contains("switch") {
+                scores[.stay, default: 0] += 3
+            } else if preference.contains("explain") || preference.contains("understand") {
+                scores[.explain, default: 0] += 3
+            }
+        }
+
+        let recentModes = history.filter(\.completed).suffix(5).map(\.mode)
+        for mode in candidates {
+            scores[mode, default: 0] -= recentModes.filter { $0 == mode }.count * 3
+            if recentModes.last == mode { scores[mode, default: 0] -= 2 }
+            if recentModes.suffix(3).allSatisfy({ $0 == mode }), recentModes.count >= 3 {
+                scores[mode, default: 0] -= 9
+            }
+        }
+
+        let deterministicOrder = definition.intent.preferredModes
+            + definition.phase.preferredModes
+            + TrainingMode.allCases
+        return candidates.max { lhs, rhs in
+            let left = scores[lhs, default: Int.min]
+            let right = scores[rhs, default: Int.min]
+            if left == right {
+                return order(lhs, in: deterministicOrder) > order(rhs, in: deterministicOrder)
+            }
+            return left < right
+        } ?? .stay
+    }
+
+    private static func addPreference(
+        _ modes: [TrainingMode],
+        weight: Int,
+        to scores: inout [TrainingMode: Int]
+    ) {
+        for (index, mode) in modes.enumerated() where scores[mode] != nil {
+            scores[mode, default: 0] += max(1, weight - index)
+        }
+    }
+
+    private static func order(_ mode: TrainingMode, in modes: [TrainingMode]) -> Int {
+        modes.firstIndex(of: mode) ?? modes.count
+    }
+
+    private struct PrescriptionCopy {
+        var headline: String
+        var sentence: String
+        var goal: String
+        var reason: String
+    }
+
+    private static func copy(
+        for mode: TrainingMode,
+        profile: AttentionProfile,
+        minutes: Int,
+        definition: ProgramDayDefinition
+    ) -> PrescriptionCopy {
+        let phaseTitle = definition.phase.title.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        let primaryGoal = profile.primaryGoal.value.flatMap { DiagnosisModels.goalLabel[$0] }
+        let reason = primaryGoal.map { "This supports your goal to \($0.lowercased())." }
+            ?? "This fits the current phase without inventing a score."
+        switch mode {
+        case .stay:
+            return PrescriptionCopy(
+                headline: profile.returnAfterDistraction.value == .weak ? "Practice the return." : "Stay with one thing.",
+                sentence: "In \(phaseTitle), continuity matters more than a perfect block.",
+                goal: "Hold one meaningful task for \(minutes) minutes.",
+                reason: reason
+            )
+        case .recall:
+            return PrescriptionCopy(
+                headline: "Close it. Bring it back.",
+                sentence: "Use real material, hide it, then reconstruct what remains.",
+                goal: "Read, close, and recall without looking.",
+                reason: reason
+            )
+        case .explain:
+            return PrescriptionCopy(
+                headline: "Explain the idea simply.",
+                sentence: "Understanding becomes clearer when the source is no longer visible.",
+                goal: "Teach one useful idea in your own words.",
+                reason: reason
+            )
+        case .nothing:
+            return PrescriptionCopy(
+                headline: "Add nothing for a moment.",
+                sentence: "A short period without new input is enough for today's test.",
+                goal: "Spend \(minutes) minutes without adding stimulus.",
+                reason: "This phase sometimes tests what happens when there is less to react to."
+            )
+        case .observe:
+            return PrescriptionCopy(
+                headline: definition.intent.kind == .observeFlowCondition ? "Notice the conditions." : "Notice before changing it.",
+                sentence: definition.intent.observationMission ?? "Observe one real moment without turning it into a score.",
+                goal: definition.intent.observationMission ?? "Notice what changes attention's direction.",
+                reason: reason
+            )
+        }
+    }
+
+    private struct EnvironmentPlan {
+        var action: String
+        var fallback: String
+        var environmentAction: EnvironmentAction?
+    }
+
+    private static func environmentPlan(
+        mode: TrainingMode,
+        profile: AttentionProfile,
+        minutes: Int,
+        phase: ProgramPhase
+    ) -> EnvironmentPlan {
+        let distractors = profile.distractors.value ?? []
         let top = topDistractor(distractors, profile: profile)
-        let env = profile.environmentEvidence
-        let level = FrictionLadder.chooseLevel(env: env, distractorKnown: !distractors.isEmpty)
-        let environmentAction = EnvironmentActionFactory.action(
+        guard phase.environmentIntensity.rawValue >= ProgramEnvironmentIntensity.intentional.rawValue,
+              mode != .nothing,
+              mode != .observe else {
+            return EnvironmentPlan(
+                action: "Keep the setup simple and honest.",
+                fallback: "Start with the conditions you have.",
+                environmentAction: nil
+            )
+        }
+        let level = FrictionLadder.chooseLevel(
+            env: profile.environmentEvidence,
+            distractorKnown: !distractors.isEmpty
+        )
+        let action = EnvironmentActionFactory.action(
             level: level,
             topDistractor: top,
-            minutes: focus,
-            env: env
+            minutes: minutes,
+            env: profile.environmentEvidence
         )
-
-        let headline: String
-        let sentence: String
-        let reason: String
-        if reflex == .high || stability == .low {
-            headline = "Make switching harder."
-            sentence = "The urge to switch is strongest at the start — we're making it expensive."
-            reason = "You reported a short focus window and frequent switching."
-        } else if sessions.count >= 2, profile.returnAfterDistraction.value == .weak {
-            headline = "Return faster."
-            sentence = "Distraction happens — the skill is coming back quickly."
-            reason = "Returning after distraction is still the weakest link."
-        } else {
-            headline = "Stay with it."
-            sentence = "One task, one block, no rearrangement."
-            reason = "Sustained attention is the foundation of everything else."
-        }
-
-        let action = top.flatMap { Distractor.action(for: $0) } ?? Distractor.action(for: Distractor.internalRestlessness)
-        let fallback = top.flatMap { Distractor.fallback(for: $0) } ?? Distractor.fallback(for: Distractor.internalRestlessness)
-
-        return DailyPrescription(
-            day: day,
-            mode: .stay,
-            minutes: focus,
-            headline: headline,
-            sentence: sentence,
-            goal: "Hold one task for \(focus) minutes.",
-            reason: reason,
-            action: action,
-            actionFallback: fallback,
-            environmentChange: environmentChange(for: profile),
-            adaptationReason: "STAY prescription driven by goal, distractors and observed stability.",
-            environmentAction: environmentAction
+        return EnvironmentPlan(
+            action: action?.title ?? top.map { Distractor.action(for: $0) } ?? "Put one clear task in front of you.",
+            fallback: top.map { Distractor.fallback(for: $0) } ?? "If the setup cannot change, begin with one clear task.",
+            environmentAction: action
         )
     }
 
-    private static func flowPrescription(profile: AttentionProfile, sessions: [SessionRecord], day: Int) -> DailyPrescription {
-        let focus = profile.focusWindowMinutes ?? 20
-        return DailyPrescription(
-            day: day,
-            mode: .stay,
-            minutes: focus,
-            headline: "Find the seam.",
-            sentence: "You lose track of time in the right conditions — today we look for them.",
-            goal: "One block in your best conditions.",
-            reason: "You want Flow — first we find where it already happens.",
-            action: "Set up the conditions you told us absorb you.",
-            actionFallback: "If the conditions aren't available, pick the closest hour.",
-            environmentChange: environmentChange(for: profile),
-            adaptationReason: "Flow goal — mapping absorption conditions.",
-            environmentAction: nil
-        )
+    private static func adaptationReason(
+        _ durationReason: AdaptiveDurationReason,
+        definition: ProgramDayDefinition
+    ) -> String {
+        let duration: String
+        switch durationReason {
+        case .baseline: duration = "The natural baseline stays fixed."
+        case .diagnosedWindow: duration = "Duration starts from the reported focus window."
+        case .repeatedComfort: duration = "Comparable sessions supported one bounded increase."
+        case .repeatedDifficulty: duration = "Repeated difficulty supported a lighter duration."
+        case .lowEnergy: duration = "Repeated low-energy reports supported a lighter duration."
+        case .heldForEvidence: duration = "Duration is held while comparable evidence accumulates."
+        }
+        return "\(definition.phase.title) \(duration)"
+    }
+
+    private static func recentEvidenceReason(
+        profile: AttentionProfile,
+        history: [SessionRecord]
+    ) -> String {
+        if let last = history.last, last.endedEarly {
+            return "The most recent protocol attempt ended early."
+        }
+        if history.suffix(2).allSatisfy({
+            $0.completed && !$0.endedEarly && ($0.difficulty ?? 3) <= 2
+        }), history.count >= 2 {
+            return "Two recent protocol sessions were reported as manageable."
+        }
+        if profile.recall.value == .weak {
+            return "Recall remains a supported weak area."
+        }
+        if !(profile.distractors.value ?? []).isEmpty {
+            return "Known distractors still inform the setup."
+        }
+        return "The curriculum is holding the load until more comparable evidence exists."
     }
 
     private static func topDistractor(_ distractors: [String], profile: AttentionProfile) -> String? {

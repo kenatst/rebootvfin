@@ -251,7 +251,7 @@ struct SessionDoneView: View {
     private var learned: some View {
         VStack(alignment: .leading, spacing: 0) {
             MetaLabel(text: "Evidence saved honestly", color: AppColors.coral)
-            EditorialHeadline(text: record?.completed == true ? "What happens next can change." : "The same day waits for you.")
+            EditorialHeadline(text: learnedTitle)
                 .padding(.top, 16)
             Text(learnedCopy, style: .todaySentence)
                 .foregroundStyle(AppColors.inkSoft)
@@ -267,7 +267,21 @@ struct SessionDoneView: View {
         guard let record else { return "Unknown stays unknown." }
         if !record.completed { return "This attempt is saved, but it does not advance the 90-day program." }
         if record.origin == .freeTraining { return "This practice can inform your profile, but your program day does not move." }
+        if record.day == 90 { return "Day 90 completes the program once. No Day 91 will be created." }
+        if ProgramCheckpointSchedule.isWeeklyCheckpoint(record.day) {
+            return "This completed protocol day advances once, then opens a short review."
+        }
         return "This completed protocol session advances the program by exactly one day."
+    }
+
+    private var learnedTitle: String {
+        guard let record else { return "What happens next can change." }
+        if !record.completed { return "The same day waits for you." }
+        if record.origin == .protocol, record.day == 90 { return "The program is complete." }
+        if record.origin == .protocol, ProgramCheckpointSchedule.isWeeklyCheckpoint(record.day) {
+            return "A short review comes next."
+        }
+        return "What happens next can change."
     }
 
     private func save() {

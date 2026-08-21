@@ -31,8 +31,20 @@ struct AdaptiveDisclosureSheet: View {
                         EditorialHeadline(text: prescription.headline)
                             .padding(.top, 18)
 
+                        sectionLabel("Current phase")
+                        Text(
+                            prescription.curriculumReason ?? product.currentProgramPhase.description,
+                            style: .heroGoal
+                        )
+                        .foregroundStyle(AppColors.ink)
+                        .padding(.top, 8)
+
                         sectionLabel("What REBOOT noticed")
-                        Text(prescription.reason, style: .heroGoal)
+                            .padding(.top, 22)
+                        Text(
+                            prescription.recentEvidenceReason ?? prescription.reason,
+                            style: .heroGoal
+                        )
                             .foregroundStyle(AppColors.ink)
                             .padding(.top, 8)
 
@@ -76,6 +88,7 @@ struct AdaptiveDisclosureSheet: View {
     }
 
     private var environmentNote: String? {
+        guard prescription.requiresEnvironmentPreparation else { return nil }
         let env = product.profile.environmentEvidence
         let distractor = product.profile.distractors.value?.first.map {
             switch $0 {

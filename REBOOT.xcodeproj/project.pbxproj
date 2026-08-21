@@ -71,6 +71,8 @@
 		591E266FCF600B9EC766004F /* ShieldConfigurationExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 14C8C96450CDC5AB23DC9488 /* ShieldConfigurationExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C0186F0BE3A2B43BAEE1CD02 /* DeviceActivityMonitorExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 44247DB7F317C90753A2D25F /* DeviceActivityMonitorExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9A0000000000000000000001 /* REBOOTTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000002 /* REBOOTTests.swift */; };
+		9B0000000000000000000001 /* ProgramCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0000000000000000000002 /* ProgramCore.swift */; };
+		9B0000000000000000000003 /* ProgramViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0000000000000000000004 /* ProgramViews.swift */; };
 	/* End PBXBuildFile section */
 
 	/* Begin PBXContainerItemProxy section */
@@ -189,6 +191,8 @@
 		6EB49221AA555E4904107F6B /* DeviceActivityMonitorDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceActivityMonitorDataSource.swift; sourceTree = "<group>"; };
 		9A0000000000000000000002 /* REBOOTTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = REBOOTTests.swift; sourceTree = "<group>"; };
 		9A0000000000000000000003 /* REBOOTTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = REBOOTTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		9B0000000000000000000002 /* ProgramCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramCore.swift; sourceTree = "<group>"; };
+		9B0000000000000000000004 /* ProgramViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramViews.swift; sourceTree = "<group>"; };
 	/* End PBXFileReference section */
 
 	/* Begin PBXGroup section */
@@ -298,6 +302,15 @@
 			path = Today;
 			sourceTree = "<group>";
 		};
+		9B0000000000000000000005 /* Program */ = {
+			isa = PBXGroup;
+			children = (
+				9B0000000000000000000002 /* ProgramCore.swift */,
+				9B0000000000000000000004 /* ProgramViews.swift */,
+			);
+			path = Program;
+			sourceTree = "<group>";
+		};
 		82CF3496F1A9FE790BD48616 /* Product */ = {
 			isa = PBXGroup;
 			children = (
@@ -305,6 +318,7 @@
 				CB8CDC008E8A32094A461287,
 				DD155ACEB803E4EC937AEFFB,
 				575972E876006934E9B5B1AC,
+				9B0000000000000000000005 /* Program */,
 				03327B4BB8B671204EF7BD05,
 				81FA6CF8148788D830F5E88A,
 				920284D85A96422B151973C1,
@@ -537,6 +551,8 @@
 				77F617EFF000250930958AD1 /* EnvironmentStore.swift in Sources */,
 				A40A0268EE1E05456D74E8FB /* ScreenTimeConnectFlow.swift in Sources */,
 				C5CE1792824D71C7837EBF2A /* AdaptiveCore.swift in Sources */,
+				9B0000000000000000000001 /* ProgramCore.swift in Sources */,
+				9B0000000000000000000003 /* ProgramViews.swift in Sources */,
 				91EF2CCF54D98AC6AFA0ACA0 /* ProductStore.swift in Sources */,
 				214B397E915C917076B0DEA2 /* QASeed.swift in Sources */,
 				DA352BF5FA05264D878B63BD /* FloatingGlassTabBar.swift in Sources */,

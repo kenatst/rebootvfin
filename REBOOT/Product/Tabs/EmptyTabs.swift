@@ -190,42 +190,6 @@ private struct ModeIntroductionSheet: View {
     }
 }
 
-// MARK: - Program
-
-struct ProgramTab: View {
-    let product: ProductStore
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                AmbientBackground()
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        MetaLabel(text: "Program", color: AppColors.coral)
-                        EditorialHeadline(text: "90 days, built around you.")
-                            .padding(.top, 6)
-                        Text(
-                            "Every session updates what comes next. The program map arrives with the next step.",
-                            style: .todaySentence
-                        )
-                        .foregroundStyle(AppColors.inkSoft)
-
-                        HStack(spacing: 16) {
-                            ProgressRing(progress: Double(product.day) / 90.0, size: 54, lineWidth: 4)
-                            MicroMetric(label: "Day", value: String(format: "%03d / 090", product.day))
-                        }
-                        .padding(.top, 10)
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, max(20, geo.safeAreaInsets.top))
-                    .padding(.bottom, 140)
-                }
-            }
-            .ignoresSafeArea()
-        }
-    }
-}
-
 // MARK: - Profile
 
 /// Real profile data only — unknowns stay unknown, every fact keeps its source.

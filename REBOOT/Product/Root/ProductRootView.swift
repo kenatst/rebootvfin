@@ -23,6 +23,15 @@ struct ProductRootView: View {
             case .done:
                 SessionDoneView(product: product)
                     .transition(.opacity)
+            case .weeklyReview(let checkpointDay):
+                WeeklyReviewView(product: product, checkpointDay: checkpointDay)
+                    .transition(.opacity)
+            case .phaseTransition(let phaseID):
+                ProgramPhaseTransitionView(product: product, phaseID: phaseID)
+                    .transition(.opacity)
+            case .programCompletion:
+                ProgramCompletionView(product: product)
+                    .transition(.opacity)
             }
         }
         .animation(.easeInOut(duration: 0.35), value: product.phase)
@@ -50,7 +59,7 @@ struct ProductRootView: View {
             try? await Task.sleep(for: .seconds(2))
             product.beginSession()
             try? await Task.sleep(for: .seconds(2))
-            product.finishRunning(actualMinutes: 10, endedEarly: false)
+            product.finishRunning(actualMinutes: product.prescription.minutes, endedEarly: false)
             try? await Task.sleep(for: .seconds(2))
             product.saveDoneSession(
                 difficulty: 2,
@@ -58,7 +67,7 @@ struct ProductRootView: View {
                 switches: 1,
                 firstSwitchMinute: nil,
                 energy: 4,
-                environmentActionDone: true
+                environmentActionDone: product.day == 1 ? nil : true
             )
             print("QA-AUTO day=\(product.day) sessions=\(product.sessions.count) mode=\(product.prescription.mode.rawValue) headline=\(product.prescription.headline) stability=\(product.profile.attentionStability.value?.rawValue ?? "unknown") return=\(product.profile.returnAfterDistraction.value?.rawValue ?? "unknown")")
         }

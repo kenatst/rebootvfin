@@ -22,14 +22,18 @@ struct TodayView: View {
                         sentence
                         TodayHero(product: product)
                             .padding(.top, 34)
-                        RealWorldActionCard(product: product, environmentStore: environmentStore)
-                            .padding(.top, 18)
-                        if prescription.mode == .nothing {
-                            resetEntry
-                                .padding(.top, 14)
+                        if product.programStatus == .active {
+                            if prescription.requiresEnvironmentPreparation {
+                                RealWorldActionCard(product: product, environmentStore: environmentStore)
+                                    .padding(.top, 18)
+                            }
+                            if prescription.mode == .nothing {
+                                resetEntry
+                                    .padding(.top, 14)
+                            }
+                            whyPill
+                                .padding(.top, 18)
                         }
-                        whyPill
-                            .padding(.top, 18)
                         microData
                             .padding(.top, 28)
                         insight
@@ -76,24 +80,41 @@ struct TodayView: View {
         HStack(spacing: 12) {
             MetaLabel(text: String(format: "Day %03d / 090", product.day))
             GlassPill(
-                text: product.isCalibrating ? "Calibrating" : prescription.mode.display.uppercased(),
-                tint: product.isCalibrating ? AppColors.coral : AppColors.ink
+                text: product.programStatus == .completed
+                    ? "Complete"
+                    : product.isCalibrating
+                        ? "Calibrating"
+                        : product.currentProgramPhase.title
+                            .trimmingCharacters(in: CharacterSet(charactersIn: ".")),
+                tint: product.programStatus == .completed || product.isCalibrating
+                    ? AppColors.coral
+                    : AppColors.ink
             )
             Spacer()
-            ProgressRing(progress: Double(product.day) / 90.0)
+            ProgressRing(progress: product.programProgress)
+                .accessibilityLabel("\(product.completedProtocolDays) of 90 program days completed")
         }
     }
 
     // MARK: - Headline + sentence
 
     private var headline: some View {
-        EditorialHeadline(text: prescription.headline)
+        EditorialHeadline(
+            text: product.programStatus == .completed
+                ? "90 protocol days complete."
+                : prescription.headline
+        )
             .padding(.top, 24)
             .frame(maxWidth: 360, alignment: .leading)
     }
 
     private var sentence: some View {
-        Text(prescription.sentence, style: .todaySentence)
+        Text(
+            product.programStatus == .completed
+                ? "No Day 91 is generated. Train and your completed program history remain available."
+                : prescription.sentence,
+            style: .todaySentence
+        )
             .foregroundStyle(AppColors.inkSoft)
             .padding(.top, 14)
             .frame(maxWidth: 360, alignment: .leading)
@@ -166,13 +187,22 @@ struct TodayView: View {
     // MARK: - Insight
 
     private var insight: some View {
-        InsightCard(insight: product.insights.first ?? "REBOOT is still learning this.")
+        InsightCard(
+            insight: product.programStatus == .completed
+                ? product.programInsights.first?.text
+                    ?? "Your completed protocol history remains available in Program."
+                : product.insights.first ?? "REBOOT is still learning this."
+        )
     }
 
     // MARK: - Footer
 
     private var footer: some View {
-        Text("What happens today changes what comes next.")
+        Text(
+            product.programStatus == .completed
+                ? "Your completed history remains available in Program."
+                : "What happens today changes what comes next."
+        )
             .type(.footnote)
             .foregroundStyle(AppColors.inkFaint)
             .multilineTextAlignment(.center)
