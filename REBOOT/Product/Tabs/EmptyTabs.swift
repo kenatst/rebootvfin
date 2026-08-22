@@ -244,6 +244,7 @@ struct ProfileTab: View {
     @State private var showAddRule = false
     @State private var selectedLabExperiment: PersonalExperiment?
     @State private var showEnvironmentLab = false
+    @State private var showOperatingManual = false
 
     private var profile: AttentionProfile { product.profile }
     private var isSparse: Bool { product.sessions.count < 3 }
@@ -254,11 +255,11 @@ struct ProfileTab: View {
                 AmbientBackground()
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
-                        MetaLabel(text: "Attention Map", color: AppColors.coral)
-                        EditorialHeadline(text: "What reboot knows.")
+                        MetaLabel(text: "Attention Profile", color: AppColors.coral)
+                        EditorialHeadline(text: "Your Attention Architecture")
                             .padding(.top, 14)
                         Text(
-                            "Only what you've told us and what sessions have shown. Unknown stays unknown.",
+                            "A living personal model of your focus conditions, physical environment, and recovery strategies.",
                             style: .todaySentence
                         )
                         .foregroundStyle(AppColors.inkSoft)
@@ -267,6 +268,23 @@ struct ProfileTab: View {
                         // Hero summary card
                         overviewCard
                             .padding(.top, 24)
+
+                        // Operating Manual Quick Entry
+                        PaperCard(radius: 22, padding: 16) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    MetaLabel(text: "Operating Manual", color: AppColors.coral)
+                                    Text("How your attention operates across 11 key dimensions.")
+                                        .type(.heroReason)
+                                        .foregroundStyle(AppColors.inkSoft)
+                                }
+                                Spacer()
+                                Button { showOperatingManual = true } label: {
+                                    GlassPill(text: "Open", symbol: "book.pages", tint: AppColors.ink)
+                                }
+                            }
+                        }
+                        .padding(.top, 16)
 
                         flowConditionsSection
                             .padding(.top, 32)
@@ -320,6 +338,9 @@ struct ProfileTab: View {
         }
         .sheet(isPresented: $showEnvironmentLab) {
             EnvironmentLabView(product: product, environmentStore: EnvironmentStore())
+        }
+        .sheet(isPresented: $showOperatingManual) {
+            AttentionOperatingManualView(manual: product.operatingManual)
         }
         .onAppear {
             if ProcessInfo.processInfo.arguments.valueAfter("-qaSeed") == "rulesWhyThisRule",

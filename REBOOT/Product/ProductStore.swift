@@ -47,6 +47,8 @@ final class ProductStore: ObservableObject {
     @Published var fuelState: FuelState = .empty
     @Published private(set) var flowState: FlowState = .empty
     @Published var digitalEnvironmentState: DigitalEnvironmentState = .empty
+    @Published var guidanceDecisions: [GuidanceDecision] = []
+    @Published var ownModeState: OwnModeState = OwnModeState()
 
     var onObservationSaved: ((EnvironmentObservation) -> Void)?
 
@@ -97,6 +99,40 @@ final class ProductStore: ObservableObject {
         )
     }
 
+    var dailyGuidance: DailyGuidance {
+        DailyGuidanceEngine.generateGuidance(
+            day: day,
+            programStatus: programStatus,
+            programPhase: currentProgramPhase,
+            profile: profile,
+            sessions: sessions,
+            personalRules: personalRules,
+            labExperiments: labState.experiments,
+            fuelState: fuelState,
+            flowState: flowState,
+            digitalEnvironmentState: digitalEnvironmentState,
+            screenTimeActive: environmentPreparation?.outcome == .completed,
+            screenTimeAuthorized: true,
+            isRecovery: isRecoveryPrescribed,
+            guidanceHistory: guidanceDecisions,
+            ownModeState: ownModeState
+        )
+    }
+
+    var operatingManual: AttentionOperatingManual {
+        AttentionOperatingManualEngine.generateManual(
+            sessions: sessions,
+            interruptionEvents: digitalEnvironmentState.interruptionEvents,
+            personalRules: personalRules,
+            labExperiments: labState.experiments,
+            fuelState: fuelState,
+            flowState: flowState,
+            digitalEnvironmentState: digitalEnvironmentState,
+            profile: profile,
+            reviews: programState.reviews
+        )
+    }
+
     var isCalibrating: Bool { completedProtocolDays < 3 }
 
     var activeExperiment: PersonalExperiment? { labState.activeExperiment }
@@ -133,6 +169,8 @@ final class ProductStore: ObservableObject {
             fuelState = stored.fuelState
             flowState = stored.flowState
             digitalEnvironmentState = stored.digitalEnvironmentState
+            guidanceDecisions = stored.guidanceDecisions
+            ownModeState = stored.ownModeState
             if digitalEnvironmentState.profile.knownDimensionsCount > 0 {
                 profile.digitalEnvironment = digitalEnvironmentState.profile
             }
@@ -172,6 +210,8 @@ final class ProductStore: ObservableObject {
             fuelState = .empty
             flowState = .empty
             digitalEnvironmentState = .empty
+            guidanceDecisions = []
+            ownModeState = OwnModeState()
             persist()
         }
 
@@ -221,6 +261,8 @@ final class ProductStore: ObservableObject {
                 self.profile.digitalEnvironment = digitalState.profile
             }
         }
+        if let decisions = seed.guidanceDecisions { self.guidanceDecisions = decisions }
+        if let ownMode = seed.ownModeState { self.ownModeState = ownMode }
         if let programState = seed.programState {
             self.programState = programState
         } else if let day = seed.day {
@@ -866,8 +908,12 @@ final class ProductStore: ObservableObject {
     }
 
     private var isRecoveryPrescribed: Bool {
-        prescription.mode == .nothing
-            && prescription.adaptationReason.localizedCaseInsensitiveContains("recovery")
+        if let last = protocolSessions.last,
+           last.mode != .nothing,
+           last.endedEarly || (last.difficulty ?? 0) >= 4 {
+            return true
+        }
+        return false
     }
 
     /// The single optional Fuel prompt for today's protocol session, if any.
@@ -2106,7 +2152,7 @@ final class ProductStore: ObservableObject {
         persist(activeSession: nil)
     }
 
-    private func persist(activeSession explicitActive: SessionRecord? = nil) {
+    func persist(activeSession explicitActive: SessionRecord? = nil) {
         let active: SessionRecord?
         let pendingReflection: SessionRecord?
         if let explicitActive {
@@ -2137,6 +2183,8 @@ final class ProductStore: ObservableObject {
             "fuel": (try? JSONEncoder().encode(fuelState)) ?? Data(),
             "flow": (try? JSONEncoder().encode(flowState)) ?? Data(),
             "digitalEnvironment": (try? JSONEncoder().encode(digitalEnvironmentState)) ?? Data(),
+            "guidanceDecisions": (try? JSONEncoder().encode(guidanceDecisions)) ?? Data(),
+            "ownModeState": (try? JSONEncoder().encode(ownModeState)) ?? Data(),
         ]
         defaults.set(payload, forKey: Self.storageKey)
     }
@@ -2151,7 +2199,9 @@ final class ProductStore: ObservableObject {
         labState: PersonalLabState,
         fuelState: FuelState,
         flowState: FlowState,
-        digitalEnvironmentState: DigitalEnvironmentState
+        digitalEnvironmentState: DigitalEnvironmentState,
+        guidanceDecisions: [GuidanceDecision],
+        ownModeState: OwnModeState
     )
 
     private static func load(defaults: UserDefaults) -> (state: StoredState?, migrated: Bool) {
@@ -2182,11 +2232,9 @@ final class ProductStore: ObservableObject {
         return (nil, false)
     }
 
-    /// A corrupt Flow payload degrades independently. The v8 key remains
-    /// authoritative and never rolls back to a stale v7 snapshot.
     private static func decodeV8(defaults: UserDefaults) -> StoredState? {
         guard let raw = defaults.dictionary(forKey: storageKey) else {
-            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty, .empty)
+            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty, .empty, [], OwnModeState())
         }
         let base = decodeCore(raw: raw)
         let fuelState = (raw["fuel"] as? Data).flatMap {
@@ -2198,28 +2246,34 @@ final class ProductStore: ObservableObject {
         let digitalEnvironmentState = (raw["digitalEnvironment"] as? Data).flatMap {
             try? JSONDecoder().decode(DigitalEnvironmentState.self, from: $0)
         } ?? .empty
-        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, fuelState, flowState, digitalEnvironmentState)
+        let guidanceDecisions = (raw["guidanceDecisions"] as? Data).flatMap {
+            try? JSONDecoder().decode([GuidanceDecision].self, from: $0)
+        } ?? []
+        let ownModeState = (raw["ownModeState"] as? Data).flatMap {
+            try? JSONDecoder().decode(OwnModeState.self, from: $0)
+        } ?? OwnModeState()
+        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, fuelState, flowState, digitalEnvironmentState, guidanceDecisions, ownModeState)
     }
 
     /// v7 decode is intentionally field-tolerant for Fuel and supplies a new,
     /// empty Flow state during migration.
     private static func decodeV7(defaults: UserDefaults) -> StoredState? {
         guard let raw = defaults.dictionary(forKey: v7StorageKey) else {
-            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty, .empty)
+            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty, .empty, [], OwnModeState())
         }
         let base = decodeCore(raw: raw)
         let fuelState = (raw["fuel"] as? Data).flatMap {
             try? JSONDecoder().decode(FuelState.self, from: $0)
         } ?? .empty
-        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, fuelState, .empty, .empty)
+        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, fuelState, .empty, .empty, [], OwnModeState())
     }
 
     private static func decodeV6(defaults: UserDefaults, key: String = "reboot.product.v6") -> StoredState? {
         guard let raw = defaults.dictionary(forKey: key) else {
-            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty, .empty)
+            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty, .empty, [], OwnModeState())
         }
         let base = decodeCore(raw: raw)
-        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, .empty, .empty, .empty)
+        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, .empty, .empty, .empty, [], OwnModeState())
     }
 
     /// Shared v6/v7 body: profile, sessions, program, rules, observations,
@@ -2277,18 +2331,18 @@ final class ProductStore: ObservableObject {
 
     private static func decodeV5(defaults: UserDefaults) -> StoredState? {
         guard let raw = defaults.dictionary(forKey: v5StorageKey) else {
-            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty, .empty)
+            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty, .empty, [], OwnModeState())
         }
         let base = decodePreLab(raw: raw)
-        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, .empty, .empty, .empty)
+        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, .empty, .empty, .empty, [], OwnModeState())
     }
 
     private static func decodeV4(from key: String, defaults: UserDefaults) -> StoredState? {
         guard let raw = defaults.dictionary(forKey: key) else {
-            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty, .empty)
+            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty, .empty, [], OwnModeState())
         }
         let base = decodePreLab(raw: raw)
-        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, .empty, .empty, .empty)
+        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, .empty, .empty, .empty, [], OwnModeState())
     }
 
     private static func decodeLegacy(
@@ -2299,10 +2353,12 @@ final class ProductStore: ObservableObject {
         guard let raw = defaults.dictionary(forKey: key),
               let profileData = raw["profile"] as? Data,
               let sessionsData = raw["sessions"] as? Data,
-              let profile = try? JSONDecoder().decode(AttentionProfile.self, from: profileData),
-              let sessions = try? JSONDecoder().decode([SessionRecord].self, from: sessionsData) else {
+              let profile = try? JSONDecoder().decode(AttentionProfile.self, from: profileData) else {
             return nil
         }
+        let sessions = (try? JSONDecoder().decode([SessionRecord].self, from: sessionsData))
+            ?? (try? JSONDecoder().decode([FailableSessionRecord].self, from: sessionsData))?.compactMap(\.value)
+            ?? []
         let preparation: EnvironmentPreparation?
         let active: SessionRecord?
         if includesV3Fields {
@@ -2327,7 +2383,9 @@ final class ProductStore: ObservableObject {
             .empty,
             .empty,
             .empty,
-            .empty
+            .empty,
+            [],
+            OwnModeState()
         )
     }
 

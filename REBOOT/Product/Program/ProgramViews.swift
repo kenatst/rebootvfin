@@ -369,10 +369,15 @@ struct WeeklyReviewView: View {
                             .foregroundStyle(AppColors.inkSoft)
                             .padding(.top, 12)
 
-                        MetaLabel(text: "What changed?")
+                        MetaLabel(text: "THIS WEEK REBOOT LEARNED", color: AppColors.coral)
                             .padding(.top, 30)
                         reviewInsights
                             .padding(.top, 12)
+
+                        MetaLabel(text: "NEXT WEEK'S FOCUS")
+                            .padding(.top, 24)
+                        nextWeekFocusCard
+                            .padding(.top, 10)
 
                         reviewQuestions
                             .padding(.top, 30)
@@ -417,6 +422,22 @@ struct WeeklyReviewView: View {
                             .foregroundStyle(AppColors.ink)
                     }
                 }
+            }
+        }
+    }
+
+    private var nextWeekFocusCard: some View {
+        let nextDay = min(90, checkpointDay + 1)
+        let nextPhase = ProgramPhase.phase(for: nextDay)
+        let topPriority = nextPhase.priorities.first?.title ?? "Sustained Focus"
+        return PaperCard(radius: 20, padding: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(topPriority)
+                    .type(.heroGoal)
+                    .foregroundStyle(AppColors.ink)
+                Text(nextPhase.description)
+                    .type(.heroReason)
+                    .foregroundStyle(AppColors.inkSoft)
             }
         }
     }
@@ -533,6 +554,7 @@ struct ProgramPhaseTransitionView: View {
 
 struct ProgramCompletionView: View {
     @ObservedObject var product: ProductStore
+    @State private var showManual = false
 
     var body: some View {
         GeometryReader { geo in
@@ -542,11 +564,11 @@ struct ProgramCompletionView: View {
                 AmbientBackground()
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
-                        MetaLabel(text: "Program complete", color: AppColors.coral)
-                        EditorialHeadline(text: "90 days complete.")
+                        MetaLabel(text: "Protocol Complete", color: AppColors.coral)
+                        EditorialHeadline(text: "You know your attention now.")
                             .padding(.top, 18)
                         Text(
-                            "The program stops here. Train remains available, and the evidence stays ready for what comes next.",
+                            "90 days did not create a rigid perfection. It built an operating system for how your attention actually works.",
                             style: .todaySentence
                         )
                         .foregroundStyle(AppColors.inkSoft)
@@ -554,19 +576,29 @@ struct ProgramCompletionView: View {
 
                         PaperCard(radius: 26, padding: 20) {
                             VStack(alignment: .leading, spacing: 8) {
-                                MetaLabel(text: "Coming next")
-                                Text("Your Attention Operating Manual", style: .cardTitle)
+                                MetaLabel(text: "Your Operating System")
+                                Text("Attention Operating Manual", style: .cardTitle)
                                     .foregroundStyle(AppColors.ink)
-                                Text("No report is invented here. The next pass can build it from your real protocol history and reviews.", style: .heroReason)
+                                Text("Evidence-backed summaries of how you start, what breaks focus, your digital environment, and your optimal conditions.", style: .heroReason)
                                     .foregroundStyle(AppColors.inkSoft)
                             }
                         }
                         .padding(.top, 30)
 
                         Spacer(minLength: 30)
-                        PrimaryPillButton(title: "Continue", symbol: "checkmark") {
+                        
+                        PrimaryPillButton(title: "Open My Operating Manual", symbol: "book.pages") {
+                            showManual = true
+                        }
+                        .padding(.top, 24)
+
+                        Button("Enter Own Mode") {
                             product.acknowledgeProgramCompletion()
                         }
+                        .type(.smallLink)
+                        .foregroundStyle(AppColors.inkSoft)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 14)
                     }
                     .frame(
                         minHeight: max(0, geo.size.height - topPadding - bottomPadding),
@@ -578,6 +610,9 @@ struct ProgramCompletionView: View {
                 }
             }
             .ignoresSafeArea()
+            .sheet(isPresented: $showManual) {
+                AttentionOperatingManualView(manual: product.operatingManual)
+            }
         }
     }
 }

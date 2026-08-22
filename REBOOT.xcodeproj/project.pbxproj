@@ -89,6 +89,12 @@
 		9F0000000000000000000005 /* FlowViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0000000000000000000006 /* FlowViews.swift */; };
 		9F0000000000000000000007 /* FlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0000000000000000000008 /* FlowTests.swift */; };
 		9E0000000000000000000021 /* DigitalEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E0000000000000000000022 /* DigitalEnvironmentTests.swift */; };
+		9D0000000000000000000081 /* DailyGuidanceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D0000000000000000000082 /* DailyGuidanceModels.swift */; };
+		9D0000000000000000000083 /* DailyGuidanceEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D0000000000000000000084 /* DailyGuidanceEngine.swift */; };
+		9D0000000000000000000085 /* AttentionOperatingManualModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D0000000000000000000086 /* AttentionOperatingManualModels.swift */; };
+		9D0000000000000000000087 /* AttentionOperatingManualEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D0000000000000000000088 /* AttentionOperatingManualEngine.swift */; };
+		9D0000000000000000000089 /* AttentionOperatingManualView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D0000000000000000000090 /* AttentionOperatingManualView.swift */; };
+		9D0000000000000000000091 /* DailyGuidanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D0000000000000000000092 /* DailyGuidanceTests.swift */; };
 	/* End PBXBuildFile section */
 
 	/* Begin PBXContainerItemProxy section */
@@ -225,6 +231,12 @@
 		9F0000000000000000000006 /* FlowViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowViews.swift; sourceTree = "<group>"; };
 		9F0000000000000000000008 /* FlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTests.swift; sourceTree = "<group>"; };
 		9E0000000000000000000022 /* DigitalEnvironmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitalEnvironmentTests.swift; sourceTree = "<group>"; };
+		9D0000000000000000000082 /* DailyGuidanceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyGuidanceModels.swift; sourceTree = "<group>"; };
+		9D0000000000000000000084 /* DailyGuidanceEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyGuidanceEngine.swift; sourceTree = "<group>"; };
+		9D0000000000000000000086 /* AttentionOperatingManualModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionOperatingManualModels.swift; sourceTree = "<group>"; };
+		9D0000000000000000000088 /* AttentionOperatingManualEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionOperatingManualEngine.swift; sourceTree = "<group>"; };
+		9D0000000000000000000090 /* AttentionOperatingManualView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionOperatingManualView.swift; sourceTree = "<group>"; };
+		9D0000000000000000000092 /* DailyGuidanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyGuidanceTests.swift; sourceTree = "<group>"; };
 	/* End PBXFileReference section */
 
 	/* Begin PBXGroup section */
@@ -376,6 +388,25 @@
 			path = Flow;
 			sourceTree = "<group>";
 		};
+		9D0000000000000000000070 /* Guidance */ = {
+			isa = PBXGroup;
+			children = (
+				9D0000000000000000000082 /* DailyGuidanceModels.swift */,
+				9D0000000000000000000084 /* DailyGuidanceEngine.swift */,
+			);
+			path = Guidance;
+			sourceTree = "<group>";
+		};
+		9D0000000000000000000075 /* Manual */ = {
+			isa = PBXGroup;
+			children = (
+				9D0000000000000000000086 /* AttentionOperatingManualModels.swift */,
+				9D0000000000000000000088 /* AttentionOperatingManualEngine.swift */,
+				9D0000000000000000000090 /* AttentionOperatingManualView.swift */,
+			);
+			path = Manual;
+			sourceTree = "<group>";
+		};
 		82CF3496F1A9FE790BD48616 /* Product */ = {
 			isa = PBXGroup;
 			children = (
@@ -387,6 +418,8 @@
 				9C0000000000000000000003 /* PersonalLab */,
 				9D0000000000000000000010 /* Fuel */,
 				9F0000000000000000000010 /* Flow */,
+				9D0000000000000000000070 /* Guidance */,
+				9D0000000000000000000075 /* Manual */,
 				03327B4BB8B671204EF7BD05,
 				81FA6CF8148788D830F5E88A,
 				920284D85A96422B151973C1,
@@ -530,6 +563,7 @@
 				9E0000000000000000000012 /* FuelTests.swift */,
 				9F0000000000000000000008 /* FlowTests.swift */,
 				9E0000000000000000000022 /* DigitalEnvironmentTests.swift */,
+				9D0000000000000000000092 /* DailyGuidanceTests.swift */,
 			);
 			path = REBOOTTests;
 			sourceTree = "<group>";
@@ -637,6 +671,11 @@
 				9F0000000000000000000001 /* FlowModels.swift in Sources */,
 				9F0000000000000000000003 /* FlowConditionEngine.swift in Sources */,
 				9F0000000000000000000005 /* FlowViews.swift in Sources */,
+				9D0000000000000000000081 /* DailyGuidanceModels.swift in Sources */,
+				9D0000000000000000000083 /* DailyGuidanceEngine.swift in Sources */,
+				9D0000000000000000000085 /* AttentionOperatingManualModels.swift in Sources */,
+				9D0000000000000000000087 /* AttentionOperatingManualEngine.swift in Sources */,
+				9D0000000000000000000089 /* AttentionOperatingManualView.swift in Sources */,
 				91EF2CCF54D98AC6AFA0ACA0 /* ProductStore.swift in Sources */,
 				214B397E915C917076B0DEA2 /* QASeed.swift in Sources */,
 				DA352BF5FA05264D878B63BD /* FloatingGlassTabBar.swift in Sources */,
@@ -689,6 +728,7 @@
 				9E0000000000000000000011 /* FuelTests.swift in Sources */,
 				9F0000000000000000000007 /* FlowTests.swift in Sources */,
 				9E0000000000000000000021 /* DigitalEnvironmentTests.swift in Sources */,
+				9D0000000000000000000091 /* DailyGuidanceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
