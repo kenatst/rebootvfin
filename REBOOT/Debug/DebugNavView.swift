@@ -10,20 +10,15 @@ struct DebugNavView: View {
 
     /// Answer seed used to reach any diagnosis question (same branch as QA flow).
     static let seedAnswers: Answers = [
-        "goals": ["scroll_less", "focus_better", "study_better", "remember_more", "build_flow"],
+        "goals": ["deep_work", "scroll_less", "study_better", "remember_more"],
         "primary": ["focus_better"],
+        "hardest": ["starting"],
         "breaker": ["notifications"],
-        "social_app": ["instagram"],
-        "phone_place": ["on_desk"],
         "focus_window": ["15_30"],
-        "work_break": ["starting"],
-        "reading": ["drift"],
-        "recall_target": ["course"],
-        "environment": ["home_desk"],
-        "energy": ["early"],
-        "absorption": ["coding", "writing"],
-        "flow_exit": ["check"],
-        "session_target": ["45"],
+        "switch_response": ["check_phone"],
+        "return_ability": ["effortful_return"],
+        "use_case": ["building"],
+        "best_time": ["early"],
     ]
 
     var body: some View {
@@ -117,30 +112,20 @@ struct DebugNavView: View {
         let questions = DiagnosisModels.visibleQuestions(Self.seedAnswers)
         var entries: [Entry] = []
 
-        // "Why are you here?" untouched
-        entries.append(.init(id: "goals", label: "1. Why are you here? (empty)", step: 0, answers: [:]))
+        // First question, empty state
+        entries.append(.init(id: "goals", label: "1. What would feel different? (empty)", step: 0, answers: [:]))
         // goals pre-selected (multi selected state)
         entries.append(.init(
             id: "goals-selected",
-            label: "1. Why are you here? (selected)",
+            label: "1. What would feel different? (selected)",
             step: 0,
-            answers: ["goals": ["scroll_less", "focus_better", "study_better", "remember_more", "build_flow"]]
+            answers: ["goals": ["deep_work", "scroll_less", "study_better", "remember_more"]]
         ))
 
         for (i, q) in questions.enumerated() {
             let step = i
             let answers = Self.seedAnswers
             entries.append(.init(id: q.id, label: "\(i + 1). \(q.title)", step: step, answers: answers))
-
-            // selected-state duplicates for multi questions
-            if q.kind == .multi, q.id == "absorption" {
-                entries.append(.init(
-                    id: "absorption-selected",
-                    label: "\(i + 1). When do you lose track of time? (selected)",
-                    step: step,
-                    answers: answers
-                ))
-            }
         }
         return entries
     }

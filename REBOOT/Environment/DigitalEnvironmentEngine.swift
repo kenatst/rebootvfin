@@ -616,7 +616,7 @@ enum DigitalResetMissionLibrary {
         DigitalResetMission(
             day: 12,
             title: "Home Screen Friction",
-            rationale: "Placing high-dopamine apps on the first page invites reflex unlocks.",
+            rationale: "Apps you open on reflex are hardest to resist when they sit one tap away.",
             instruction: "Move your most frequent reflex app off your first home screen page and into the App Library or a secondary folder."
         ),
         DigitalResetMission(

@@ -1,14 +1,24 @@
 import SwiftUI
 
-/// Port of `StartingPoint.tsx` — the Craft-style "Your starting point" report
-/// that ends the diagnosis. "Start day one" is intentionally inert (web parity;
-/// Today is out of scope for this step).
+/// "Your starting point" — the report that closes the diagnosis.
+///
+/// It shows what the user told REBOOT as honest priors, and names what REBOOT
+/// will replace them with through observation. Nothing here is a verdict.
 struct StartingPointView: View {
     @ObservedObject var state: AppState
 
     private var answers: Answers { state.answers }
     private var primary: String {
-        DiagnosisModels.answerLabels("primary", answers).first ?? "Not chosen yet"
+        if DiagnosisModels.isUnknown("primary", answers),
+           let only = answers["goals"]?.first, answers["goals"]?.count == 1 {
+            return DiagnosisModels.goalLabel[only] ?? "Not chosen yet"
+        }
+        return DiagnosisModels.answerLabels("primary", answers).first ?? "Not chosen yet"
+    }
+    private var hardest: String {
+        DiagnosisModels.isUnknown("hardest", answers)
+            ? "Still unclear — Day 1 watches for it"
+            : (DiagnosisModels.answerLabels("hardest", answers).first ?? "")
     }
     private var breaker: String {
         DiagnosisModels.isUnknown("breaker", answers)
@@ -20,65 +30,42 @@ struct StartingPointView: View {
         let value = answers["focus_window"]?.first ?? ""
         return Self.focusCopy[value] ?? "Unmeasured"
     }
-    private var absorption: [String] {
-        DiagnosisModels.isUnknown("absorption", answers)
-            ? []
-            : DiagnosisModels.answerLabels("absorption", answers)
+    private var returning: String {
+        DiagnosisModels.isUnknown("return_ability", answers)
+            ? "Unmeasured"
+            : (DiagnosisModels.answerLabels("return_ability", answers).first ?? "")
     }
 
     private static let focusCopy: [String: String] = [
-        "lt5": "Under 5 minutes",
+        "lt5": "Under 5 min",
         "5_15": "5 – 15 minutes",
         "15_30": "15 – 30 minutes",
         "30_60": "30 – 60 minutes",
+        "usually_60_plus": "60+ minutes",
         "gt60": "60+ minutes",
     ]
 
+    /// Priors the report renders as rows. Goals and primary live in their own
+    /// card; everything else maps to one honest line.
     private var knownRows: [(label: String, value: String)] {
-        DiagnosisModels.visibleQuestions(answers)
-            .filter { !DiagnosisModels.isUnknown($0.id, answers) && !["goals", "primary"].contains($0.id) }
-            .map { q in
-                (label: Self.shortLabels[q.id] ?? q.title, value: DiagnosisModels.answerLabels(q.id, answers).joined(separator: ", "))
-            }
+        var rows: [(String, String)] = []
+        if !DiagnosisModels.isUnknown("hardest", answers) {
+            rows.append(("Hardest part", hardest))
+        }
+        rows.append(("Main breaker", breaker))
+        rows.append(("Focus window", window))
+        rows.append(("Returning after distraction", returning))
+        if !DiagnosisModels.isUnknown("switch_response", answers) {
+            rows.append(("When it gets hard", DiagnosisModels.answerLabels("switch_response", answers).first ?? ""))
+        }
+        if !DiagnosisModels.isUnknown("use_case", answers) {
+            rows.append(("Work that matters now", DiagnosisModels.answerLabels("use_case", answers).first ?? ""))
+        }
+        if !DiagnosisModels.isUnknown("best_time", answers) {
+            rows.append(("Best hours", DiagnosisModelss.bestTimeLabel(answers["best_time"]?.first)))
+        }
+        return rows.filter { !$0.1.isEmpty }
     }
-
-    private var unknowns: [String] {
-        DiagnosisModels.visibleQuestions(answers)
-            .filter { DiagnosisModels.isUnknown($0.id, answers) }
-            .map { Self.unknownCopy[$0.id] ?? $0.title }
-    }
-
-    private static let shortLabels: [String: String] = [
-        "breaker": "Main breaker",
-        "social_app": "Strongest pull",
-        "phone_place": "Phone placement",
-        "focus_window": "Focus window",
-        "work_break": "Breaking point",
-        "reading": "Reading pattern",
-        "recall_target": "Recall target",
-        "environment": "Environment",
-        "energy": "Best hours",
-        "absorption": "Absorption",
-        "flow_exit": "Flow exit",
-        "session_target": "Session target",
-    ]
-
-    private static let unknownCopy: [String: String] = [
-        "breaker": "Which interruption actually costs you the most",
-        "social_app": "Which app pulls hardest, in real numbers",
-        "phone_place": "How phone placement changes your sessions",
-        "focus_window": "Your true focus window, measured",
-        "work_break": "Where the work breaks down",
-        "reading": "How you read under load",
-        "recall_target": "What you most need to retain",
-        "environment": "Which environment performs best",
-        "energy": "Your real energy curve across the day",
-        "absorption": "The conditions that absorb you",
-        "flow_exit": "What ends your Flow",
-        "session_target": "The session length that fits you",
-        "goals": "Your goals",
-        "primary": "Your primary goal",
-    ]
 
     var body: some View {
         GeometryReader { geo in
@@ -87,11 +74,8 @@ struct StartingPointView: View {
                     header
                     primaryGoalCard
                     statGrid
-                    absorptionCard
-                    if !knownRows.isEmpty {
-                        knownCard
-                    }
-                    unknownCard
+                    knownCard
+                    learnCard
                     statusCard
                     actions
                 }
@@ -109,11 +93,11 @@ struct StartingPointView: View {
         Reveal(delay: 0) {
             VStack(alignment: .leading, spacing: 0) {
                 MetaLabel(text: "Reboot / Calibration")
-                Text("Your starting point", style: .reportTitle)
+                Text("Your starting point.", style: .reportTitle)
                     .foregroundStyle(AppColors.ink)
                     .padding(.top, AppSpacing.sm)
                 Text(
-                    "Built from what you told us. The first week will replace these answers with what actually happens.",
+                    "This is not a verdict. It is where REBOOT starts — and the first week begins replacing these answers with what actually happens.",
                     style: .reportBody
                 )
                 .foregroundStyle(AppColors.inkSoft)
@@ -127,7 +111,7 @@ struct StartingPointView: View {
         Reveal(delay: 0.08) {
             PaperSurface(shadow: .lift, padding: AppSpacing.md) {
                 VStack(alignment: .leading, spacing: 0) {
-                    MetaLabel(text: "Primary goal", color: AppColors.coral)
+                    MetaLabel(text: "You told reboot", color: AppColors.coral)
                     Text(primary, style: .cardTitle)
                         .foregroundStyle(AppColors.ink)
                         .padding(.top, 8)
@@ -147,7 +131,7 @@ struct StartingPointView: View {
     private var statGrid: some View {
         HStack(alignment: .top, spacing: AppSpacing.gridGap) {
             Reveal(delay: 0.14) {
-                StatCard(label: "Main breaker", value: breaker, accent: AppColors.coral)
+                StatCard(label: "Hardest part", value: hardest, accent: AppColors.coral)
             }
             Reveal(delay: 0.18) {
                 StatCard(label: "Focus window", value: window, accent: AppColors.cyan)
@@ -156,33 +140,11 @@ struct StartingPointView: View {
         .frame(maxWidth: AppSpacing.contentMaxWidth)
     }
 
-    private var absorptionCard: some View {
-        Reveal(delay: 0.24) {
-            PaperSurface(shadow: .soft, padding: AppSpacing.md) {
-                VStack(alignment: .leading, spacing: 0) {
-                    MetaLabel(text: "Absorption context")
-                    if absorption.isEmpty {
-                        Text(
-                            "Nothing reliable yet — REBOOT will look for it in your sessions.",
-                            style: .hint
-                        )
-                        .foregroundStyle(AppColors.inkSoft)
-                        .padding(.top, 8)
-                    } else {
-                        FlowPills(labels: absorption, pill: Pill.absorption)
-                            .padding(.top, 12)
-                    }
-                }
-            }
-            .frame(maxWidth: AppSpacing.contentMaxWidth, alignment: .leading)
-        }
-    }
-
     private var knownCard: some View {
         Reveal(delay: 0.30) {
             PaperSurface(shadow: .soft, padding: AppSpacing.md) {
                 VStack(alignment: .leading, spacing: 0) {
-                    MetaLabel(text: "What we know")
+                    MetaLabel(text: "What you told us")
                     VStack(spacing: 14) {
                         ForEach(knownRows, id: \.label) { row in
                             HStack(alignment: .firstTextBaseline, spacing: 24) {
@@ -202,33 +164,22 @@ struct StartingPointView: View {
         }
     }
 
-    private var unknownCard: some View {
+    private var learnCard: some View {
         Reveal(delay: 0.36) {
             PaperSurface(shadow: .soft, padding: AppSpacing.md) {
-                VStack(alignment: .leading, spacing: 0) {
-                    MetaLabel(text: "Unknown dimensions")
-                    if unknowns.isEmpty {
-                        Text(
-                            "Nothing missing — we'll still verify everything through practice.",
-                            style: .hint
-                        )
+                VStack(alignment: .leading, spacing: 10) {
+                    MetaLabel(text: "What reboot will learn instead")
+                    Text("Your real focus window, measured across sessions.", style: .hint)
                         .foregroundStyle(AppColors.inkSoft)
-                        .padding(.top, 8)
-                    } else {
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(unknowns, id: \.self) { item in
-                                HStack(alignment: .top, spacing: 12) {
-                                    Circle()
-                                        .fill(AppColors.inkFaint)
-                                        .frame(width: 6, height: 6)
-                                        .padding(.top, 8.8)
-                                    Text(item, style: .hint)
-                                        .foregroundStyle(AppColors.inkSoft)
-                                }
-                            }
-                        }
-                        .padding(.top, AppSpacing.sm)
-                    }
+                    Text("Whether the phone actually pulls you, or something else does.", style: .hint)
+                        .foregroundStyle(AppColors.inkSoft)
+                    Text("How quickly you return — and what makes returning easier.", style: .hint)
+                        .foregroundStyle(AppColors.inkSoft)
+                    Text("Which conditions hold your deeper work.", style: .hint)
+                        .foregroundStyle(AppColors.inkSoft)
+                    Text("None of these stay fixed. Observed evidence outweighs every answer above.", style: .hint)
+                        .foregroundStyle(AppColors.inkFaint)
+                        .padding(.top, 4)
                 }
             }
             .frame(maxWidth: AppSpacing.contentMaxWidth, alignment: .leading)
@@ -271,7 +222,7 @@ struct StartingPointView: View {
                 }
 
                 Text(
-                    "REBOOT artwork is metaphorical. Nothing here measures your brain, dopamine or any biological state.",
+                    "REBOOT trains attention behaviors. It doesn't diagnose anything or measure your brain.",
                     style: .footnote
                 )
                 .foregroundStyle(AppColors.inkFaint)
@@ -284,7 +235,20 @@ struct StartingPointView: View {
     }
 }
 
-/// Compact chip flow used by goal / absorption cards.
+private enum DiagnosisModelss {
+    static func bestTimeLabel(_ value: String?) -> String {
+        switch value {
+        case "early": return "Early morning"
+        case "morning": return "Mid-morning"
+        case "afternoon": return "Afternoon"
+        case "evening": return "Evening"
+        case "night": return "Late night"
+        default: return ""
+        }
+    }
+}
+
+/// Compact chip flow used by goal cards.
 struct FlowPills: View {
     let labels: [String]
     let pill: (String) -> Pill
@@ -361,9 +325,10 @@ struct StatCard: View {
     }
 }
 
-/// Coral pulsing status dot (web `animate-ping`).
+/// Coral pulsing status dot.
 struct PulsingDot: View {
     @State private var pulsing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -377,7 +342,7 @@ struct PulsingDot: View {
                 .frame(width: 10, height: 10)
         }
         .onAppear {
-            withAnimation(.easeOut(duration: 1.4).repeatForever(autoreverses: false)) {
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 1.4).repeatForever(autoreverses: false)) {
                 pulsing = true
             }
         }

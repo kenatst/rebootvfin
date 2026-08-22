@@ -17,140 +17,172 @@ enum AttentionOperatingManualEngine {
         let totalDays = Set(protocolSessions.map(\.day)).count
         let totalSess = sessions.count
 
-        let startBest = deriveHowIStartBest(sessions: protocolSessions, rules: personalRules, profile: profile)
-        let commonBreakers = deriveMyMostCommonBreakers(events: interruptionEvents, digitalState: digitalEnvironmentState, sessions: sessions)
-        let returnStrat = deriveMyReturnStrategy(sessions: protocolSessions, events: interruptionEvents, profile: profile)
-        let focusWin = deriveMyFocusWindow(sessions: sessions, profile: profile)
-        let digitalEnv = deriveMyDigitalEnvironment(digitalState: digitalEnvironmentState, events: interruptionEvents)
-        let deepWork = deriveMyDeepWorkConditions(sessions: sessions, flowState: flowState, rules: personalRules)
-        let recallStrat = deriveMyRecallStrategy(sessions: sessions)
-        let energyCtx = deriveMyEnergyAndContext(sessions: sessions, fuelState: fuelState)
-        let flowCond = deriveMyFlowConditions(flowState: flowState, sessions: sessions)
-        let personalRulesItems = deriveMyPersonalRules(rules: personalRules)
-        let unknowns = deriveWhatRebootStillDoesNotKnow(
-            sessions: sessions,
-            fuelState: fuelState,
-            flowState: flowState,
-            digitalState: digitalEnvironmentState,
-            experiments: labExperiments
-        )
-
         return AttentionOperatingManual(
             generatedAt: Date(),
             lastUpdated: Date(),
             totalProtocolDays: totalDays,
             totalSessions: totalSess,
-            howIStartBest: startBest,
-            myMostCommonBreakers: commonBreakers,
-            myReturnStrategy: returnStrat,
-            myFocusWindow: focusWin,
-            myDigitalEnvironment: digitalEnv,
-            myDeepWorkConditions: deepWork,
-            myRecallStrategy: recallStrat,
-            myEnergyAndContext: energyCtx,
-            myFlowConditions: flowCond,
-            myPersonalRules: personalRulesItems,
-            whatRebootStillDoesNotKnow: unknowns
+            howIStartBest: deriveHowIStartBest(sessions: sessions, rules: personalRules, profile: profile),
+            myMostCommonBreakers: deriveMyMostCommonBreakers(events: interruptionEvents, digitalState: digitalEnvironmentState, sessions: sessions),
+            myReturnStrategy: deriveMyReturnStrategy(sessions: protocolSessions, events: interruptionEvents, profile: profile),
+            myFocusWindow: deriveMyFocusWindow(sessions: sessions, profile: profile),
+            myDigitalEnvironment: deriveMyDigitalEnvironment(digitalState: digitalEnvironmentState, events: interruptionEvents),
+            myDeepWorkConditions: deriveMyDeepWorkConditions(sessions: sessions, flowState: flowState, rules: personalRules),
+            myRecallStrategy: deriveMyRecallStrategy(sessions: sessions),
+            myEnergyAndContext: deriveMyEnergyAndContext(sessions: sessions, fuelState: fuelState),
+            myFlowConditions: deriveMyFlowConditions(flowState: flowState, sessions: sessions),
+            myPersonalRules: deriveMyPersonalRules(rules: personalRules),
+            whatRebootStillDoesNotKnow: deriveWhatRebootStillDoesNotKnow(
+                sessions: sessions,
+                fuelState: fuelState,
+                flowState: flowState,
+                digitalState: digitalEnvironmentState,
+                experiments: labExperiments
+            )
         )
     }
 
     // MARK: - 1. How I Start Best
 
     private static func deriveHowIStartBest(sessions: [SessionRecord], rules: [PersonalRule], profile: AttentionProfile) -> ManualItem {
-        let preparedSessions = sessions.filter { $0.environmentActionDone == true }
-        let normalSessions = sessions.filter { $0.environmentActionDone == false || $0.environmentActionDone == nil }
+        let prepared = sessions.filter { $0.environmentActionDone == true }
+        let normal = sessions.filter { $0.environmentActionDone != true }
 
-        let preparedCompletedRate = preparedSessions.isEmpty ? 0.0 : Double(preparedSessions.filter(\.completed).count) / Double(preparedSessions.count)
-        let normalCompletedRate = normalSessions.isEmpty ? 0.0 : Double(normalSessions.filter(\.completed).count) / Double(normalSessions.count)
+        let preparedRate = prepared.isEmpty ? 0.0 : Double(prepared.filter(\.completed).count) / Double(prepared.count)
+        let normalRate = normal.isEmpty ? 0.0 : Double(normal.filter(\.completed).count) / Double(normal.count)
 
-        if preparedCompletedRate > normalCompletedRate + 0.15 && preparedSessions.count >= 5 {
+        // Observed comparison first — but only with enough comparable sessions.
+        if prepared.count >= 4, normal.count >= 2, preparedRate > normalRate + 0.15 {
             return ManualItem(
                 sectionTitle: "HOW I START BEST",
-                statement: "Starting with an explicit physical environment setup reduces initial task-switching friction by \((preparedCompletedRate - normalCompletedRate) * 100 > 0 ? Int((preparedCompletedRate - normalCompletedRate) * 100) : 20)%.",
-                maturity: .repeatedSignal,
-                evidenceSource: "\(preparedSessions.count) sessions with environment preparation vs \(normalSessions.count) without",
-                observationCount: preparedSessions.count + normalSessions.count,
+                statement: "Sessions started after an explicit environment setup have completed more often than the rest (\(Int(preparedRate * 100))% vs \(Int(normalRate * 100))%).",
+                maturity: prepared.count >= 8 ? .repeatedSignal : .emergingSignal,
+                evidenceSource: "\(prepared.count) prepared starts vs \(normal.count) without",
+                observationCount: prepared.count + normal.count,
                 lastUpdated: Date()
             )
-        } else if let keptRule = rules.first(where: { $0.lifecycle == .kept }) {
+        }
+
+        if let keptRule = rules.first(where: { $0.lifecycle == .kept && $0.category == .environment }) {
             return ManualItem(
                 sectionTitle: "HOW I START BEST",
-                statement: "Starting succeeds most reliably when applying rule: \"\(keptRule.title)\".",
-                maturity: .repeatedSignal,
-                evidenceSource: "Kept personal rule established through practice",
-                observationCount: sessions.count,
+                statement: "You chose to keep one starting rule: \(keptRule.title.lowercased()). It is applied before your focused blocks.",
+                maturity: keptRule.confidence == .strong ? .repeatedSignal : .emergingSignal,
+                evidenceSource: keptRule.sourceType.displayLabel,
+                observationCount: max(keptRule.timesTested, 1),
                 lastUpdated: Date()
             )
-        } else {
+        }
+
+        // Honest unknown until evidence exists.
+        if sessions.count < 3 {
             return ManualItem(
                 sectionTitle: "HOW I START BEST",
-                statement: "A short 2-minute buffer without screen inputs before starting creates the highest probability of an uninterrupted first focus block.",
-                maturity: sessions.count >= 30 ? .repeatedSignal : (sessions.count >= 10 ? .emergingSignal : .learning),
-                evidenceSource: "\(sessions.count) session initiation logs",
+                statement: "Still learning how you start best. A few more sessions will show whether a setup ritual helps.",
+                maturity: .learning,
+                evidenceSource: "Only \(sessions.count) sessions recorded so far",
                 observationCount: sessions.count,
                 lastUpdated: Date()
             )
         }
+
+        return ManualItem(
+            sectionTitle: "HOW I START BEST",
+            statement: "No clear difference between prepared and unprepared starts yet. The comparison continues.",
+            maturity: .learning,
+            evidenceSource: "\(prepared.count) prepared vs \(normal.count) unprepared starts — not enough separation",
+            observationCount: sessions.count,
+            lastUpdated: Date()
+        )
     }
 
     // MARK: - 2. My Most Common Breakers
 
     private static func deriveMyMostCommonBreakers(events: [InterruptionEvent], digitalState: DigitalEnvironmentState, sessions: [SessionRecord]) -> ManualItem {
+        // Observed digital pull from the environment engine.
         let pull = digitalState.profile.primaryDigitalPull
         if pull.isKnown && pull.value != .unknown && pull.evidenceCount >= 3 {
             return ManualItem(
-                sectionTitle: "MY MOST COMMON BREAKERS",
-                statement: "\(pull.value.displayName) is your primary pull during moments of task friction or cognitive pause.",
-                maturity: pull.confidence >= 0.7 ? .repeatedSignal : .emergingSignal,
-                evidenceSource: "\(pull.evidenceCount) recorded interruption observations",
+                sectionTitle: "WHAT BREAKS MY ATTENTION",
+                statement: "\(pull.value.displayName) is your most observed pull during moments of friction or pause.",
+                maturity: pull.evidenceCount >= 6 ? .repeatedSignal : .emergingSignal,
+                evidenceSource: "\(pull.evidenceCount) observed interruption events",
                 observationCount: pull.evidenceCount,
                 lastUpdated: Date()
             )
         }
 
-        let firstDistractions = sessions.compactMap(\.firstDistraction)
-        if let top = Dictionary(grouping: firstDistractions, by: { $0 }).max(by: { $0.value.count < $1.value.count }), top.value.count >= 3 {
+        // Self-reported first distractions across sessions.
+        let firstDistractions = sessions.compactMap(\.firstDistraction).filter { $0 != "none" && $0 != "forgot" }
+        if let top = Dictionary(grouping: firstDistractions, by: { $0 }).max(by: { $0.value.count < $1.value.count }),
+           top.value.count >= 2 {
+            let name = top.key == Distractor.internalRestlessness ? "internal restlessness" : top.key
             return ManualItem(
-                sectionTitle: "MY MOST COMMON BREAKERS",
-                statement: "Distraction occurs most frequently via \(top.key.capitalized) when cognitive demand increases.",
-                maturity: .emergingSignal,
-                evidenceSource: "\(top.value.count) self-reported interruption logs",
+                sectionTitle: "WHAT BREAKS MY ATTENTION",
+                statement: "In your own session reports, \(name) came up most often as the first thing that pulled you away.",
+                maturity: top.value.count >= 4 ? .repeatedSignal : .emergingSignal,
+                evidenceSource: "\(top.value.count) self-reported first distractions",
                 observationCount: top.value.count,
                 lastUpdated: Date()
             )
         }
 
         return ManualItem(
-            sectionTitle: "MY MOST COMMON BREAKERS",
-            statement: "Automatic reflex checking occurs before conscious intent during low-friction transitions.",
+            sectionTitle: "WHAT BREAKS MY ATTENTION",
+            statement: "Still learning what breaks your attention most. Keep answering the two honest questions after each session.",
             maturity: .learning,
-            evidenceSource: "\(events.count) interruption events recorded",
+            evidenceSource: sessions.isEmpty ? "No sessions yet" : "No repeated breaker in \(sessions.count) sessions",
             observationCount: events.count,
             lastUpdated: Date()
         )
     }
 
-    // MARK: - 3. My Return Strategy
+    // MARK: - 3. How I Return
 
     private static func deriveMyReturnStrategy(sessions: [SessionRecord], events: [InterruptionEvent], profile: AttentionProfile) -> ManualItem {
-        let returnsWithSwitches = sessions.filter { ($0.switches ?? 0) > 0 && $0.completed && !$0.endedEarly }
-        if returnsWithSwitches.count >= 4 {
+        let switchedAndCompleted = sessions.filter { ($0.switches ?? 0) >= 1 && $0.completed && !$0.endedEarly }
+        let switchedTotal = sessions.filter { ($0.switches ?? 0) >= 1 }
+
+        // Returning after switching and still finishing is real evidence.
+        if switchedTotal.count >= 4, switchedAndCompleted.count >= switchedTotal.count / 2 {
             return ManualItem(
-                sectionTitle: "MY RETURN STRATEGY",
-                statement: "You successfully recover focus after an urge when you pause without leaving the physical desk.",
-                maturity: .repeatedSignal,
-                evidenceSource: "\(returnsWithSwitches.count) sessions completed after distraction events",
-                observationCount: returnsWithSwitches.count,
+                sectionTitle: "HOW I RETURN",
+                statement: "When you notice a switch, you usually come back to the same task and finish the block. Switching has not been failing you.",
+                maturity: switchedAndCompleted.count >= 6 ? .repeatedSignal : .emergingSignal,
+                evidenceSource: "\(switchedAndCompleted.count) of \(switchedTotal.count) sessions finished after reported switches",
+                observationCount: switchedTotal.count,
+                lastUpdated: Date()
+            )
+        }
+
+        if let level = profile.returnAfterDistraction.value, level == .weak, sessions.count >= 2 {
+            return ManualItem(
+                sectionTitle: "HOW I RETURN",
+                statement: "Returning after distraction looks like your hardest skill right now. Sessions practice the return itself — noticing, then coming back to the same task.",
+                maturity: .learning,
+                evidenceSource: "Your starting-point answer, not yet re-tested by many sessions",
+                observationCount: switchedTotal.count,
+                lastUpdated: Date()
+            )
+        }
+
+        if switchedTotal.isEmpty, !sessions.isEmpty {
+            return ManualItem(
+                sectionTitle: "HOW I RETURN",
+                statement: "Few switches reported so far — either attention holds well, or switches go unnoticed. Both are worth watching.",
+                maturity: .learning,
+                evidenceSource: "\(sessions.count) sessions, none with a reported switch",
+                observationCount: sessions.count,
                 lastUpdated: Date()
             )
         }
 
         return ManualItem(
-            sectionTitle: "MY RETURN STRATEGY",
-            statement: "Noticing the urge without completing the distraction loop is your most effective return pathway.",
-            maturity: .emergingSignal,
-            evidenceSource: "Profile return assessment and session logs",
-            observationCount: sessions.count,
+            sectionTitle: "HOW I RETURN",
+            statement: "Still learning how you return. More sessions with reported switches will make this concrete.",
+            maturity: .learning,
+            evidenceSource: "\(switchedTotal.count) sessions with reported switches",
+            observationCount: switchedTotal.count,
             lastUpdated: Date()
         )
     }
@@ -159,13 +191,25 @@ enum AttentionOperatingManualEngine {
 
     private static func deriveMyFocusWindow(sessions: [SessionRecord], profile: AttentionProfile) -> ManualItem {
         let completed = sessions.filter(\.completed)
-        let actuals = completed.map(\.actualMinutes)
-        let avg = actuals.isEmpty ? 20 : actuals.reduce(0, +) / actuals.count
-        let maxWin = profile.focusWindowMinutes ?? (actuals.max() ?? 25)
+        guard completed.count >= 3 else {
+            let prior = profile.focusWindowMinutes.map { "\($0) minutes (from your starting point)" } ?? "unknown"
+            return ManualItem(
+                sectionTitle: "MY FOCUS WINDOW",
+                statement: "Your focus window looks like \(prior). REBOOT is measuring the real window across completed blocks.",
+                maturity: .learning,
+                evidenceSource: "Starting-point answer; \(completed.count) completed sessions so far",
+                observationCount: completed.count,
+                lastUpdated: Date()
+            )
+        }
+
+        let actuals = completed.map(\.actualMinutes).sorted()
+        let median = actuals[actuals.count / 2]
+        let best = actuals.max() ?? median
 
         return ManualItem(
             sectionTitle: "MY FOCUS WINDOW",
-            statement: "Your natural continuous focus window is \(avg)–\(maxWin) minutes. Beyond \(maxWin) minutes, cognitive efficiency drops exponentially without a deliberate pause.",
+            statement: "A typical completed block lasts about \(median) minutes; your longest so far is \(best). Durations grow only when several comparable sessions support it.",
             maturity: completed.count >= 10 ? .repeatedSignal : .emergingSignal,
             evidenceSource: "\(completed.count) completed focus blocks",
             observationCount: completed.count,
@@ -176,49 +220,92 @@ enum AttentionOperatingManualEngine {
     // MARK: - 5. My Digital Environment
 
     private static func deriveMyDigitalEnvironment(digitalState: DigitalEnvironmentState, events: [InterruptionEvent]) -> ManualItem {
-        let phoneProx = digitalState.profile.phoneProximity
-        if phoneProx.value == .outsideRoom || phoneProx.value == .acrossRoom {
+        let prox = digitalState.profile.phoneProximity
+        if prox.isKnown && prox.value != .unknown && prox.evidenceCount >= 3 {
+            let placement = prox.value == .outsideRoom
+                ? "outside the room"
+                : prox.value.displayName.lowercased()
             return ManualItem(
                 sectionTitle: "MY DIGITAL ENVIRONMENT",
-                statement: "Outside the room is your high-leverage placement. Phone in line-of-sight increases unconscious pickup rate by over 2x.",
-                maturity: .repeatedSignal,
-                evidenceSource: "\(phoneProx.evidenceCount) physical placement observations",
-                observationCount: phoneProx.evidenceCount,
+                statement: "Your phone is most often \(placement) during focused work, based on what your sessions recorded.",
+                maturity: prox.evidenceCount >= 6 ? .repeatedSignal : .emergingSignal,
+                evidenceSource: "\(prox.evidenceCount) placement observations",
+                observationCount: prox.evidenceCount,
+                lastUpdated: Date()
+            )
+        }
+
+        if let accepted = optionalAcceptedInterventions(digitalState), accepted > 0 {
+            return ManualItem(
+                sectionTitle: "MY DIGITAL ENVIRONMENT",
+                statement: "Environment setups have been confirmed before \(accepted) focused block\(accepted == 1 ? "" : "s").",
+                maturity: accepted >= 3 ? .repeatedSignal : .emergingSignal,
+                evidenceSource: "Confirmed environment actions across sessions",
+                observationCount: accepted,
                 lastUpdated: Date()
             )
         }
 
         return ManualItem(
             sectionTitle: "MY DIGITAL ENVIRONMENT",
-            statement: "Physical separation between phone and work surface provides greater focus stability than software limits alone.",
-            maturity: .emergingSignal,
-            evidenceSource: "Digital environment profile and session comparisons",
-            observationCount: digitalState.interruptionEvents.count,
+            statement: "Still learning how your physical and digital setup affects sessions. A few comparable sessions will tell.",
+            maturity: .learning,
+            evidenceSource: "Not enough placement or protection observations yet",
+            observationCount: events.count,
             lastUpdated: Date()
         )
     }
 
-    // MARK: - 6. My Deep-Work Conditions
+    private static func optionalAcceptedInterventions(_ state: DigitalEnvironmentState) -> Int? {
+        let total = state.interventionLog.acceptedCounts.values.reduce(0, +)
+        return total > 0 ? total : nil
+    }
+
+    // MARK: - 6. How I Work Deeply
 
     private static func deriveMyDeepWorkConditions(sessions: [SessionRecord], flowState: FlowState, rules: [PersonalRule]) -> ManualItem {
-        if let topProject = flowState.projects.first(where: { $0.status == .active }) {
+        // Flow conditions are the honest source for deep-work knowledge.
+        let patterns = FlowConditionEngine.evaluate(state: flowState)
+        if let top = patterns.first(where: { !$0.supportingEvidenceIDs.isEmpty }) {
             return ManualItem(
-                sectionTitle: "MY DEEP-WORK CONDITIONS",
-                statement: "Deep work sustains best on single-project blocks with clear definition: \"\(topProject.title)\".",
-                maturity: .repeatedSignal,
-                evidenceSource: "\(topProject.recentBlockIDs.count) completed Flow blocks",
-                observationCount: topProject.recentBlockIDs.count,
+                sectionTitle: "HOW I WORK DEEPLY",
+                statement: top.statement,
+                maturity: top.supportingEvidenceIDs.count >= 3 ? .repeatedSignal : .emergingSignal,
+                evidenceSource: "\(top.supportingEvidenceIDs.count) Flow block reflections agree",
+                observationCount: top.supportingEvidenceIDs.count,
                 lastUpdated: Date()
             )
         }
 
-        let longSessions = sessions.filter { $0.actualMinutes >= 25 && $0.completed }
+        if let project = flowState.projects.first(where: { $0.status == .active }), project.recentBlockIDs.count >= 2 {
+            return ManualItem(
+                sectionTitle: "HOW I WORK DEEPLY",
+                statement: "Deep work sustains best so far on single-project blocks with a defined finish line — \"\(project.title)\" has carried your longest stretches.",
+                maturity: .emergingSignal,
+                evidenceSource: "\(project.recentBlockIDs.count) Flow blocks on this project",
+                observationCount: project.recentBlockIDs.count,
+                lastUpdated: Date()
+            )
+        }
+
+        let longCompleted = sessions.filter { $0.completed && $0.actualMinutes >= 20 && $0.origin != .flow }
+        if longCompleted.count >= 3 {
+            return ManualItem(
+                sectionTitle: "HOW I WORK DEEPLY",
+                statement: "Your deepest blocks share one pattern: one task, one visible stopping point. That is the only deep-work condition your sessions have confirmed so far.",
+                maturity: longCompleted.count >= 6 ? .repeatedSignal : .emergingSignal,
+                evidenceSource: "\(longCompleted.count) longer completed blocks",
+                observationCount: longCompleted.count,
+                lastUpdated: Date()
+            )
+        }
+
         return ManualItem(
-            sectionTitle: "MY DEEP-WORK CONDITIONS",
-            statement: "Single-task isolation with full browser tab clearance provides your most stable deep-work state.",
-            maturity: longSessions.count >= 5 ? .repeatedSignal : .emergingSignal,
-            evidenceSource: "\(longSessions.count) deep work sessions (>= 25 min)",
-            observationCount: longSessions.count,
+            sectionTitle: "HOW I WORK DEEPLY",
+            statement: "Still learning your deeper-work conditions. Real projects and longer blocks will surface them.",
+            maturity: .learning,
+            evidenceSource: "No repeated deep-work condition in \(sessions.count) sessions",
+            observationCount: longCompleted.count,
             lastUpdated: Date()
         )
     }
@@ -226,61 +313,75 @@ enum AttentionOperatingManualEngine {
     // MARK: - 7. My Recall Strategy
 
     private static func deriveMyRecallStrategy(sessions: [SessionRecord]) -> ManualItem {
-        let recallSessions = sessions.filter { $0.mode == .recall }
-        let completedRecall = recallSessions.filter(\.completed)
+        let recall = sessions.filter { $0.mode == .recall }
+        let assessments = recall.compactMap { $0.evidence?.recall?.selfAssessment }
 
-        if completedRecall.count >= 3 {
+        guard !recall.isEmpty else {
             return ManualItem(
                 sectionTitle: "MY RECALL STRATEGY",
-                statement: "Immediate active retrieval at the end of a block increases long-term retention compared to passive re-reading.",
-                maturity: .repeatedSignal,
-                evidenceSource: "\(completedRecall.count) completed RECALL protocol sessions",
-                observationCount: completedRecall.count,
+                statement: "No recall practice recorded yet. When the program prescribes it, read, close the source, and reconstruct what remains.",
+                maturity: .learning,
+                evidenceSource: "Zero recall sessions logged",
+                observationCount: 0,
+                lastUpdated: Date()
+            )
+        }
+
+        let someOrMost = assessments.filter { $0 == .some || $0 == .most }.count
+        if assessments.count >= 3 {
+            let ratioText = "\(someOrMost) of \(assessments.count)"
+            return ManualItem(
+                sectionTitle: "MY RECALL STRATEGY",
+                statement: "In \(ratioText) recall sessions, at least some material came back without the source. Closing the source earlier tends to sharpen what returns.",
+                maturity: assessments.count >= 5 ? .repeatedSignal : .emergingSignal,
+                evidenceSource: "\(assessments.count) honest self-assessments",
+                observationCount: assessments.count,
                 lastUpdated: Date()
             )
         }
 
         return ManualItem(
             sectionTitle: "MY RECALL STRATEGY",
-            statement: "Active recall is still developing. Brief 3-minute synthesis blocks strengthen consolidation.",
+            statement: "Recall practice has started (\(recall.count) session\(recall.count == 1 ? "" : "s")). Not enough assessments yet to say what works for you.",
             maturity: .learning,
-            evidenceSource: "\(recallSessions.count) RECALL sessions logged",
-            observationCount: recallSessions.count,
+            evidenceSource: "\(assessments.count) self-assessments so far",
+            observationCount: recall.count,
             lastUpdated: Date()
         )
     }
 
-    // MARK: - 8. My Energy & Context
+    // MARK: - 8. My Energy Context
 
     private static func deriveMyEnergyAndContext(sessions: [SessionRecord], fuelState: FuelState) -> ManualItem {
         let fuelSessions = sessions.filter { $0.fuelContext != nil && !$0.fuelContext!.isEmpty }
-        let fuelAnalysis = FuelPatternEngine.evaluate(sessions: fuelSessions)
-
-        if let topPattern = fuelAnalysis.patterns.first(where: { $0.maturity == .repeatedSignal }) {
+        guard !fuelSessions.isEmpty else {
             return ManualItem(
-                sectionTitle: "MY ENERGY & CONTEXT",
-                statement: topPattern.statement,
-                maturity: .repeatedSignal,
-                evidenceSource: "Fuel pattern derived from \(fuelSessions.count) sessions",
-                observationCount: fuelSessions.count,
+                sectionTitle: "MY ENERGY CONTEXT",
+                statement: "Energy may matter here. There isn't enough evidence yet — Fuel asks one optional question before some sessions.",
+                maturity: .learning,
+                evidenceSource: "No session carries context yet",
+                observationCount: 0,
                 lastUpdated: Date()
             )
-        } else if let emergingPattern = fuelAnalysis.patterns.first(where: { $0.maturity == .earlySignal }) {
+        }
+
+        let analysis = FuelPatternEngine.evaluate(sessions: fuelSessions)
+        if let pattern = analysis.patterns.first {
             return ManualItem(
-                sectionTitle: "MY ENERGY & CONTEXT",
-                statement: emergingPattern.statement,
-                maturity: .emergingSignal,
-                evidenceSource: "Fuel observation across \(fuelSessions.count) sessions",
+                sectionTitle: "MY ENERGY CONTEXT",
+                statement: pattern.statement,
+                maturity: pattern.maturity == .repeatedSignal ? .repeatedSignal : .emergingSignal,
+                evidenceSource: "Pattern across \(fuelSessions.count) context-linked sessions",
                 observationCount: fuelSessions.count,
                 lastUpdated: Date()
             )
         }
 
         return ManualItem(
-            sectionTitle: "MY ENERGY & CONTEXT",
-            statement: "High-demand focus is most resilient when energy is preserved and sessions are not scheduled immediately after heavy digital inputs.",
-            maturity: fuelSessions.count >= 5 ? .emergingSignal : .learning,
-            evidenceSource: "\(fuelSessions.count) pre-session context captures",
+            sectionTitle: "MY ENERGY CONTEXT",
+            statement: "Context has been captured \(fuelSessions.count) times, but no stable pattern has emerged — that is an honest result, not a failure.",
+            maturity: .learning,
+            evidenceSource: "\(fuelSessions.count) captures, no consistent signal",
             observationCount: fuelSessions.count,
             lastUpdated: Date()
         )
@@ -289,25 +390,38 @@ enum AttentionOperatingManualEngine {
     // MARK: - 9. My Flow Conditions
 
     private static func deriveMyFlowConditions(flowState: FlowState, sessions: [SessionRecord]) -> ManualItem {
-        let activeProjects = flowState.projects.filter { $0.status == .active }
-        if !activeProjects.isEmpty {
-            let names = activeProjects.map(\.title).joined(separator: ", ")
+        let evidence = flowState.evidence
+        guard evidence.count >= 3 else {
             return ManualItem(
                 sectionTitle: "MY FLOW CONDITIONS",
-                statement: "Flow conditions trigger most reliably when working on active structured projects (\(names)) with pre-set durations.",
-                maturity: .repeatedSignal,
-                evidenceSource: "\(flowState.evidence.count) recorded Flow reflections",
-                observationCount: flowState.evidence.count,
+                statement: "Still learning which conditions support your deeper work. Flow Lab reads each real block's reflection to find them.",
+                maturity: .learning,
+                evidenceSource: evidence.isEmpty
+                    ? "No Flow blocks reflected on yet"
+                    : "Only \(evidence.count) Flow reflections so far",
+                observationCount: evidence.count,
+                lastUpdated: Date()
+            )
+        }
+
+        let patterns = FlowConditionEngine.evaluate(state: flowState)
+        if let top = patterns.first(where: { !$0.supportingEvidenceIDs.isEmpty }) {
+            return ManualItem(
+                sectionTitle: "MY FLOW CONDITIONS",
+                statement: top.statement,
+                maturity: top.supportingEvidenceIDs.count >= 3 ? .repeatedSignal : .emergingSignal,
+                evidenceSource: "\(top.supportingEvidenceIDs.count) supporting Flow reflections",
+                observationCount: evidence.count,
                 lastUpdated: Date()
             )
         }
 
         return ManualItem(
             sectionTitle: "MY FLOW CONDITIONS",
-            statement: "Clear task boundaries and structured project objectives are essential to entering flow without hesitation.",
-            maturity: .emergingSignal,
-            evidenceSource: "\(sessions.filter(\.completed).count) completed sessions",
-            observationCount: sessions.filter(\.completed).count,
+            statement: "\(evidence.count) Flow blocks reflected on, no consistent condition yet. Mixed results are still results.",
+            maturity: .mixed,
+            evidenceSource: "\(evidence.count) reflections, contradictory signals",
+            observationCount: evidence.count,
             lastUpdated: Date()
         )
     }
@@ -315,17 +429,18 @@ enum AttentionOperatingManualEngine {
     // MARK: - 10. My Personal Rules
 
     private static func deriveMyPersonalRules(rules: [PersonalRule]) -> [ManualItem] {
-        let keptRules = rules.filter { $0.lifecycle == .kept }
-        return keptRules.map { rule in
-            ManualItem(
-                sectionTitle: "PERSONAL RULE: \(rule.category.rawValue.uppercased())",
-                statement: "\(rule.title): \(rule.detail)",
-                maturity: .repeatedSignal,
-                evidenceSource: "Kept rule with verified adherence",
-                observationCount: nil,
-                lastUpdated: Date()
-            )
-        }
+        rules
+            .filter { $0.lifecycle == .kept }
+            .map { rule in
+                ManualItem(
+                    sectionTitle: "PERSONAL RULE · \(rule.category.rawValue.uppercased())",
+                    statement: "\(rule.title) — \(rule.detail)",
+                    maturity: rule.confidence == .strong || rule.timesTested >= 3 ? .repeatedSignal : .emergingSignal,
+                    evidenceSource: rule.sourceType.displayLabel,
+                    observationCount: rule.timesTested > 0 ? rule.timesTested : nil,
+                    lastUpdated: Date()
+                )
+            }
     }
 
     // MARK: - 11. What REBOOT Still Doesn't Know
@@ -339,46 +454,62 @@ enum AttentionOperatingManualEngine {
     ) -> [ManualItem] {
         var unknowns: [ManualItem] = []
 
-        let fuelSessions = sessions.filter { $0.fuelContext != nil && !$0.fuelContext!.isEmpty }
-        if fuelSessions.count < 10 {
+        let fuelLinked = sessions.filter { $0.fuelContext != nil && !$0.fuelContext!.isEmpty }
+        if fuelLinked.count < 10 {
             unknowns.append(ManualItem(
-                sectionTitle: "WHAT REBOOT STILL DOESN'T KNOW",
-                statement: "How specific sleep quality and meal timings modulate focus endurance across consecutive days.",
+                sectionTitle: "WHAT I STILL DON'T KNOW",
+                statement: "How sleep, meals and movement shape your focus across consecutive days.",
                 maturity: .learning,
-                evidenceSource: "Sample size too small (n=\(fuelSessions.count))",
-                observationCount: fuelSessions.count,
+                evidenceSource: fuelLinked.isEmpty
+                    ? "No context-linked sessions yet"
+                    : "Only \(fuelLinked.count) context-linked sessions",
+                observationCount: fuelLinked.count,
                 lastUpdated: Date()
             ))
         }
 
         if experiments.filter({ $0.result != nil }).count < 3 {
             unknowns.append(ManualItem(
-                sectionTitle: "WHAT REBOOT STILL DOESN'T KNOW",
-                statement: "Whether multi-task browser isolation outperforms physical phone placement for your creative work.",
+                sectionTitle: "WHAT I STILL DON'T KNOW",
+                statement: "Which environment change actually helps most — distance, protection, or a cleared desk. Personal Lab resolves it one comparison at a time.",
                 maturity: .learning,
-                evidenceSource: "Awaiting further A/B personal comparisons",
+                evidenceSource: "\(experiments.filter { $0.result != nil }.count) completed comparisons",
                 observationCount: experiments.count,
                 lastUpdated: Date()
             ))
         }
 
-        if digitalState.profile.interruptionPressure.value == .unknown {
+        if flowState.evidence.count < 3 {
             unknowns.append(ManualItem(
-                sectionTitle: "WHAT REBOOT STILL DOESN'T KNOW",
-                statement: "Exact threshold between internal restlessness vs external notification reflex.",
+                sectionTitle: "WHAT I STILL DON'T KNOW",
+                statement: "The conditions that hold your deepest work — challenge, feedback, duration, sound.",
                 maturity: .learning,
-                evidenceSource: "Interruption pressure not yet fully isolated",
-                observationCount: nil,
+                evidenceSource: flowState.evidence.isEmpty
+                    ? "No Flow reflections yet"
+                    : "Only \(flowState.evidence.count) Flow reflections",
+                observationCount: flowState.evidence.count,
+                lastUpdated: Date()
+            ))
+        }
+
+        if digitalState.profile.primaryDigitalPull.value == nil
+            || digitalState.profile.primaryDigitalPull.value == .unknown {
+            unknowns.append(ManualItem(
+                sectionTitle: "WHAT I STILL DON'T KNOW",
+                statement: "Whether external pulls or internal restlessness actually breaks attention more often.",
+                maturity: .learning,
+                evidenceSource: "Digital pull not yet isolated from session evidence",
+                observationCount: digitalState.interruptionEvents.count,
                 lastUpdated: Date()
             ))
         }
 
         if unknowns.isEmpty {
             unknowns.append(ManualItem(
-                sectionTitle: "WHAT REBOOT STILL DOESN'T KNOW",
-                statement: "Long-term seasonal variation and multi-week workload shifts.",
+                sectionTitle: "WHAT I STILL DON'T KNOW",
+                statement: "How these patterns hold over months, seasons and changing workloads. The manual keeps learning after Day 90.",
                 maturity: .learning,
-                evidenceSource: "Requires multi-month longitudinal observations",
+                evidenceSource: "Longer horizons need longer observation",
                 observationCount: nil,
                 lastUpdated: Date()
             ))

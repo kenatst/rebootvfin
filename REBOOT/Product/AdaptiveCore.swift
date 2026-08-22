@@ -788,25 +788,31 @@ enum Distractor {
     static let people = "people"
     static let internalRestlessness = "internal"
 
+    /// Maps diagnosis answers onto distractor hypotheses. A diagnosis answer
+    /// is a starting hypothesis only — observed session evidence outranks it.
     static func fromDiagnosis(_ answers: Answers) -> [String] {
         var out: [String] = []
-        for value in answers["breaker"] ?? [] {
-            switch value {
-            case "notifications": out.append(notifications)
-            case "social": out.append(social)
-            case "messages": out.append(notifications)
-            case "restlessness": out.append(internalRestlessness)
-            case "people": out.append(people)
-            case "tabs": out.append(tabs)
-            default: break
+        // Modern breaker values (and legacy placements) both feed the prior.
+        if let breakers = answers["breaker"] {
+            for value in breakers {
+                switch value {
+                case "phone", "in_hand", "on_desk": out.append(phone)
+                case "notifications", "messages": out.append(notifications)
+                case "social": out.append(social)
+                case "tabs": out.append(tabs)
+                case "people": out.append(people)
+                case "thoughts", "restlessness": out.append(internalRestlessness)
+                default: break
+                }
             }
         }
-        if answers["social_app"]?.isEmpty == false {
-            out.append(social)
-        }
-        if answers["phone_place"]?.isEmpty == false {
+        // Switch response reinforces the phone-pull hypothesis.
+        if DiagnosisModels.has(answers, "switch_response", "check_phone") {
             out.append(phone)
         }
+        // Legacy values from earlier installs remain decodable.
+        if let legacy = answers["social_app"], !legacy.isEmpty { out.append(social) }
+        if let legacyPlace = answers["phone_place"], !legacyPlace.isEmpty { out.append(phone) }
         return Array(Set(out))
     }
 
@@ -837,21 +843,31 @@ enum Distractor {
 // MARK: - Profile Builder (diagnosis → profile)
 
 enum ProfileBuilder {
+    /// Builds the STARTING POINT profile from diagnosis answers. Every value
+    /// here is a self-reported prior with `EvidenceSource.selfReport`; observed
+    /// session evidence progressively outweighs all of it.
     static func build(from answers: Answers) -> AttentionProfile {
         var profile = AttentionProfile()
         let src = EvidenceSource.selfReport
 
-        if let primary = answers["primary"]?.first {
-            profile.primaryGoal = .known(primary, source: src)
-        }
+        // Goal: single-goal users keep it as primary; multi-goal users get the
+        // explicit "one could fully change" answer as primary.
         if let goals = answers["goals"], !goals.isEmpty {
             profile.goals = .known(goals, source: src)
         }
+        if let primary = answers["primary"]?.first {
+            profile.primaryGoal = .known(primary, source: src)
+        } else if let only = answers["goals"]?.first, answers["goals"]?.count == 1 {
+            profile.primaryGoal = .known(only, source: src)
+        }
+
         let distractors = Distractor.fromDiagnosis(answers)
         if !distractors.isEmpty {
             profile.distractors = .known(distractors, source: src)
         }
 
+        // Focus window prior + reflex/stability priors. Behavioral anchors,
+        // never identity: sessions re-derive all three within days.
         switch answers["focus_window"]?.first {
         case "lt5":
             profile.focusWindowMinutes = 10
@@ -869,7 +885,7 @@ enum ProfileBuilder {
             profile.focusWindowMinutes = 30
             profile.reflex = .known(.low, source: src)
             profile.attentionStability = .known(.medium, source: src)
-        case "gt60":
+        case "usually_60_plus", "gt60":
             profile.focusWindowMinutes = 45
             profile.reflex = .known(.low, source: src)
             profile.attentionStability = .known(.high, source: src)
@@ -877,33 +893,35 @@ enum ProfileBuilder {
             profile.focusWindowMinutes = 15
         }
 
-        switch answers["reading"]?.first {
-        case "reread", "drift", "forget":
-            profile.recall = .known(.weak, source: src)
-        case "screen_only":
-            profile.recall = .known(.fair, source: src)
+        // Return prior — the honest unknown stays unknown.
+        switch answers["return_ability"]?.first {
+        case "quick_return":
+            profile.returnAfterDistraction = .known(.strong, source: src)
+        case "effortful_return":
+            profile.returnAfterDistraction = .known(.fair, source: src)
+        case "drift_elsewhere", "abandon_original":
+            profile.returnAfterDistraction = .known(.weak, source: src)
         default:
             break
         }
 
-        if let target = answers["recall_target"]?.first {
-            profile.recall = .known(.fair, source: src)
-            _ = target
+        // Recall prior: weak recall is claimed only by the user's own hardest-
+        // part answer; strong recall is never assumed at intake.
+        switch answers["hardest"]?.first {
+        case "remembering":
+            profile.recall = .known(.weak, source: src)
+        default:
+            break
+        }
+        if DiagnosisModels.has(answers, "switch_response", "keep_going_shallow") {
+            profile.depth = .known(.shallow, source: src)
         }
 
-        if let environment = answers["environment"]?.first {
-            profile.environment = .known(environment, source: src)
+        if let useCase = answers["use_case"]?.first {
+            profile.environment = .known(useCase, source: src)
         }
-        if let energy = answers["energy"]?.first {
-            profile.energyContext = .known(energy, source: src)
-        }
-        if let flow = answers["absorption"], !flow.isEmpty {
-            profile.flowConditions = .known(flow, source: src)
-        }
-        if let absorption = answers["absorption"], absorption.count >= 2 {
-            profile.depth = .known(.fair, source: src)
-        } else if answers["absorption"]?.isEmpty == false {
-            profile.depth = .known(.shallow, source: src)
+        if let bestTime = answers["best_time"]?.first {
+            profile.energyContext = .known(bestTime, source: src)
         }
 
         return profile
@@ -1331,7 +1349,7 @@ enum PrescriptionEngine {
 
         let goal = profile.primaryGoal.value ?? ""
         let memoryGoals: Set<String> = ["read_more", "remember_more", "study_better"]
-        let controlGoals: Set<String> = ["scroll_less", "phone_less"]
+        let controlGoals: Set<String> = ["scroll_less", "calmer_phone"]
         if memoryGoals.contains(goal) {
             scores[.recall, default: 0] += 16
             scores[.explain, default: 0] += 8
@@ -1344,9 +1362,9 @@ enum PrescriptionEngine {
             scores[.stay, default: 0] += 12
             scores[.observe, default: 0] += 3
             scores[.explain, default: 0] += goal == "deep_work" ? 3 : 0
-        } else if goal == "build_flow" {
+        } else if goal == "finish_tasks" {
             scores[.stay, default: 0] += 10
-            scores[.observe, default: 0] += 9
+            scores[.explain, default: 0] += 5
         }
 
         if profile.recall.value == .weak || (memoryGoals.contains(goal) && !profile.recall.isKnown) {
@@ -1579,8 +1597,7 @@ enum ProfileUpdater {
         if let switches = session.switches, session.mode == .stay || session.mode == .observe {
             let level: StabilityLevel = switches <= 1 ? .high : (switches <= 3 ? .medium : .low)
             if let current = profile.attentionStability.value {
-                let merged = merge(current, with: level)
-                profile.attentionStability = .known(merged, source: src)
+                profile.attentionStability = .known(merge(current, with: level), source: src)
             } else {
                 profile.attentionStability = .known(level, source: src)
             }
@@ -1666,25 +1683,32 @@ enum ProfileUpdater {
         }
     }
 
+    /// Merging moves one step toward the newest observation. Consistent
+    /// evidence converges on the observed level within a couple of sessions;
+    /// contradictory evidence settles honestly in the middle instead of
+    /// flapping. Averaging would pin a wrong prior forever.
     private static func merge(_ a: StabilityLevel, with b: StabilityLevel) -> StabilityLevel {
         let order: [StabilityLevel] = [.low, .medium, .high]
         let ia = order.firstIndex(of: a) ?? 1
         let ib = order.firstIndex(of: b) ?? 1
-        return order[(ia + ib) / 2]
+        if ia == ib { return a }
+        return order[ia + (ib > ia ? 1 : -1)]
     }
 
     private static func merge(_ a: ReturnLevel, with b: ReturnLevel) -> ReturnLevel {
         let order: [ReturnLevel] = [.weak, .fair, .strong]
         let ia = order.firstIndex(of: a) ?? 1
         let ib = order.firstIndex(of: b) ?? 1
-        return order[(ia + ib) / 2]
+        if ia == ib { return a }
+        return order[ia + (ib > ia ? 1 : -1)]
     }
 
     private static func merge(_ a: DepthLevel, with b: DepthLevel) -> DepthLevel {
         let order: [DepthLevel] = [.shallow, .fair, .deep]
         let ia = order.firstIndex(of: a) ?? 1
         let ib = order.firstIndex(of: b) ?? 1
-        return order[(ia + ib) / 2]
+        if ia == ib { return a }
+        return order[ia + (ib > ia ? 1 : -1)]
     }
 }
 
@@ -1740,5 +1764,237 @@ struct FocusLinePoint: Identifiable {
 enum FocusHistory {
     static func points(sessions: [SessionRecord]) -> [FocusLinePoint] {
         sessions.suffix(7).map { FocusLinePoint(minutes: $0.actualMinutes) }
+    }
+}
+
+// MARK: - Attention Profile Engine (living model)
+
+/// Evidence maturity for the Attention Profile.
+///
+/// REBOOT distinguishes what the user TOLD it from what it has OBSERVED, and
+/// never exposes fake confidence percentages. Maturity is derived per dimension
+/// from the evidence source behind the current value.
+enum ProfileEvidenceMaturity: String, Codable, Equatable, CaseIterable {
+    /// Diagnosis only — a self-reported prior with no observed support yet.
+    case startingPoint
+    /// A few observations begin to support (or contradict) the prior.
+    case earlySignal
+    /// Repeated sessions support the same conclusion consistently.
+    case repeatedSignal
+    /// Observed evidence and the prior disagree; both are shown honestly.
+    case mixed
+
+    var title: String {
+        switch self {
+        case .startingPoint: return "Starting point"
+        case .earlySignal: return "Early signal"
+        case .repeatedSignal: return "Repeated signal"
+        case .mixed: return "Mixed evidence"
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .startingPoint:
+            return "From what you told REBOOT at intake. Not yet confirmed by sessions."
+        case .earlySignal:
+            return "A few relevant observations agree so far."
+        case .repeatedSignal:
+            return "Several sessions point the same way."
+        case .mixed:
+            return "Recent evidence points in more than one direction."
+        }
+    }
+}
+
+/// One rendered row of the living Attention Profile.
+struct ProfileDimensionSnapshot: Equatable, Identifiable {
+    var id: String { name }
+    let name: String
+    let value: String
+    let maturity: ProfileEvidenceMaturity
+    /// True when the dimension currently has no honest value at all.
+    let isUnknown: Bool
+}
+
+enum AttentionProfileEngine {
+
+    // MARK: - Dimension snapshots
+
+    static func dimensions(
+        profile: AttentionProfile,
+        sessions: [SessionRecord]
+    ) -> [ProfileDimensionSnapshot] {
+        let protocolSessions = sessions.filter { $0.origin == .protocol }
+
+        var out: [ProfileDimensionSnapshot] = []
+        out.append(dimension(
+            "STARTING",
+            knowledge: profile.reflex.map { reflexSummary($0) },
+            observedCount: protocolSessions.filter { $0.firstDistraction != nil }.count,
+            unknownText: "Still learning how you begin."
+        ))
+        out.append(dimension(
+            "STAYING",
+            knowledge: profile.attentionStability.map { stabilitySummary($0) },
+            observedCount: protocolSessions.filter { ($0.switches ?? 0) > 0 || $0.completed }.count,
+            unknownText: "Still learning how long attention holds."
+        ))
+        out.append(dimension(
+            "RETURNING",
+            knowledge: profile.returnAfterDistraction.map { returnSummary($0) },
+            observedCount: protocolSessions.filter { ($0.switches ?? 0) >= 1 }.count,
+            unknownText: "Still learning what happens after a switch."
+        ))
+        out.append(dimension(
+            "RECALL",
+            knowledge: profile.recall.map { recallSummary($0) },
+            observedCount: protocolSessions.filter { $0.evidence?.recall?.selfAssessment != nil }.count,
+            unknownText: "Still learning what comes back without the source."
+        ))
+        out.append(dimension(
+            "DEPTH",
+            knowledge: profile.depth.map { depthSummary($0) },
+            observedCount: protocolSessions.filter { $0.mode == .stay && $0.completed }.count,
+            unknownText: "Still learning what depth looks like for you."
+        ))
+        out.append(dimension(
+            "DIGITAL PULL",
+            knowledge: profile.distractors.map { distractorSummary($0) },
+            observedCount: sessions.compactMap(\.firstDistraction)
+                .filter { $0 != "none" && $0 != "forgot" }.count,
+            unknownText: "Still learning where attention breaks most."
+        ))
+        out.append(dimension(
+            "ENERGY CONTEXT",
+            knowledge: profile.energyContext.map { energySummary($0) },
+            observedCount: sessions.filter { $0.energy != nil }.count,
+            unknownText: "Still learning how energy moves through your day."
+        ))
+        return out
+    }
+
+    private static func dimension(
+        _ name: String,
+        knowledge: (value: String, source: EvidenceSource?)?,
+        observedCount: Int,
+        unknownText: String
+    ) -> ProfileDimensionSnapshot {
+        guard let knowledge else {
+            return ProfileDimensionSnapshot(
+                name: name,
+                value: unknownText,
+                maturity: .startingPoint,
+                isUnknown: true
+            )
+        }
+        return ProfileDimensionSnapshot(
+            name: name,
+            value: knowledge.value,
+            maturity: maturity(source: knowledge.source, observedCount: observedCount),
+            isUnknown: false
+        )
+    }
+
+    /// Maps (source, observation volume) onto an honest maturity tier.
+    static func maturity(source: EvidenceSource?, observedCount: Int) -> ProfileEvidenceMaturity {
+        switch source {
+        case .selfReport, .none:
+            return observedCount >= 2 ? .earlySignal : .startingPoint
+        case .observed, .session:
+            return observedCount >= 3 ? .repeatedSignal : .earlySignal
+        case .repeated:
+            return .repeatedSignal
+        }
+    }
+
+    // MARK: - Overall maturity
+
+    /// The profile-level maturity label shown on the Profile tab.
+    static func overallMaturity(profile: AttentionProfile, sessions: [SessionRecord]) -> ProfileEvidenceMaturity {
+        let observedSessions = sessions.filter { $0.origin == .protocol }.count
+        if observedSessions == 0 { return .startingPoint }
+        if observedSessions < 4 { return .earlySignal }
+        return .repeatedSignal
+    }
+
+    // MARK: - Summaries
+
+    static func reflexSummary(_ level: ReflexLevel) -> String {
+        switch level {
+        case .high: return "Attention redirects quickly once something pulls it."
+        case .medium: return "Pulls land sometimes, not always."
+        case .low: return "Pulls rarely redirect you mid-block."
+        }
+    }
+
+    static func stabilitySummary(_ level: StabilityLevel) -> String {
+        switch level {
+        case .low: return "Attention holds briefly before moving."
+        case .medium: return "Attention holds a moderate stretch before moving."
+        case .high: return "Attention holds well once engaged."
+        }
+    }
+
+    static func returnSummary(_ level: ReturnLevel) -> String {
+        switch level {
+        case .weak: return "Coming back after distraction is the weak spot right now."
+        case .fair: return "You usually come back, though it costs some momentum."
+        case .strong: return "You come back to the same task quickly."
+        }
+    }
+
+    static func recallSummary(_ level: RecallLevel) -> String {
+        switch level {
+        case .weak: return "Little comes back once the source is gone."
+        case .fair: return "Some material comes back without the source."
+        case .strong: return "Most of the material survives being hidden."
+        }
+    }
+
+    static func depthSummary(_ level: DepthLevel) -> String {
+        switch level {
+        case .shallow: return "Long stretches tend to lose their depth."
+        case .fair: return "Depth appears in patches during longer blocks."
+        case .deep: return "Sustained blocks keep their depth to the end."
+        }
+    }
+
+    static func distractorSummary(_ values: [String]) -> String {
+        let names = values.prefix(3).map { label(for: $0) }
+        return "The usual suspects: \(names.joined(separator: ", "))."
+    }
+
+    static func energySummary(_ timeOfDay: String) -> String {
+        switch timeOfDay {
+        case "early": return "Early morning is when attention feels best — so far self-reported."
+        case "morning": return "Mid-morning is your reported best window."
+        case "afternoon": return "Afternoon is your reported best window."
+        case "evening": return "Evening is your reported best window."
+        case "night": return "Late night is your reported best window."
+        default: return "No clear best window yet."
+        }
+    }
+
+    static func label(for distractor: String) -> String {
+        switch distractor {
+        case Distractor.phone: return "the phone"
+        case Distractor.social: return "social apps"
+        case Distractor.notifications: return "notifications"
+        case Distractor.tabs: return "open tabs"
+        case Distractor.people: return "people & noise"
+        case Distractor.internalRestlessness: return "internal restlessness"
+        default: return distractor
+        }
+    }
+}
+
+// MARK: - Knowledge helpers
+
+extension Knowledge {
+    /// Flattens to (value-description, source) for summary rendering.
+    func map<U>(_ transform: (Value) -> U) -> (value: U, source: EvidenceSource?)? {
+        guard case .known(let value, let source) = self else { return nil }
+        return (transform(value), source)
     }
 }

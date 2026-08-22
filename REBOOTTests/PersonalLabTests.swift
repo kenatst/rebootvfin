@@ -694,8 +694,9 @@ final class PersonalLabTests: XCTestCase {
     }
 
     func testNinetyDaySimulationWithLabAndRuleKeepsProgramSemantics() {
+        // Modern diagnosis keys (the legacy "primary_goal" id is no longer written).
         let store = ProductStore(
-            diagnosisAnswers: ["primary_goal": ["deep_work"], "breaker": ["phone"]],
+            diagnosisAnswers: ["goals": ["deep_work"], "breaker": ["phone"]],
             defaults: defaults
         )
         var experimentID: UUID?

@@ -59,17 +59,3 @@ struct EditorialIllustrationContainer<Content: View>: View {
 }
 
 /// Abstract "attention bloom": concentric arcs around a small dot.
-struct AttentionBloomMark: View {
-    var accent: Color = AppColors.coral
-
-    var body: some View {
-        ZStack {
-            Circle().stroke(accent.opacity(0.35), lineWidth: 1.5)
-                .frame(width: 34, height: 34)
-            Circle().stroke(accent.opacity(0.55), lineWidth: 1.5)
-                .frame(width: 22, height: 22)
-            Circle().fill(accent)
-                .frame(width: 7, height: 7)
-        }
-    }
-}
