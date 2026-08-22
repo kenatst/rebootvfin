@@ -638,7 +638,7 @@ final class PersonalLabTests: XCTestCase {
         XCTAssertEqual(store.day, 2)
         XCTAssertEqual(store.sessions.count, 1)
         XCTAssertTrue(store.labState.experiments.isEmpty)
-        XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v6"))
+        XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v7"))
         XCTAssertNil(defaults.object(forKey: "reboot.product.v5"))
     }
 
@@ -963,7 +963,7 @@ final class PersonalLabTests: XCTestCase {
     }
 
     private func clearPersistence() {
-        for key in (1...6).map({ "reboot.product.v\($0)" }) {
+        for key in (1...7).map({ "reboot.product.v\($0)" }) {
             defaults.removeObject(forKey: key)
         }
     }

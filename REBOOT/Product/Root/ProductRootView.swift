@@ -14,6 +14,9 @@ struct ProductRootView: View {
             case .lab:
                 PersonalLabView(product: product, environmentStore: environmentStore)
                     .transition(.opacity)
+            case .fuel:
+                FuelView(product: product)
+                    .transition(.opacity)
             case .preparing(let request):
                 SessionPreparationView(product: product, environmentStore: environmentStore, request: request)
                     .transition(.opacity)
@@ -48,6 +51,9 @@ struct ProductRootView: View {
 #if DEBUG
         .onAppear {
             print("QA-PRESC day=\(product.day) mode=\(product.prescription.mode.rawValue) headline=\(product.prescription.headline) minutes=\(product.prescription.minutes) action=\(product.prescription.action)")
+            if ProcessInfo.processInfo.arguments.contains("-qaOpenFuel") {
+                product.openFuel()
+            }
             if ProcessInfo.processInfo.arguments.contains("-qaAuto") {
                 runQAAuto()
             }

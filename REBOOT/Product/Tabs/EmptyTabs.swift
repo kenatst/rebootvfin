@@ -249,6 +249,9 @@ struct ProfileTab: View {
                         personalLabSection
                             .padding(.top, 32)
 
+                        energyContextSection
+                            .padding(.top, 32)
+
                         // Personal Rules Section
                         personalRulesSection
                             .padding(.top, 32)
@@ -376,6 +379,57 @@ struct ProfileTab: View {
         return product.labSuggestions(
             screenTimeAvailable: environment?.screenTimeConnected == true && environment?.hasSelection == true
         )
+    }
+
+    // MARK: - Energy & Context (Fuel)
+
+    private var energyContextSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                MetaLabel(text: "Energy & Context", color: AppColors.coral)
+                Spacer()
+                Button { product.openFuel() } label: {
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppColors.coral)
+                        .frame(width: 36, height: 36)
+                }
+                .accessibilityLabel("Open Fuel")
+            }
+
+            let analysis = product.fuelAnalysis
+            if let pattern = analysis.patterns.first(where: { $0.dimension == .energy }) ?? analysis.patterns.first {
+                PaperCard(radius: 24, padding: 18) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        GlassPill(text: pattern.maturity.label, tint: AppColors.coral)
+                        Text(pattern.statement, style: .heroGoal)
+                            .foregroundStyle(AppColors.ink)
+                        Button { product.openFuel() } label: {
+                            GlassPill(text: "Open Fuel", symbol: "chevron.right", tint: AppColors.ink)
+                        }
+                        .buttonStyle(PressScaleStyle())
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Energy context. \(pattern.maturity.label). \(pattern.statement)")
+            } else {
+                PaperCard(radius: 24, padding: 18) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(
+                            product.fuelLinkedSessions.isEmpty
+                                ? "REBOOT is still learning how daily context interacts with your sessions."
+                                : "No stable context pattern yet — that is an honest result.",
+                            style: .heroReason
+                        )
+                        .foregroundStyle(AppColors.inkSoft)
+                        Button { product.openFuel() } label: {
+                            GlassPill(text: "Open Fuel", symbol: "chevron.right", tint: AppColors.ink)
+                        }
+                        .buttonStyle(PressScaleStyle())
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Overview card
@@ -548,6 +602,15 @@ struct ProfileTab: View {
                         value: levelText(profile.returnAfterDistraction),
                         source: profile.returnAfterDistraction.source?.label ?? "Self-reported"
                     )
+                    Button { product.openFuel() } label: {
+                        dimensionCard(
+                            title: "Energy Context",
+                            value: energyContextValue,
+                            source: "From Fuel observations"
+                        )
+                    }
+                    .buttonStyle(PressScaleStyle())
+                    .accessibilityLabel("Energy context. \(energyContextValue). Opens Fuel.")
                 }
             }
         }
@@ -645,6 +708,19 @@ struct ProfileTab: View {
             return "Initial focus holds 10–20 min before switching"
         }
         return "Steady return pattern across sessions"
+    }
+
+    /// Attention Map Energy Context: meaningful only when Fuel evidence
+    /// exists; otherwise honestly unknown.
+    private var energyContextValue: String {
+        let analysis = product.fuelAnalysis
+        if let pattern = analysis.patterns.first(where: { $0.dimension == .energy }) {
+            return "\(pattern.maturity.label) — \(pattern.statement)"
+        }
+        if product.fuelLinkedSessions.isEmpty {
+            return "Still learning"
+        }
+        return "No stable pattern yet"
     }
 
     private var observedDistractorSummary: String {

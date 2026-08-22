@@ -84,7 +84,8 @@ struct PersonalLabView: View {
         }
         .sheet(isPresented: $showLibrary) {
             ExperimentLibrarySheet(
-                screenTimeAvailable: environmentStore.isConnected && environmentStore.selection != nil
+                screenTimeAvailable: environmentStore.isConnected && environmentStore.selection != nil,
+                observationalFuelAvailable: product.fuelState.promptsEnabled
             ) { template in
                 showLibrary = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -105,6 +106,11 @@ struct PersonalLabView: View {
                selectedExperiment == nil,
                let completed = product.pastExperiments.first(where: { $0.result != nil }) {
                 selectedExperiment = LabExperimentSelection(id: completed.id)
+            }
+            if ProcessInfo.processInfo.arguments.contains("-qaOpenActiveLabDetail"),
+               selectedExperiment == nil,
+               let active = product.activeExperiment {
+                selectedExperiment = LabExperimentSelection(id: active.id)
             }
 #endif
         }
@@ -150,7 +156,13 @@ struct PersonalLabView: View {
                         .foregroundStyle(AppColors.ink)
                         .padding(.top, 18)
 
-                    if let assignment = PersonalLabEngine.nextAssignment(for: experiment) {
+                    if experiment.comparisonKind == .observationalComparison {
+                        MetaLabel(text: "How it fills")
+                            .padding(.top, 18)
+                        Text("You don't change anything. REBOOT pairs sessions that occur naturally.", style: .heroReason)
+                            .foregroundStyle(AppColors.inkSoft)
+                            .padding(.top, 5)
+                    } else if let assignment = PersonalLabEngine.nextAssignment(for: experiment) {
                         let arm = experiment.arm(for: assignment.armKind)
                         MetaLabel(text: "Current condition")
                             .padding(.top, 18)
@@ -383,6 +395,15 @@ private struct ExperimentTemplateSheet: View {
                 test: template.testCondition
             )
             .padding(.top, 28)
+
+            if template.comparisonKind == .observationalComparison {
+                Text(
+                    "Naturally occurring — you don't change anything. REBOOT pairs real sessions from both sides as they happen.",
+                    style: .footnote
+                )
+                .foregroundStyle(AppColors.inkFaint)
+                .padding(.top, 14)
+            }
 
             VStack(alignment: .leading, spacing: 7) {
                 MetaLabel(text: "What we're watching")
@@ -631,12 +652,15 @@ struct ExperimentDetailView: View {
             Text("\(result.completedPairs) comparable pair\(result.completedPairs == 1 ? "" : "s")", style: .heroGoal)
                 .foregroundStyle(AppColors.ink)
             ForEach(result.pairResults) { pair in
-                HStack(spacing: 9) {
-                    Image(systemName: pairSymbol(pair.comparison))
-                        .foregroundStyle(AppColors.coral)
-                    Text("Pair \(pair.pairIndex): \(pair.explanation)", style: .heroReason)
-                        .foregroundStyle(AppColors.inkSoft)
-                }
+                compactPairTrace(pair, experiment: experiment)
+            }
+            if !experiment.historicalResults.isEmpty {
+                Text(
+                    "Earlier result on this test: INCONCLUSIVE · kept as history, never counted twice.",
+                    style: .footnote
+                )
+                .foregroundStyle(AppColors.inkFaint)
+                .padding(.top, 4)
             }
         }
         .padding(.top, 26)
@@ -698,6 +722,20 @@ struct ExperimentDetailView: View {
                 }
             }
         case .inconclusive:
+            if experiment.status == .completed,
+               experiment.plan.targetPairs < ExperimentPolicy.maxPairs,
+               let result = experiment.result, result.state == .inconclusive {
+                PrimaryPillButton(title: "Run one more comparison", symbol: "plus.circle") {
+                    _ = product.extendInconclusiveExperiment(id: experiment.id)
+                    dismiss()
+                }
+                Text(
+                    "Adds one balanced pair to this same test. Earlier results are kept as history and never counted twice.",
+                    style: .footnote
+                )
+                .foregroundStyle(AppColors.inkFaint)
+                .padding(.top, 8)
+            }
             HStack(spacing: 12) {
                 repeatButton(experiment)
                 Button { dismiss() } label: {
@@ -705,6 +743,7 @@ struct ExperimentDetailView: View {
                 }
                 .buttonStyle(PressScaleStyle())
             }
+            .padding(.top, 12)
         }
     }
 
@@ -727,6 +766,64 @@ struct ExperimentDetailView: View {
         .buttonStyle(PressScaleStyle())
     }
 
+    /// Restrained trace: transparency, not a dashboard. Each pair shows both
+    /// arms with the session day, mode, and the primary-outcome value.
+    private func compactPairTrace(_ pair: ExperimentPair, experiment: PersonalExperiment) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 9) {
+                Image(systemName: pairSymbol(pair.comparison))
+                    .foregroundStyle(AppColors.coral)
+                Text("Pair \(pair.pairIndex)", style: .heroMode)
+                    .foregroundStyle(AppColors.ink)
+            }
+            ForEach([ExperimentArmKind.normal, .test], id: \.self) { armKind in
+                if let observationID = armKind == .normal ? pair.normalObservationID : pair.testObservationID,
+                   let observation = experiment.observations.first(where: { $0.id == observationID }) {
+                    HStack(alignment: .top, spacing: 8) {
+                        Text(armKind.displayLabel.uppercased(), style: .footnote)
+                            .foregroundStyle(armKind == .test ? AppColors.coral : AppColors.inkFaint)
+                            .frame(minWidth: 62, alignment: .leading)
+                        Text(
+                            "Day \(observationDateDay(observation)) · \(observation.mode.rawValue)\(primaryOutcomeText(observation, experiment: experiment))",
+                            style: .footnote
+                        )
+                        .foregroundStyle(AppColors.inkSoft)
+                    }
+                }
+            }
+            Text(pair.explanation, style: .footnote)
+                .foregroundStyle(AppColors.inkFaint)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppColors.paperRaised)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Pair \(pair.pairIndex). \(pair.explanation)")
+    }
+
+    private func observationDateDay(_ observation: ExperimentObservation) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: observation.date)
+    }
+
+    private func primaryOutcomeText(
+        _ observation: ExperimentObservation,
+        experiment: PersonalExperiment
+    ) -> String {
+        guard let value = observation.outcomes[experiment.primaryOutcome.key] else { return "" }
+        let text: String
+        switch value {
+        case .integer(let int): text = "\(int)"
+        case .boolean(let bool): text = bool ? "yes" : "no"
+        case .firstSwitch(let timing): text = timing.label
+        case .recall(let recall): text = recall == .little ? "a little" : (recall == .some ? "some" : "most")
+        case .explanation(let explanation): text = explanation == .yes ? "yes" : (explanation == .partly ? "partly" : "not yet")
+        }
+        return " · \(experiment.primaryOutcome.displayName): \(text)"
+    }
+
     private func pairStatus(index: Int, experiment: PersonalExperiment) -> String {
         if let pair = experiment.pairs.first(where: { $0.pairIndex == index }), pair.isComplete {
             return "Pair \(index) complete"
@@ -742,12 +839,19 @@ struct ExperimentDetailView: View {
 
 private struct ExperimentLibrarySheet: View {
     let screenTimeAvailable: Bool
+    var observationalFuelAvailable: Bool = true
     let select: (ExperimentTemplate) -> Void
     @Environment(\.dismiss) private var dismiss
 
     private var templates: [ExperimentTemplate] {
-        ExperimentTemplateLibrary.all.filter {
-            $0.capabilityRequirement != .screenTimeSelection || screenTimeAvailable
+        ExperimentTemplateLibrary.all.filter { template in
+            if template.capabilityRequirement == .screenTimeSelection, !screenTimeAvailable { return false }
+            // Sleep/meal observational comparisons need Fuel context answers;
+            // without prompts they could never fill an arm.
+            if template.comparisonKind == .observationalComparison,
+               template.targetVariable == .sleepContext || template.targetVariable == .mealContext,
+               !observationalFuelAvailable { return false }
+            return true
         }
     }
 

@@ -11,6 +11,19 @@ struct TodayView: View {
 
     private var prescription: DailyPrescription { product.prescription }
 
+    /// Opportunity-aware: the Lab card appears only when today's real session
+    /// genuinely counts toward the active test.
+    private var experimentCardEligible: Bool {
+        switch product.todayExperimentOpportunity(
+            activeRecurringProtection: environmentStore.hasActiveProtectionNow
+        ) {
+        case .eligibleNow, .eligibleWithConfirmation:
+            return true
+        case .notComparable, .blocked, nil:
+            return false
+        }
+    }
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -20,6 +33,10 @@ struct TodayView: View {
                         metadata
                         headline
                         sentence
+                        if product.programStatus == .active, let fuelPrompt = product.currentFuelPrompt {
+                            FuelPromptCard(product: product, prompt: fuelPrompt)
+                                .padding(.top, 26)
+                        }
                         TodayHero(product: product)
                             .padding(.top, 34)
                         if product.programStatus == .active {
@@ -27,9 +44,7 @@ struct TodayView: View {
                                 RealWorldActionCard(product: product, environmentStore: environmentStore)
                                     .padding(.top, 18)
                             }
-                            if product.todayExperimentParticipation(
-                                activeRecurringProtection: environmentStore.hasActiveProtectionNow
-                            ) != nil {
+                            if experimentCardEligible {
                                 TodayExperimentCard(product: product, environmentStore: environmentStore)
                                     .padding(.top, 14)
                             }

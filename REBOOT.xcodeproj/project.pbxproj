@@ -74,6 +74,11 @@
 		9B0000000000000000000001 /* ProgramCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0000000000000000000002 /* ProgramCore.swift */; };
 		9B0000000000000000000003 /* ProgramViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0000000000000000000004 /* ProgramViews.swift */; };
 		9C0000000000000000000001 /* PersonalLabCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C0000000000000000000002 /* PersonalLabCore.swift */; };
+		9D0000000000000000000011 /* FuelModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D0000000000000000000012 /* FuelModels.swift */; };
+		9D0000000000000000000021 /* FuelSamplingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D0000000000000000000022 /* FuelSamplingEngine.swift */; };
+		9D0000000000000000000031 /* FuelPatternEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D0000000000000000000032 /* FuelPatternEngine.swift */; };
+		9D0000000000000000000041 /* FuelViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D0000000000000000000042 /* FuelViews.swift */; };
+		9E0000000000000000000011 /* FuelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E0000000000000000000012 /* FuelTests.swift */; };
 		9C0000000000000000000004 /* PersonalLabViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C0000000000000000000005 /* PersonalLabViews.swift */; };
 		9C0000000000000000000006 /* PersonalLabTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C0000000000000000000007 /* PersonalLabTests.swift */; };
 	/* End PBXBuildFile section */
@@ -199,6 +204,11 @@
 		9C0000000000000000000002 /* PersonalLabCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalLabCore.swift; sourceTree = "<group>"; };
 		9C0000000000000000000005 /* PersonalLabViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalLabViews.swift; sourceTree = "<group>"; };
 		9C0000000000000000000007 /* PersonalLabTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalLabTests.swift; sourceTree = "<group>"; };
+		9D0000000000000000000012 /* FuelModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FuelModels.swift; sourceTree = "<group>"; };
+		9D0000000000000000000022 /* FuelSamplingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FuelSamplingEngine.swift; sourceTree = "<group>"; };
+		9D0000000000000000000032 /* FuelPatternEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FuelPatternEngine.swift; sourceTree = "<group>"; };
+		9D0000000000000000000042 /* FuelViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FuelViews.swift; sourceTree = "<group>"; };
+		9E0000000000000000000012 /* FuelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FuelTests.swift; sourceTree = "<group>"; };
 	/* End PBXFileReference section */
 
 	/* Begin PBXGroup section */
@@ -317,6 +327,17 @@
 			path = Program;
 			sourceTree = "<group>";
 		};
+		9D0000000000000000000010 /* Fuel */ = {
+			isa = PBXGroup;
+			children = (
+				9D0000000000000000000012 /* FuelModels.swift */,
+				9D0000000000000000000022 /* FuelSamplingEngine.swift */,
+				9D0000000000000000000032 /* FuelPatternEngine.swift */,
+				9D0000000000000000000042 /* FuelViews.swift */,
+			);
+			path = Fuel;
+			sourceTree = "<group>";
+		};
 		9C0000000000000000000003 /* PersonalLab */ = {
 			isa = PBXGroup;
 			children = (
@@ -335,6 +356,7 @@
 				575972E876006934E9B5B1AC,
 				9B0000000000000000000005 /* Program */,
 				9C0000000000000000000003 /* PersonalLab */,
+				9D0000000000000000000010 /* Fuel */,
 				03327B4BB8B671204EF7BD05,
 				81FA6CF8148788D830F5E88A,
 				920284D85A96422B151973C1,
@@ -475,6 +497,7 @@
 			children = (
 				9A0000000000000000000002 /* REBOOTTests.swift */,
 				9C0000000000000000000007 /* PersonalLabTests.swift */,
+				9E0000000000000000000012 /* FuelTests.swift */,
 			);
 			path = REBOOTTests;
 			sourceTree = "<group>";
@@ -571,6 +594,10 @@
 				9B0000000000000000000001 /* ProgramCore.swift in Sources */,
 				9B0000000000000000000003 /* ProgramViews.swift in Sources */,
 				9C0000000000000000000001 /* PersonalLabCore.swift in Sources */,
+				9D0000000000000000000011 /* FuelModels.swift in Sources */,
+				9D0000000000000000000021 /* FuelSamplingEngine.swift in Sources */,
+				9D0000000000000000000031 /* FuelPatternEngine.swift in Sources */,
+				9D0000000000000000000041 /* FuelViews.swift in Sources */,
 				9C0000000000000000000004 /* PersonalLabViews.swift in Sources */,
 				91EF2CCF54D98AC6AFA0ACA0 /* ProductStore.swift in Sources */,
 				214B397E915C917076B0DEA2 /* QASeed.swift in Sources */,
@@ -621,6 +648,7 @@
 			files = (
 				9A0000000000000000000001 /* REBOOTTests.swift in Sources */,
 				9C0000000000000000000006 /* PersonalLabTests.swift in Sources */,
+				9E0000000000000000000011 /* FuelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

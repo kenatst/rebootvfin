@@ -465,6 +465,9 @@ struct TrainingSessionRequest: Codable, Identifiable, Equatable {
     var curriculumIntent: CurriculumIntentKind?
     var adaptationReason: String?
     var experimentParticipation: ExperimentParticipation?
+    /// Pre-session Fuel context captured from one optional prompt (or a Lab
+    /// observational matcher). Optional fields only; unknown stays unknown.
+    var fuelContext: FuelContextSnapshot? = nil
     var createdAt = Date()
 
     static func protocolRequest(
@@ -563,6 +566,10 @@ struct SessionRecord: Codable, Identifiable, Equatable {
     /// session remains protocol while contributing one Lab observation.
     var experimentParticipation: ExperimentParticipation?
 
+    /// Fuel context captured before the session. Frozen once the session is
+    /// saved: historical context is never rewritten from later user state.
+    var fuelContext: FuelContextSnapshot? = nil
+
     init(
         id: UUID = UUID(),
         origin: SessionOrigin = .protocol,
@@ -592,7 +599,8 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         curriculumIntent: CurriculumIntentKind? = nil,
         adaptationReason: String? = nil,
         environment: EnvironmentSnapshot? = nil,
-        experimentParticipation: ExperimentParticipation? = nil
+        experimentParticipation: ExperimentParticipation? = nil,
+        fuelContext: FuelContextSnapshot? = nil
     ) {
         self.id = id
         self.origin = origin
@@ -623,6 +631,7 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         self.adaptationReason = adaptationReason
         self.environment = environment
         self.experimentParticipation = experimentParticipation
+        self.fuelContext = fuelContext
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -630,7 +639,7 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         case elapsedSeconds, completed, endedEarly, firstDistraction, switches, difficulty
         case energy, environmentActionDone, environmentVerification, startedEasierSelfReport, firstSwitchMinute, firstSwitchTiming, evidence
         case appliedRuleIDs, environmentPreparation, programPhase, curriculumIntent, adaptationReason, environment
-        case experimentParticipation
+        case experimentParticipation, fuelContext
     }
 
     init(from decoder: Decoder) throws {
@@ -665,6 +674,7 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         adaptationReason = try values.decodeIfPresent(String.self, forKey: .adaptationReason)
         environment = try values.decodeIfPresent(EnvironmentSnapshot.self, forKey: .environment)
         experimentParticipation = try values.decodeIfPresent(ExperimentParticipation.self, forKey: .experimentParticipation)
+        fuelContext = try values.decodeIfPresent(FuelContextSnapshot.self, forKey: .fuelContext)
     }
 
     var targetReached: Bool {

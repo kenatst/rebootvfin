@@ -49,6 +49,40 @@ enum ExperimentConditionTiming: String, Codable, Equatable {
     case afterSession
 }
 
+/// Typed namespace for experiment conditions. Existing string-backed IDs
+/// remain the wire format; the domain gives comparison and conflict logic a
+/// clean, extensible classification instead of keyword heuristics alone.
+enum ExperimentConditionDomain: String, Codable, Equatable {
+    case digital
+    case environment
+    case task
+    case fuel
+    case flow
+    case custom
+
+    /// Maps a stored condition ID (e.g. "phone.usual", "fuel.movement.walk_before")
+    /// to its domain. Unknown prefixes stay `.custom`, preserving historical
+    /// meaning instead of rejecting it.
+    static func domain(forConditionID id: String) -> ExperimentConditionDomain {
+        if id.hasPrefix("phone.") || id.hasPrefix("screen_time.") || id.hasPrefix("browser.") { return .digital }
+        if id.hasPrefix("sound.") { return .environment }
+        if id.hasPrefix("finish_line.") { return .task }
+        if id.hasPrefix("fuel.") { return .fuel }
+        if id.hasPrefix("flow.") { return .flow }
+        return .custom
+    }
+}
+
+/// Machine-readable matcher for observational comparison arms: the arm a
+/// session belongs to is determined by naturally occurring context, never by
+/// instruction. Daypart matchers resolve from the session timestamp; other
+/// fields resolve from the session's Fuel snapshot.
+enum ExperimentContextMatcherField: String, Codable, Equatable {
+    case daypart
+    case sleepQuality
+    case mealTiming
+}
+
 /// A string-backed condition keeps Lab open to future Fuel and Flow providers
 /// without making the current public library pretend those inputs exist today.
 struct ExperimentCondition: Codable, Identifiable, Equatable, Hashable {
@@ -58,9 +92,74 @@ struct ExperimentCondition: Codable, Identifiable, Equatable, Hashable {
     var timing: ExperimentConditionTiming = .beforeSession
     var expectedTruthSource: ExperimentTruthSource = .userReported
     var requiresExplicitConsent: Bool = false
+    /// Observational arms only: which naturally occurring context selects this arm.
+    var contextMatcher: ExperimentContextMatcher?
 
     var requiresManualConfirmation: Bool {
         expectedTruthSource == .userReported
+    }
+
+    var domain: ExperimentConditionDomain {
+        ExperimentConditionDomain.domain(forConditionID: id)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, detail, timing, expectedTruthSource, requiresExplicitConsent, contextMatcher
+    }
+
+    init(
+        id: String,
+        title: String,
+        detail: String,
+        timing: ExperimentConditionTiming = .beforeSession,
+        expectedTruthSource: ExperimentTruthSource = .userReported,
+        requiresExplicitConsent: Bool = false,
+        contextMatcher: ExperimentContextMatcher? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.detail = detail
+        self.timing = timing
+        self.expectedTruthSource = expectedTruthSource
+        self.requiresExplicitConsent = requiresExplicitConsent
+        self.contextMatcher = contextMatcher
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        title = try values.decode(String.self, forKey: .title)
+        detail = try values.decode(String.self, forKey: .detail)
+        timing = try values.decodeIfPresent(ExperimentConditionTiming.self, forKey: .timing) ?? .beforeSession
+        expectedTruthSource = try values.decodeIfPresent(ExperimentTruthSource.self, forKey: .expectedTruthSource) ?? .userReported
+        requiresExplicitConsent = try values.decodeIfPresent(Bool.self, forKey: .requiresExplicitConsent) ?? false
+        // v6 conditions predate matchers; absent key must decode to nil.
+        contextMatcher = try values.decodeIfPresent(ExperimentContextMatcher.self, forKey: .contextMatcher)
+    }
+}
+
+/// Observational arm selector: the context value that decides which arm a
+/// naturally occurring session belongs to.
+struct ExperimentContextMatcher: Codable, Equatable, Hashable {
+    var field: ExperimentContextMatcherField
+    var value: String
+
+    func matches(snapshot: FuelContextSnapshot?, sessionDate: Date) -> Bool {
+        switch field {
+        case .daypart:
+            return FuelDaypart.derive(from: sessionDate).rawValue == value
+        case .sleepQuality:
+            return snapshot?.sleepQuality?.rawValue == value
+        case .mealTiming:
+            return snapshot?.mealTiming?.rawValue == value
+        }
+    }
+
+    var truthSource: ExperimentTruthSource {
+        switch field {
+        case .daypart: return .systemConfirmed
+        case .sleepQuality, .mealTiming: return .userReported
+        }
     }
 }
 
@@ -145,6 +244,22 @@ struct ExperimentPlan: Codable, Equatable {
             armOrder: slots
         )
     }
+
+    /// Appends one more balanced pair, continuing the rotation pattern.
+    /// Caller enforces the max-pairs policy.
+    mutating func extendByOnePair() {
+        let nextIndex = targetPairs + 1
+        let pairOrders: [[ExperimentArmKind]] = [
+            [.normal, .test],
+            [.test, .normal],
+            [.normal, .test],
+        ]
+        let order = pairOrders[(nextIndex - 1) % pairOrders.count]
+        armOrder.append(contentsOf: order.map {
+            ExperimentAssignmentSlot(pairIndex: nextIndex, armKind: $0)
+        })
+        targetPairs = nextIndex
+    }
 }
 
 struct ExperimentEligibilitySnapshot: Codable, Equatable {
@@ -184,6 +299,10 @@ enum ExperimentConfoundKind: String, Codable, Equatable {
     case missingPrimaryOutcome
     case endedTooEarly
     case conflictingEnvironmentOverride
+    /// Variable-aware comparability: the target variable did not differ between arms.
+    case targetVariableDidNotDiffer
+    /// Variable-aware comparability: a non-target context differed between arms.
+    case contextMismatch
 }
 
 struct ExperimentConfound: Codable, Identifiable, Equatable {
@@ -211,6 +330,80 @@ struct ExperimentObservation: Codable, Identifiable, Equatable {
     var confounds: [ExperimentConfound]
     var sourceEvidenceIDs: [UUID]
     var date: Date
+    /// Fuel context captured with the session — used by variable-aware
+    /// comparability. Absent on all pre-Fuel observations, which stay valid.
+    var fuelContext: FuelContextSnapshot?
+
+    enum CodingKeys: String, CodingKey {
+        case id, experimentID, sessionID, armID, armKind, pairIndex, requestedCondition
+        case mode, targetMinutes, actualMinutes, completed, endedEarly, outcomes
+        case classification, classificationReason, confounds, sourceEvidenceIDs, date, fuelContext
+    }
+
+    init(
+        id: UUID = UUID(),
+        experimentID: UUID,
+        sessionID: UUID,
+        armID: UUID,
+        armKind: ExperimentArmKind,
+        pairIndex: Int,
+        requestedCondition: ExperimentConditionSnapshot,
+        mode: TrainingMode,
+        targetMinutes: Int,
+        actualMinutes: Int,
+        completed: Bool,
+        endedEarly: Bool,
+        outcomes: [String: ExperimentMetricValue],
+        classification: ExperimentObservationClassification,
+        classificationReason: String,
+        confounds: [ExperimentConfound],
+        sourceEvidenceIDs: [UUID],
+        date: Date,
+        fuelContext: FuelContextSnapshot? = nil
+    ) {
+        self.id = id
+        self.experimentID = experimentID
+        self.sessionID = sessionID
+        self.armID = armID
+        self.armKind = armKind
+        self.pairIndex = pairIndex
+        self.requestedCondition = requestedCondition
+        self.mode = mode
+        self.targetMinutes = targetMinutes
+        self.actualMinutes = actualMinutes
+        self.completed = completed
+        self.endedEarly = endedEarly
+        self.outcomes = outcomes
+        self.classification = classification
+        self.classificationReason = classificationReason
+        self.confounds = confounds
+        self.sourceEvidenceIDs = sourceEvidenceIDs
+        self.date = date
+        self.fuelContext = fuelContext
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        experimentID = try values.decode(UUID.self, forKey: .experimentID)
+        sessionID = try values.decode(UUID.self, forKey: .sessionID)
+        armID = try values.decode(UUID.self, forKey: .armID)
+        armKind = try values.decode(ExperimentArmKind.self, forKey: .armKind)
+        pairIndex = try values.decode(Int.self, forKey: .pairIndex)
+        requestedCondition = try values.decode(ExperimentConditionSnapshot.self, forKey: .requestedCondition)
+        mode = try values.decode(TrainingMode.self, forKey: .mode)
+        targetMinutes = try values.decode(Int.self, forKey: .targetMinutes)
+        actualMinutes = try values.decode(Int.self, forKey: .actualMinutes)
+        completed = try values.decode(Bool.self, forKey: .completed)
+        endedEarly = try values.decode(Bool.self, forKey: .endedEarly)
+        outcomes = try values.decodeIfPresent([String: ExperimentMetricValue].self, forKey: .outcomes) ?? [:]
+        classification = try values.decode(ExperimentObservationClassification.self, forKey: .classification)
+        classificationReason = try values.decode(String.self, forKey: .classificationReason)
+        confounds = try values.decodeIfPresent([ExperimentConfound].self, forKey: .confounds) ?? []
+        sourceEvidenceIDs = try values.decodeIfPresent([UUID].self, forKey: .sourceEvidenceIDs) ?? []
+        date = try values.decode(Date.self, forKey: .date)
+        fuelContext = try values.decodeIfPresent(FuelContextSnapshot.self, forKey: .fuelContext)
+    }
 }
 
 enum ExperimentPairResult: String, Codable, Equatable {
@@ -254,6 +447,46 @@ struct ExperimentRuleDraft: Codable, Equatable {
     var contexts: [RuleContext]
 }
 
+/// The two conceptual comparison types Personal Lab supports.
+/// - interventionTest: the user deliberately changes one condition.
+/// - observationalComparison: REBOOT compares naturally occurring contexts
+///   (e.g. morning vs afternoon). The user never manipulates the variable.
+enum ExperimentComparisonKind: String, Codable, Equatable {
+    case interventionTest
+    case observationalComparison
+
+    var displayLabel: String {
+        switch self {
+        case .interventionTest: return "Deliberate test"
+        case .observationalComparison: return "Naturally occurring"
+        }
+    }
+}
+
+/// The variable an experiment deliberately varies. Variable-aware
+/// comparability allows the target variable to differ between arms while
+/// other contexts remain matched. Mirrors the typed condition namespace.
+enum ExperimentTargetVariable: String, Codable, Equatable {
+    case phoneDistance
+    case screenProtection
+    case browserScope
+    case sound
+    case finishLine
+    case movement
+    case breakStyle
+    case daypart
+    case sleepContext
+    case mealContext
+    case caffeineContext
+}
+
+/// Conservative pair policy: default 3 balanced pairs, at most 5 total when
+/// an INCONCLUSIVE result earns one more comparison.
+enum ExperimentPolicy {
+    static let defaultTargetPairs = 3
+    static let maxPairs = 5
+}
+
 struct PersonalExperiment: Codable, Identifiable, Equatable {
     var id = UUID()
     var templateID: String?
@@ -269,9 +502,14 @@ struct PersonalExperiment: Codable, Identifiable, Equatable {
     var plan: ExperimentPlan
     var status: ExperimentStatus
     var origin: ExperimentOrigin
+    var comparisonKind: ExperimentComparisonKind = .interventionTest
+    var targetVariable: ExperimentTargetVariable? = nil
     var observations: [ExperimentObservation] = []
     var pairs: [ExperimentPair] = []
     var result: ExperimentResult?
+    /// Results superseded by an INCONCLUSIVE extension. Never double-counted:
+    /// the active result always reflects all completed pairs.
+    var historicalResults: [ExperimentResult] = []
     var approvedRuleExceptionIDs: [UUID] = []
     var linkedPersonalRuleID: UUID?
     var ruleDraft: ExperimentRuleDraft?
@@ -279,12 +517,126 @@ struct PersonalExperiment: Codable, Identifiable, Equatable {
     var updatedAt = Date()
     var completedAt: Date?
 
+    init(
+        id: UUID = UUID(),
+        templateID: String?,
+        version: Int = 1,
+        question: String,
+        rationale: String,
+        normalArm: ExperimentArm,
+        testArm: ExperimentArm,
+        eligibleModes: [TrainingMode],
+        preferredDuration: Int,
+        primaryOutcome: ExperimentOutcomeMetric,
+        secondaryOutcomes: [ExperimentOutcomeMetric],
+        plan: ExperimentPlan,
+        status: ExperimentStatus,
+        origin: ExperimentOrigin,
+        comparisonKind: ExperimentComparisonKind = .interventionTest,
+        targetVariable: ExperimentTargetVariable? = nil,
+        observations: [ExperimentObservation] = [],
+        pairs: [ExperimentPair] = [],
+        result: ExperimentResult? = nil,
+        historicalResults: [ExperimentResult] = [],
+        approvedRuleExceptionIDs: [UUID] = [],
+        linkedPersonalRuleID: UUID? = nil,
+        ruleDraft: ExperimentRuleDraft? = nil,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date(),
+        completedAt: Date? = nil
+    ) {
+        self.id = id
+        self.templateID = templateID
+        self.version = version
+        self.question = question
+        self.rationale = rationale
+        self.normalArm = normalArm
+        self.testArm = testArm
+        self.eligibleModes = eligibleModes
+        self.preferredDuration = preferredDuration
+        self.primaryOutcome = primaryOutcome
+        self.secondaryOutcomes = secondaryOutcomes
+        self.plan = plan
+        self.status = status
+        self.origin = origin
+        self.comparisonKind = comparisonKind
+        self.targetVariable = targetVariable
+        self.observations = observations
+        self.pairs = pairs
+        self.result = result
+        self.historicalResults = historicalResults
+        self.approvedRuleExceptionIDs = approvedRuleExceptionIDs
+        self.linkedPersonalRuleID = linkedPersonalRuleID
+        self.ruleDraft = ruleDraft
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.completedAt = completedAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, templateID, version, question, rationale, normalArm, testArm
+        case eligibleModes, preferredDuration, primaryOutcome, secondaryOutcomes
+        case plan, status, origin, comparisonKind, targetVariable
+        case observations, pairs, result, historicalResults
+        case approvedRuleExceptionIDs, linkedPersonalRuleID, ruleDraft
+        case createdAt, updatedAt, completedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        templateID = try values.decodeIfPresent(String.self, forKey: .templateID)
+        version = try values.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        question = try values.decode(String.self, forKey: .question)
+        rationale = try values.decode(String.self, forKey: .rationale)
+        normalArm = try values.decode(ExperimentArm.self, forKey: .normalArm)
+        testArm = try values.decode(ExperimentArm.self, forKey: .testArm)
+        eligibleModes = try values.decode([TrainingMode].self, forKey: .eligibleModes)
+        preferredDuration = try values.decode(Int.self, forKey: .preferredDuration)
+        primaryOutcome = try values.decode(ExperimentOutcomeMetric.self, forKey: .primaryOutcome)
+        secondaryOutcomes = try values.decodeIfPresent([ExperimentOutcomeMetric].self, forKey: .secondaryOutcomes) ?? []
+        plan = try values.decode(ExperimentPlan.self, forKey: .plan)
+        status = try values.decode(ExperimentStatus.self, forKey: .status)
+        origin = try values.decode(ExperimentOrigin.self, forKey: .origin)
+        // v6 experiments predate Fuel: absent keys decode to safe defaults.
+        comparisonKind = try values.decodeIfPresent(ExperimentComparisonKind.self, forKey: .comparisonKind) ?? .interventionTest
+        targetVariable = try values.decodeIfPresent(ExperimentTargetVariable.self, forKey: .targetVariable)
+        observations = try values.decodeIfPresent([ExperimentObservation].self, forKey: .observations) ?? []
+        pairs = try values.decodeIfPresent([ExperimentPair].self, forKey: .pairs) ?? []
+        result = try values.decodeIfPresent(ExperimentResult.self, forKey: .result)
+        historicalResults = try values.decodeIfPresent([ExperimentResult].self, forKey: .historicalResults) ?? []
+        approvedRuleExceptionIDs = try values.decodeIfPresent([UUID].self, forKey: .approvedRuleExceptionIDs) ?? []
+        linkedPersonalRuleID = try values.decodeIfPresent(UUID.self, forKey: .linkedPersonalRuleID)
+        ruleDraft = try values.decodeIfPresent(ExperimentRuleDraft.self, forKey: .ruleDraft)
+        createdAt = try values.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        updatedAt = try values.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
+        completedAt = try values.decodeIfPresent(Date.self, forKey: .completedAt)
+    }
+
     func arm(for kind: ExperimentArmKind) -> ExperimentArm {
         kind == .normal ? normalArm : testArm
     }
 
     var completePairCount: Int {
         pairs.filter(\.isComplete).count
+    }
+
+    /// Extends an INCONCLUSIVE experiment with exactly one more balanced pair.
+    /// The experiment ID, question, conditions, and primary metric are
+    /// unchanged; the previous result is preserved as history; the status
+    /// becomes active again. Returns false when extension is not allowed.
+    mutating func extendForAdditionalComparison(now: Date = Date()) -> Bool {
+        guard let currentResult = result,
+              currentResult.state == .inconclusive,
+              status == .completed,
+              plan.targetPairs < ExperimentPolicy.maxPairs else { return false }
+        historicalResults.append(currentResult)
+        result = nil
+        status = .active
+        completedAt = nil
+        plan.extendByOnePair()
+        updatedAt = now
+        return true
     }
 }
 
@@ -327,6 +679,8 @@ struct ExperimentTemplate: Identifiable, Equatable {
     var minimumPairs: Int = 2
     var targetPairs: Int = 3
     var capabilityRequirement: ExperimentCapabilityRequirement?
+    var comparisonKind: ExperimentComparisonKind = .interventionTest
+    var targetVariable: ExperimentTargetVariable? = nil
     var ruleDraft: ExperimentRuleDraft?
 }
 
@@ -477,11 +831,185 @@ enum ExperimentTemplateLibrary {
         oneBrowserTask,
         sound,
         clearFinishLine,
+        shortWalkBeforeFocus,
+        noInputBreak,
+        morningFocus,
+        sleepQualityComparison,
+        mealTimingComparison,
+    ]
+
+    /// Deliberate Fuel tests — safe intentional setups run through Personal Lab.
+    static let fuelInterventionTemplates: [ExperimentTemplate] = [
+        shortWalkBeforeFocus,
+        noInputBreak,
+    ]
+
+    /// Observational comparisons of naturally occurring contexts. The user
+    /// never manipulates the variable; arms are selected by real context.
+    static let fuelObservationalTemplates: [ExperimentTemplate] = [
+        morningFocus,
+        sleepQualityComparison,
+        mealTimingComparison,
     ]
 
     static func template(id: String) -> ExperimentTemplate? {
         all.first { $0.id == id }
     }
+
+    // MARK: Fuel — deliberate safe setups (intervention tests)
+
+    /// "Does a short comfortable walk before focused work change how starting feels?"
+    /// No intensity, no duration target, self-reported truth. Always optional.
+    static let shortWalkBeforeFocus = ExperimentTemplate(
+        id: "fuel_walk_before_focus",
+        shortTitle: "Short walk before focus",
+        question: "Does a short comfortable walk before focused work change how starting feels?",
+        rationale: "Movement is worth one fair comparison — only when it feels suitable for you.",
+        normalCondition: ExperimentCondition(
+            id: "fuel.movement.usual",
+            title: "Start normally",
+            detail: "Begin the session the way you usually would."
+        ),
+        testCondition: ExperimentCondition(
+            id: "fuel.movement.walk_before",
+            title: "Short comfortable walk first",
+            detail: "Take a short, comfortable walk before starting. Stop if it doesn't suit you."
+        ),
+        eligibleModes: [.stay],
+        preferredDuration: 15,
+        primaryOutcome: .startEase,
+        secondaryOutcomes: [.difficulty, .reportedSwitches],
+        comparisonKind: .interventionTest,
+        targetVariable: .movement,
+        ruleDraft: ExperimentRuleDraft(
+            title: "When practical, take a short walk before difficult focus",
+            detail: "A short comfortable walk before starting focused work is worth trying when it fits.",
+            category: .timing,
+            contexts: [.stay, .deepWork]
+        )
+    )
+
+    /// "Does taking a short no-input break make returning easier than your usual break?"
+    static let noInputBreak = ExperimentTemplate(
+        id: "fuel_no_input_break",
+        shortTitle: "No-input break",
+        question: "Does taking a short no-input break make returning easier than your usual break?",
+        rationale: "What you do during a break may matter as much as taking one. A fair comparison settles it for you.",
+        normalCondition: ExperimentCondition(
+            id: "fuel.break.usual",
+            title: "Your usual break",
+            detail: "Take the kind of break you normally would."
+        ),
+        testCondition: ExperimentCondition(
+            id: "fuel.break.no_input",
+            title: "Break without new input",
+            detail: "A short break with no feeds, no scrolling, no new input."
+        ),
+        eligibleModes: [.stay, .recall],
+        preferredDuration: 15,
+        primaryOutcome: .startEase,
+        secondaryOutcomes: [.difficulty, .completion],
+        comparisonKind: .interventionTest,
+        targetVariable: .breakStyle,
+        ruleDraft: ExperimentRuleDraft(
+            title: "A short no-input break is worth trying before restarting",
+            detail: "After a long work block, a short break without new input may make returning easier.",
+            category: .environment,
+            contexts: [.stay, .recall, .deepWork]
+        )
+    )
+
+    // MARK: Fuel — observational comparisons (naturally occurring)
+
+    /// Morning vs afternoon. Daypart arms are system-derived from the session
+    /// timestamp: the user is never told to change when they work.
+    static let morningFocus = ExperimentTemplate(
+        id: "fuel_morning_vs_afternoon",
+        shortTitle: "Morning vs afternoon",
+        question: "Do your demanding sessions feel steadier before noon or later in the day?",
+        rationale: "You already work at different times. REBOOT can compare the sessions that occur naturally.",
+        normalCondition: ExperimentCondition(
+            id: "fuel.daypart.afternoon",
+            title: "Afternoon sessions",
+            detail: "Sessions that begin between noon and 5pm.",
+            expectedTruthSource: .systemConfirmed,
+            contextMatcher: ExperimentContextMatcher(field: .daypart, value: FuelDaypart.afternoon.rawValue)
+        ),
+        testCondition: ExperimentCondition(
+            id: "fuel.daypart.morning",
+            title: "Morning sessions",
+            detail: "Sessions that begin before noon.",
+            expectedTruthSource: .systemConfirmed,
+            contextMatcher: ExperimentContextMatcher(field: .daypart, value: FuelDaypart.morning.rawValue)
+        ),
+        eligibleModes: [.stay, .recall],
+        preferredDuration: 15,
+        primaryOutcome: .difficulty,
+        secondaryOutcomes: [.reportedSwitches, .firstSwitchTiming],
+        minimumPairs: 2,
+        targetPairs: 3,
+        comparisonKind: .observationalComparison,
+        targetVariable: .daypart,
+        ruleDraft: ExperimentRuleDraft(
+            title: "When possible, schedule demanding work earlier",
+            detail: "Morning has looked more reliable for demanding work in your comparable sessions.",
+            category: .timing,
+            contexts: [.stay, .recall, .deepWork]
+        )
+    )
+
+    /// Naturally occurring sleep reports — rough vs good. Never a manipulation.
+    static let sleepQualityComparison = ExperimentTemplate(
+        id: "fuel_sleep_quality_context",
+        shortTitle: "Sleep context",
+        question: "Do sessions after rough-reported sleep feel different from sessions after good-reported sleep?",
+        rationale: "Your sleep varies on its own. This only compares sessions you already have.",
+        normalCondition: ExperimentCondition(
+            id: "fuel.sleep.rough",
+            title: "After rough-reported sleep",
+            detail: "Sessions started after a night you described as rough.",
+            contextMatcher: ExperimentContextMatcher(field: .sleepQuality, value: FuelSleepQuality.rough.rawValue)
+        ),
+        testCondition: ExperimentCondition(
+            id: "fuel.sleep.good",
+            title: "After good-reported sleep",
+            detail: "Sessions started after a night you described as good.",
+            contextMatcher: ExperimentContextMatcher(field: .sleepQuality, value: FuelSleepQuality.good.rawValue)
+        ),
+        eligibleModes: [.stay, .recall, .explain],
+        preferredDuration: 15,
+        primaryOutcome: .difficulty,
+        secondaryOutcomes: [.reportedSwitches, .completion],
+        comparisonKind: .observationalComparison,
+        targetVariable: .sleepContext
+    )
+
+    /// Naturally occurring meal timing — recently ate vs between meals.
+    /// Pure context; no dietary instruction of any kind.
+    static let mealTimingComparison = ExperimentTemplate(
+        id: "fuel_meal_timing_context",
+        shortTitle: "Meal timing context",
+        question: "Do sessions right after eating feel different from sessions between meals?",
+        rationale: "Meal timing varies naturally across your week. This only observes what already happens.",
+        normalCondition: ExperimentCondition(
+            id: "fuel.meal.between",
+            title: "Between meals",
+            detail: "Sessions started between meals.",
+            contextMatcher: ExperimentContextMatcher(field: .mealTiming, value: FuelMealTiming.betweenMeals.rawValue)
+        ),
+        testCondition: ExperimentCondition(
+            id: "fuel.meal.recently_ate",
+            title: "Recently ate",
+            detail: "Sessions started soon after a meal.",
+            contextMatcher: ExperimentContextMatcher(field: .mealTiming, value: FuelMealTiming.recentlyAte.rawValue)
+        ),
+        eligibleModes: [.stay, .recall, .explain],
+        preferredDuration: 15,
+        primaryOutcome: .difficulty,
+        secondaryOutcomes: [.reportedSwitches, .completion],
+        comparisonKind: .observationalComparison,
+        targetVariable: .mealContext
+    )
 }
 
 // MARK: - Eligibility and assignment
@@ -577,6 +1105,25 @@ enum ExperimentComparisonEngine {
                 continue
             }
 
+            // Variable-aware comparability: only when both arms captured Fuel
+            // context. Missing context stays missing — it never confounds.
+            if let variable = experiment.targetVariable,
+               let contextConfound = evaluateVariableAwareMatch(
+                normal: normal,
+                test: test,
+                targetVariable: variable
+               ) {
+                confoundLaterObservation(
+                    normalIndex: normalIndex,
+                    testIndex: testIndex,
+                    kind: contextConfound.kind,
+                    explanation: contextConfound.explanation,
+                    experiment: &experiment
+                )
+                rebuiltPairs.append(unusablePair(pairIndex, reason: contextConfound.explanation))
+                continue
+            }
+
             let comparison = compare(
                 normal: normal,
                 test: test,
@@ -655,6 +1202,35 @@ enum ExperimentComparisonEngine {
         default:
             return .unusable
         }
+    }
+
+    /// Variable-aware matching. The experiment's target variable is ALLOWED
+    /// (indeed required) to differ between arms; other contexts should match.
+    /// Fuel-era contexts only: absent context never confounds.
+    private static func evaluateVariableAwareMatch(
+        normal: ExperimentObservation,
+        test: ExperimentObservation,
+        targetVariable: ExperimentTargetVariable
+    ) -> (kind: ExperimentConfoundKind, explanation: String)? {
+        if targetVariable == .daypart {
+            let normalDaypart = FuelDaypart.derive(from: normal.date)
+            let testDaypart = FuelDaypart.derive(from: test.date)
+            if normalDaypart == testDaypart {
+                return (.targetVariableDidNotDiffer, "Both sessions happened in the same part of the day.")
+            }
+        } else {
+            let normalDaypart = FuelDaypart.derive(from: normal.date)
+            let testDaypart = FuelDaypart.derive(from: test.date)
+            if normalDaypart != testDaypart {
+                return (.contextMismatch, "The sessions happened at different times of day.")
+            }
+        }
+        if let normalTask = normal.fuelContext?.taskContext,
+           let testTask = test.fuelContext?.taskContext,
+           normalTask != testTask {
+            return (.contextMismatch, "The task types were different.")
+        }
+        return nil
     }
 
     private static func candidateIndices(
@@ -825,6 +1401,92 @@ enum ExperimentResultEngine {
     }
 }
 
+// MARK: - Opportunity-aware surfacing
+
+enum ExperimentOpportunity: Equatable {
+    /// The current session genuinely counts toward the test.
+    case eligibleNow(message: String)
+    /// The session is comparable, but a kept-rule exception needs explicit approval.
+    case eligibleWithConfirmation(message: String)
+    /// Today's real session cannot support a fair comparison.
+    case notComparable(reasons: [String])
+    /// The test itself cannot run (Day 1, recovery, paused, finished).
+    case blocked(reasons: [String])
+}
+
+/// Deterministic eligibility for surfacing experiment opportunities. Lab
+/// surfaces only when a genuinely compatible session exists — this reduces
+/// "Continue test" noise on days that can never count.
+enum ExperimentOpportunityEngine {
+    static func evaluate(
+        request: TrainingSessionRequest,
+        experiment: PersonalExperiment,
+        isRecovery: Bool,
+        activeRecurringProtection: Bool = false,
+        rules: [PersonalRule] = [],
+        fuel: FuelContextSnapshot? = nil,
+        sessionDate: Date = Date()
+    ) -> ExperimentOpportunity {
+        var blockedReasons: [String] = []
+        if experiment.status != .active {
+            blockedReasons.append("This test is not active.")
+        }
+        if request.origin == .protocol, request.programDay == 1 {
+            blockedReasons.append("Day 1 protects your natural baseline.")
+        }
+        if isRecovery {
+            blockedReasons.append("Recovery sessions keep their original intent.")
+        }
+        if !blockedReasons.isEmpty {
+            return .blocked(reasons: blockedReasons)
+        }
+
+        var reasons: [String] = []
+        if !experiment.eligibleModes.contains(request.mode) {
+            reasons.append("This training mode is not comparable for the current question.")
+        }
+        if request.origin == .protocol,
+           !PersonalLabEligibilityEngine.durationCompatible(request.targetMinutes, experiment.preferredDuration) {
+            reasons.append("Today's session length is not comparable for this test.")
+        }
+
+        if experiment.comparisonKind == .observationalComparison {
+            // The session's real context must select an open arm.
+            if PersonalLabEngine.observationalAssignment(
+                for: experiment,
+                fuel: fuel,
+                sessionDate: sessionDate
+            ) == nil {
+                let needed = PersonalLabEngine.fuelFieldNeeded(by: experiment)
+                if let needed {
+                    reasons.append("This test needs to know your \(needed.label.lowercased()) first.")
+                } else {
+                    reasons.append("Today's context does not fill the next comparison slot.")
+                }
+            }
+        } else if let assignment = PersonalLabEngine.nextAssignment(for: experiment),
+                  assignment.armKind == .normal,
+                  experiment.normalArm.condition.id == "screen_time.unprotected",
+                  activeRecurringProtection {
+            reasons.append("A protected window is already active.")
+        }
+
+        if !reasons.isEmpty {
+            return .notComparable(reasons: reasons)
+        }
+
+        if experiment.comparisonKind == .interventionTest {
+            let conflicts = PersonalLabEngine.conflictingRuleIDs(for: experiment, rules: rules)
+            if !conflicts.isEmpty && !experiment.approvedRuleExceptionIDs.contains(conflicts[0]) {
+                return .eligibleWithConfirmation(
+                    message: "This test needs a temporary exception to one of your kept rules. The rule stays kept."
+                )
+            }
+        }
+        return .eligibleNow(message: "Today can count toward your current test.")
+    }
+}
+
 // MARK: - Lab coordination engine
 
 enum ExperimentStartOutcome: Equatable {
@@ -854,6 +1516,8 @@ enum PersonalLabEngine {
             plan: .balanced(targetPairs: template.targetPairs, minimumPairs: template.minimumPairs),
             status: .draft,
             origin: origin,
+            comparisonKind: template.comparisonKind,
+            targetVariable: template.targetVariable,
             linkedPersonalRuleID: linkedRuleID,
             ruleDraft: template.ruleDraft,
             createdAt: now,
@@ -896,23 +1560,42 @@ enum PersonalLabEngine {
         for experiment: PersonalExperiment,
         rules: [PersonalRule]
     ) -> [UUID] {
-        let normalKey = experiment.normalArm.condition.id
+        let normalCondition = experiment.normalArm.condition
         return rules.filter { rule in
             guard rule.lifecycle == .kept else { return false }
             let copy = "\(rule.title) \(rule.detail)".lowercased()
-            if normalKey == "phone.usual" {
-                return copy.contains("phone") && (copy.contains("reach") || copy.contains("room") || copy.contains("away"))
+            switch normalCondition.domain {
+            case .digital:
+                // Legacy keyword heuristics kept byte-for-byte: the digital
+                // conflict behavior is verified by existing regression tests.
+                if normalCondition.id == "phone.usual" {
+                    return copy.contains("phone") && (copy.contains("reach") || copy.contains("room") || copy.contains("away"))
+                }
+                if normalCondition.id == "screen_time.unprotected" {
+                    return copy.contains("protect") || copy.contains("screen time")
+                }
+                if normalCondition.id == "browser.usual" {
+                    return copy.contains("tab") || copy.contains("browser")
+                }
+                return false
+            case .task:
+                if normalCondition.id == "finish_line.usual" {
+                    return copy.contains("done") || copy.contains("finish")
+                }
+                return false
+            case .fuel:
+                // Conservative: only same-dimension fuel rules can conflict.
+                switch experiment.targetVariable {
+                case .movement:
+                    return copy.contains("walk")
+                case .breakStyle:
+                    return copy.contains("break")
+                default:
+                    return false
+                }
+            case .environment, .flow, .custom:
+                return false
             }
-            if normalKey == "screen_time.unprotected" {
-                return copy.contains("protect") || copy.contains("screen time")
-            }
-            if normalKey == "browser.usual" {
-                return copy.contains("tab") || copy.contains("browser")
-            }
-            if normalKey == "finish_line.usual" {
-                return copy.contains("done") || copy.contains("finish")
-            }
-            return false
         }
         .map(\.id)
     }
@@ -956,13 +1639,102 @@ enum PersonalLabEngine {
         }
     }
 
+    /// For observational comparisons, the arm is chosen by the naturally
+    /// occurring context — never by instruction. Returns the open pair and
+    /// the arm this real context can fill, or nil when nothing matches.
+    static func observationalAssignment(
+        for experiment: PersonalExperiment,
+        fuel: FuelContextSnapshot?,
+        sessionDate: Date
+    ) -> (slot: ExperimentAssignmentSlot, arm: ExperimentArm)? {
+        guard experiment.comparisonKind == .observationalComparison,
+              experiment.status == .active else { return nil }
+        func hasUsable(_ pairIndex: Int, _ armKind: ExperimentArmKind) -> Bool {
+            experiment.observations.contains { observation in
+                observation.pairIndex == pairIndex
+                    && observation.armKind == armKind
+                    && observation.requestedCondition.conditionFollowed
+                    && (observation.classification == .comparable
+                        || observation.classification == .usableButUnmatched)
+            }
+        }
+        for pairIndex in 1...experiment.plan.targetPairs {
+            let normalFilled = hasUsable(pairIndex, .normal)
+            let testFilled = hasUsable(pairIndex, .test)
+            if normalFilled && testFilled { continue }
+            if !normalFilled,
+               experiment.normalArm.condition.contextMatcher?.matches(snapshot: fuel, sessionDate: sessionDate) == true {
+                return (
+                    ExperimentAssignmentSlot(pairIndex: pairIndex, armKind: .normal),
+                    experiment.normalArm
+                )
+            }
+            if !testFilled,
+               experiment.testArm.condition.contextMatcher?.matches(snapshot: fuel, sessionDate: sessionDate) == true {
+                return (
+                    ExperimentAssignmentSlot(pairIndex: pairIndex, armKind: .test),
+                    experiment.testArm
+                )
+            }
+            // This pair is open but today's context does not fill it; later
+            // pairs stay closed until earlier ones complete.
+            return nil
+        }
+        return nil
+    }
+
+    /// The Fuel field an active observational experiment still needs, if any.
+    /// Daypart experiments need nothing (derived from the timestamp).
+    static func fuelFieldNeeded(by experiment: PersonalExperiment) -> FuelContextField? {
+        guard experiment.status == .active,
+              experiment.comparisonKind == .observationalComparison else { return nil }
+        switch experiment.targetVariable {
+        case .sleepContext: return .sleepQuality
+        case .mealContext: return .mealTiming
+        default: return nil
+        }
+    }
+
+    /// True while an active deliberate Fuel test (walk, no-input break) owns
+    /// the user's one deliberate variable — generic sampling stays silent.
+    static func hasActiveFuelConditionTest(_ experiment: PersonalExperiment?) -> Bool {
+        guard let experiment, experiment.status == .active else { return false }
+        return experiment.comparisonKind == .interventionTest
+            && experiment.normalArm.condition.domain == .fuel
+    }
+
     static func participation(
         for experiment: PersonalExperiment,
         request: TrainingSessionRequest,
-        eligibility: ExperimentEligibilitySnapshot
+        eligibility: ExperimentEligibilitySnapshot,
+        fuel: FuelContextSnapshot? = nil,
+        sessionDate: Date = Date()
     ) -> ExperimentParticipation? {
-        guard eligibility.eligible,
-              let assignment = nextAssignment(for: experiment) else { return nil }
+        guard eligibility.eligible else { return nil }
+        if experiment.comparisonKind == .observationalComparison {
+            guard let assignment = observationalAssignment(
+                for: experiment,
+                fuel: fuel,
+                sessionDate: sessionDate
+            ) else { return nil }
+            // The context itself selects the arm: the condition is followed
+            // by definition, with the honest truth source for that context.
+            var snapshot = ExperimentConditionSnapshot.pending(assignment.arm.condition)
+            snapshot.actualDescription = assignment.arm.condition.detail
+            snapshot.truthSource = assignment.arm.condition.contextMatcher?.truthSource ?? .userReported
+            snapshot.conditionFollowed = true
+            snapshot.capturedAt = sessionDate
+            return ExperimentParticipation(
+                experimentID: experiment.id,
+                armID: assignment.arm.id,
+                armKind: assignment.arm.kind,
+                pairIndex: assignment.slot.pairIndex,
+                conditionSnapshot: snapshot,
+                eligibilitySnapshot: eligibility,
+                assignmentReason: "Filled by your naturally occurring context (pair \(assignment.slot.pairIndex))."
+            )
+        }
+        guard let assignment = nextAssignment(for: experiment) else { return nil }
         let arm = experiment.arm(for: assignment.armKind)
         return ExperimentParticipation(
             experimentID: experiment.id,
@@ -1054,7 +1826,8 @@ enum PersonalLabEngine {
             classificationReason: reason,
             confounds: confounds,
             sourceEvidenceIDs: sourceEvidenceIDs,
-            date: session.date
+            date: session.date,
+            fuelContext: session.fuelContext
         )
         state.experiments[experimentIndex].observations.append(observation)
         ExperimentComparisonEngine.updateComparability(&state.experiments[experimentIndex])
@@ -1157,6 +1930,27 @@ enum PersonalLabEngine {
         if suggestions.isEmpty, sessions.count >= 3,
            reportedDistractors.contains(Distractor.people) {
             add(ExperimentTemplateLibrary.sound, reason: "Your sound environment appears relevant, but the evidence is still mixed.")
+        }
+
+        // Fuel observational opportunities: real context data already exists
+        // on both sides, so a fair comparison is genuinely executable.
+        let withFuel = sessions.filter { $0.fuelContext != nil && !$0.fuelContext!.isEmpty }
+        if withFuel.count >= 4 {
+            let morningStay = withFuel.filter { $0.mode == .stay && $0.fuelContext?.daypart == .morning }
+            let afternoonStay = withFuel.filter { $0.mode == .stay && $0.fuelContext?.daypart == .afternoon }
+            if morningStay.count >= 2 && afternoonStay.count >= 2 {
+                add(ExperimentTemplateLibrary.morningFocus, reason: "You already have morning and afternoon sessions worth comparing.")
+            }
+            let goodSleep = withFuel.filter { $0.fuelContext?.sleepQuality == .good }
+            let roughSleep = withFuel.filter { $0.fuelContext?.sleepQuality == .rough }
+            if goodSleep.count >= 2 && roughSleep.count >= 2 {
+                add(ExperimentTemplateLibrary.sleepQualityComparison, reason: "You've reported both good and rough nights recently.")
+            }
+            let recentlyAte = withFuel.filter { $0.fuelContext?.mealTiming == .recentlyAte }
+            let betweenMeals = withFuel.filter { $0.fuelContext?.mealTiming == .betweenMeals }
+            if recentlyAte.count >= 2 && betweenMeals.count >= 2 {
+                add(ExperimentTemplateLibrary.mealTimingComparison, reason: "Meal timing varies naturally across your sessions.")
+            }
         }
         return Array(suggestions.prefix(3))
     }

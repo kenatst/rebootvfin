@@ -383,7 +383,7 @@ final class REBOOTTests: XCTestCase {
             XCTAssertEqual(store.protocolSessions.count, 1)
             XCTAssertEqual(store.protocolSessions[0].origin, .protocol)
             XCTAssertEqual(store.day, 2)
-            XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v6"))
+            XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v7"))
         }
     }
 
@@ -413,7 +413,7 @@ final class REBOOTTests: XCTestCase {
         XCTAssertNil(store.programState.pendingReviewDay)
         XCTAssertNil(store.programState.pendingPhaseTransition)
         XCTAssertTrue(store.programState.acknowledgedPhaseTransitions.contains(.controlInput))
-        XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v6"))
+        XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v7"))
         XCTAssertNil(defaults.object(forKey: "reboot.product.v3"))
     }
 
@@ -840,6 +840,7 @@ final class REBOOTTests: XCTestCase {
             "reboot.product.v4",
             "reboot.product.v5",
             "reboot.product.v6",
+            "reboot.product.v7",
         ] {
             defaults.removeObject(forKey: key)
         }
@@ -1377,8 +1378,8 @@ final class REBOOTTests: XCTestCase {
         let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
         XCTAssertEqual(store.day, 6)
         XCTAssertEqual(store.sessions.count, 5)
-        XCTAssertNil(defaults.object(forKey: "reboot.product.v4"), "Legacy v4 key must be cleaned after v6 migration")
-        XCTAssertNotNil(defaults.object(forKey: "reboot.product.v6"), "v6 storage key must be set")
+        XCTAssertNil(defaults.object(forKey: "reboot.product.v4"), "Legacy v4 key must be cleaned after v7 migration")
+        XCTAssertNotNil(defaults.object(forKey: "reboot.product.v7"), "v7 storage key must be set")
     }
 
     func testCorruptedPersistenceV6SafeRecovery() {
