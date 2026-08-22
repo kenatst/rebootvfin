@@ -37,6 +37,10 @@ struct FuelPattern: Identifiable, Equatable {
     /// Personal Lab test that could genuinely resolve this question, when one
     /// is actually executable. Nil means observation only.
     var suggestsTestTemplateID: String?
+    /// Whether this pattern answers the open question for its dimension.
+    /// Timestamp-derived patterns (daypart) do not answer e.g. the energy
+    /// question, so they must not hide it.
+    var claimsDimensionForQuestions: Bool = true
 }
 
 /// An unresolved Fuel question with too little evidence to say anything.
@@ -150,11 +154,12 @@ enum FuelPatternEngine {
               afternoonRough.count >= 1 || morningSteady.count >= 3 else { return nil }
         return makePattern(
             id: "daypart.morning.switches",
-            dimension: .energy, // daypart is derived; the signal is grouped under energy & context display
+            dimension: .energy, // grouped under energy & context for display
             statement: "Your recent demanding sessions before noon have involved fewer reported switches.",
             supporting: morningSteady,
             contradicting: morningRough,
-            known: morning + afternoon
+            known: morning + afternoon,
+            claimsDimension: false // a timestamp-derived signal does not answer the energy question
         )
     }
 
@@ -218,7 +223,7 @@ enum FuelPatternEngine {
     // MARK: Open questions
 
     private static func openQuestions(sessions: [SessionRecord], surfaced: [FuelPattern]) -> [FuelOpenQuestion] {
-        let surfacedDimensions = Set(surfaced.map(\.dimension))
+        let surfacedDimensions = Set(surfaced.filter(\.claimsDimensionForQuestions).map(\.dimension))
         var questions: [FuelOpenQuestion] = []
         for field in FuelContextField.allCases where !surfacedDimensions.contains(field) {
             let known = sessions.filter { $0.fuelContext?.value(for: field) != nil }.count
@@ -251,7 +256,8 @@ enum FuelPatternEngine {
         supporting: [SessionRecord],
         contradicting: [SessionRecord],
         known: [SessionRecord],
-        suggestsTest: String? = nil
+        suggestsTest: String? = nil,
+        claimsDimension: Bool = true
     ) -> FuelPattern {
         let maturity: FuelPatternMaturity
         if contradicting.count >= 2 && supporting.count >= 2 {
@@ -271,7 +277,8 @@ enum FuelPatternEngine {
             contradictingSessions: contradicting.count,
             knownSessions: known.count,
             sessionIDs: (supporting + contradicting).map(\.id),
-            suggestsTestTemplateID: maturity == .mixed ? nil : suggestsTest
+            suggestsTestTemplateID: maturity == .mixed ? nil : suggestsTest,
+            claimsDimensionForQuestions: claimsDimension
         )
         if maturity == .mixed {
             pattern.statement = "The evidence here is mixed recently — no stable pattern yet."

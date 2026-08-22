@@ -1008,6 +1008,190 @@ final class FuelTests: XCTestCase {
         }
     }
 
+    // MARK: - Post-audit regression fixes
+
+    func testProtocolAttachPathKeepsObservationalSleepParticipation() {
+        // The Today card promises "this session can count"; the prepared
+        // protocol request must actually carry the participation.
+        let store = ProductStore(diagnosisAnswers: ["primary": ["deep_work"]], defaults: defaults)
+        var iterations = 0
+        while store.prescription.mode != .stay || store.day < 2 {
+            if store.programStatus != .active { return XCTFail("Program ended before STAY day") }
+            runOneProtocolDay(store)
+            iterations += 1
+            if iterations > 20 { return XCTFail("No STAY prescription day found") }
+        }
+        _ = store.startExperiment(template: ExperimentTemplateLibrary.sleepQualityComparison)
+        let prompt = tryUnwrap(store.currentFuelPrompt)
+        XCTAssertEqual(prompt.field, .sleepQuality)
+        store.answerFuelPrompt(prompt, rawValue: FuelSleepQuality.good.rawValue)
+
+        store.prepareProtocolSession(participatingInLab: true)
+        guard case .preparing(let request) = store.phase else {
+            return XCTFail("Expected preparation")
+        }
+        guard let participation = request.experimentParticipation else {
+            return XCTFail("Protocol attach path must keep observational participation")
+        }
+        XCTAssertEqual(participation.armKind, .test, "Good-reported sleep fills the Test arm")
+        store.beginPreparedSession()
+        store.finishRunning(actualMinutes: store.prescription.minutes, endedEarly: false)
+        store.saveDoneSession(
+            difficulty: 2,
+            firstDistraction: "none",
+            switches: 1,
+            firstSwitchMinute: nil,
+            energy: nil,
+            environmentActionDone: true
+        )
+        drainRequiredFlow(store)
+        let experiment = tryUnwrap(store.experiment(id: participation.experimentID))
+        XCTAssertEqual(experiment.observations.count, 1, "The promised session counted")
+        XCTAssertEqual(experiment.observations.first?.armKind, .test)
+    }
+
+    func testStaleCaptureIsDiscardedAndNeverBlocksFutureAnswers() {
+        let store = dayTwoStore()
+        var stale = FuelContextSnapshot(energy: .okay)
+        stale.capturedAt = Date().addingTimeInterval(-2 * 86_400)
+        store.fuelState.pendingCapture = stale
+
+        let prompt = ContextSamplingEngine.prompt(for: .caffeineRecency)
+        store.answerFuelPrompt(prompt, rawValue: FuelCaffeineRecency.recently.rawValue)
+        let fresh = tryUnwrap(store.fuelState.pendingCapture)
+        XCTAssertEqual(FuelState.calendarDay(fresh.capturedAt), FuelState.calendarDay(Date()),
+                       "A stale base must never anchor the new capture")
+        XCTAssertNil(fresh.energy, "Stale-day fields are dropped, not carried into today")
+
+        store.beginSession()
+        store.finishRunning(actualMinutes: store.prescription.minutes, endedEarly: false)
+        store.saveDoneSession(
+            difficulty: 2,
+            firstDistraction: "none",
+            switches: 1,
+            firstSwitchMinute: nil,
+            energy: nil,
+            environmentActionDone: true
+        )
+        drainRequiredFlow(store)
+        XCTAssertEqual(store.sessions.last?.fuelContext?.caffeineRecency, .recently,
+                       "Fuel attachment stays alive after a stale day")
+    }
+
+    func testPromptAfterCompletedDayAttachesToNextSession() {
+        // Program day advances on save, so after today's session the next
+        // prompt belongs to tomorrow's session — and its answer must actually
+        // attach when that session begins the same calendar day.
+        let store = dayTwoStore()
+        runOneProtocolDay(store)
+        let prompt = tryUnwrap(store.currentFuelPrompt)
+        store.answerFuelPrompt(prompt, rawValue: prompt.options.first!.rawValue)
+        runOneProtocolDay(store)
+        XCTAssertEqual(store.sessions.last?.fuelContext?.value(for: prompt.field),
+                       prompt.options.first?.rawValue,
+                       "The answered capture attaches to the next session begun the same day")
+    }
+
+    func testStaleCaptureDoesNotDriveLabEligibility() {
+        let store = dayTwoStore()
+        _ = store.startExperiment(template: ExperimentTemplateLibrary.sleepQualityComparison)
+        var stale = FuelContextSnapshot(sleepQuality: .good)
+        stale.capturedAt = Date().addingTimeInterval(-86_400)
+        store.fuelState.pendingCapture = stale
+
+        XCTAssertNil(store.todaysFuelCapture)
+        XCTAssertFalse(store.canPrepareStandaloneLabSession,
+                       "Yesterday's answers must not enable today's test")
+        if case .eligibleNow = store.todayExperimentOpportunity() {
+            XCTFail("Stale capture must not surface the Today card as eligible")
+        }
+    }
+
+    func testNeededFieldQuietsAfterRepeatedSkips() {
+        let now = Date()
+        var log = FuelSamplingLog()
+        log.skipCounts[FuelContextField.sleepQuality.rawValue] = 3
+        log.lastPromptAt[FuelContextField.sleepQuality.rawValue] = now.addingTimeInterval(-86_400)
+        let quiet = ContextSamplingEngine.recommendPrompt(.init(
+            programDay: 10,
+            completedProtocolDays: 9,
+            phase: .controlInput,
+            preferredField: .sleepQuality,
+            log: log,
+            now: now
+        ))
+        XCTAssertNil(quiet, "Repeated skips quiet even the field a test waits on")
+
+        var patientLog = FuelSamplingLog()
+        patientLog.lastPromptAt[FuelContextField.sleepQuality.rawValue] = now.addingTimeInterval(-3 * 86_400)
+        let asking = ContextSamplingEngine.recommendPrompt(.init(
+            programDay: 10,
+            completedProtocolDays: 9,
+            phase: .controlInput,
+            preferredField: .sleepQuality,
+            log: patientLog,
+            now: now
+        ))
+        XCTAssertEqual(asking?.field, .sleepQuality)
+    }
+
+    func testInterventionStandaloneDoesNotConsumeCapture() {
+        let store = dayTwoStore()
+        _ = store.startExperiment(template: ExperimentTemplateLibrary.shortWalkBeforeFocus)
+        store.fuelState.pendingCapture = FuelContextSnapshot(energy: .okay)
+
+        XCTAssertTrue(store.canPrepareStandaloneLabSession)
+        store.prepareStandaloneLabSession()
+        guard case .preparing = store.phase else { return XCTFail("Expected standalone preparation") }
+        store.beginPreparedSession()
+        store.finishRunning(actualMinutes: 15, endedEarly: false)
+        store.saveDoneSession(
+            difficulty: 2,
+            firstDistraction: "none",
+            switches: 1,
+            firstSwitchMinute: nil,
+            energy: nil,
+            environmentActionDone: nil
+        )
+        XCTAssertNil(store.sessions.last?.fuelContext,
+                     "Deliberate intervention tests do not eat the day's capture")
+        XCTAssertNotNil(store.fuelState.pendingCapture,
+                        "The capture stays available for today's protocol session")
+    }
+
+    func testDaypartPatternDoesNotHideEnergyOpenQuestion() {
+        // Morning-steady sessions with task context only — no energy answers.
+        let sessions: [SessionRecord] = [
+            fuelSession(movement: .mostlyStill, difficulty: 2, switches: 1, dayOffset: 0),
+            fuelSession(movement: .mostlyStill, difficulty: 2, switches: 2, dayOffset: 1),
+            fuelSession(movement: .mostlyStill, difficulty: 3, switches: 1, dayOffset: 2),
+            afternoonRoughSession(),
+        ]
+        let result = FuelPatternEngine.evaluate(sessions: sessions)
+        XCTAssertTrue(result.patterns.contains { $0.id == "daypart.morning.switches" },
+                      "Fixture should surface the morning pattern")
+        XCTAssertTrue(result.openQuestions.contains { $0.dimension == .energy },
+                      "A timestamp-derived signal must not answer the energy question")
+    }
+
+    private func afternoonRoughSession() -> SessionRecord {
+        var snapshot = FuelContextSnapshot()
+        snapshot.taskContext = .focusedWork
+        snapshot.capturedAt = dateAt(14, dayOffset: 3)
+        return SessionRecord(
+            origin: .protocol,
+            day: 14,
+            date: dateAt(14, dayOffset: 3),
+            mode: .stay,
+            targetMinutes: 15,
+            actualMinutes: 15,
+            completed: true,
+            switches: 4,
+            difficulty: 3,
+            fuelContext: snapshot
+        )
+    }
+
     // MARK: - Helpers
 
     private func runOneProtocolDay(_ store: ProductStore) {
@@ -1085,6 +1269,7 @@ final class FuelTests: XCTestCase {
         snapshot.caffeineRecency = caffeine
         snapshot.movement = movement
         snapshot.breakType = breakType
+        snapshot.capturedAt = dateAt(9, dayOffset: dayOffset)
         return SessionRecord(
             origin: .protocol,
             day: 10 + dayOffset,

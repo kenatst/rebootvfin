@@ -313,6 +313,16 @@ final class ProductStore: ObservableObject {
         sessions.last(where: { $0.fuelContext != nil && !$0.fuelContext!.isEmpty })?.fuelContext
     }
 
+    /// Today's unconsumed prompt answers. A capture from an earlier day can
+    /// never attach to a session and never drives eligibility UI.
+    var todaysFuelCapture: FuelContextSnapshot? {
+        guard let capture = fuelState.pendingCapture,
+              FuelState.calendarDay(capture.capturedAt) == FuelState.calendarDay(Date()) else {
+            return nil
+        }
+        return capture
+    }
+
     /// Sessions with Fuel context, newest first, for restrained display.
     var fuelLinkedSessions: [SessionRecord] {
         sessions.filter { $0.fuelContext != nil && !$0.fuelContext!.isEmpty }.reversed()
@@ -325,7 +335,10 @@ final class ProductStore: ObservableObject {
 
     /// The single optional Fuel prompt for today's protocol session, if any.
     var currentFuelPrompt: FuelSamplePrompt? {
-        ContextSamplingEngine.recommendPrompt(.init(
+        // No prompt once today's protocol session is done: nothing could
+        // consume the answer, and an unconsumed answer must never linger.
+        guard !hasCompletedCurrentProtocol else { return nil }
+        return ContextSamplingEngine.recommendPrompt(.init(
             programDay: day,
             completedProtocolDays: completedProtocolDays,
             phase: currentProgramPhase.id,
@@ -333,15 +346,16 @@ final class ProductStore: ObservableObject {
             promptsEnabled: fuelState.promptsEnabled,
             activeFuelConditionTest: PersonalLabEngine.hasActiveFuelConditionTest(activeExperiment),
             preferredField: activeExperiment.flatMap(PersonalLabEngine.fuelFieldNeeded(by:)),
-            pendingCapture: fuelState.pendingCapture,
+            pendingCapture: todaysFuelCapture,
             log: fuelState.sampling
         ))
     }
 
     func answerFuelPrompt(_ prompt: FuelSamplePrompt, rawValue: String) {
-        let capture = (fuelState.pendingCapture ?? FuelContextSnapshot())
-            .with(field: prompt.field, rawValue: rawValue)
-        fuelState.pendingCapture = capture
+        // A stale capture from an earlier day is discarded, not merged into:
+        // its fields could never honestly attach to today's session.
+        let base = todaysFuelCapture ?? FuelContextSnapshot()
+        fuelState.pendingCapture = base.with(field: prompt.field, rawValue: rawValue)
         fuelState.recordAnswer(field: prompt.field)
         persist()
     }
@@ -605,7 +619,7 @@ final class ProductStore: ObservableObject {
             for: experiment,
             request: request,
             eligibility: eligibility,
-            fuel: fuelState.pendingCapture,
+            fuel: todaysFuelCapture,
             sessionDate: Date()
         ) else { return }
         request.experimentParticipation = participation
@@ -634,7 +648,7 @@ final class ProductStore: ObservableObject {
             for: experiment,
             request: request,
             eligibility: eligibility,
-            fuel: fuelState.pendingCapture,
+            fuel: todaysFuelCapture,
             sessionDate: Date()
         ) != nil
     }
@@ -674,7 +688,7 @@ final class ProductStore: ObservableObject {
             isRecovery: isProtectedRecovery(request),
             activeRecurringProtection: activeRecurringProtection,
             rules: personalRules,
-            fuel: fuelState.pendingCapture ?? request.fuelContext
+            fuel: todaysFuelCapture ?? request.fuelContext
         )
     }
 
@@ -693,7 +707,7 @@ final class ProductStore: ObservableObject {
             for: experiment,
             request: request,
             eligibility: eligibility,
-            fuel: fuelState.pendingCapture ?? request.fuelContext
+            fuel: todaysFuelCapture ?? request.fuelContext
         )
     }
 
@@ -807,12 +821,14 @@ final class ProductStore: ObservableObject {
         let isNaturalBaseline = request.origin == .protocol && request.programDay == 1
         // Fuel context attaches only when honestly captured today, never on
         // Day 1. Protocol sessions consume the day's optional prompt; a
-        // standalone Lab session consumes it when an observational comparison
-        // needs the field. Free training never touches it.
+        // standalone Lab session consumes it only when an observational
+        // comparison needs the field. Free training and deliberate
+        // intervention tests never touch it.
+        let standaloneNeedsFuel = request.origin == .experiment
+            && activeExperiment?.comparisonKind == .observationalComparison
         if request.fuelContext == nil, !isNaturalBaseline,
-           request.origin == .protocol || request.origin == .experiment,
-           let pending = fuelState.pendingCapture,
-           FuelState.calendarDay(pending.capturedAt) == FuelState.calendarDay(Date()) {
+           request.origin == .protocol || standaloneNeedsFuel,
+           let pending = todaysFuelCapture {
             request.fuelContext = pending
             fuelState.pendingCapture = nil
         }
@@ -915,6 +931,13 @@ final class ProductStore: ObservableObject {
     ) -> TrainingSessionRequest {
         guard !labParticipationProtectedToday,
               let experiment = activeExperiment else { return request }
+        // Observational comparisons join protocol sessions only — the real
+        // context that selects the arm comes from the sampled day. Enforced
+        // here too, not only in the Train-tab gate.
+        if experiment.comparisonKind == .observationalComparison,
+           request.origin != .protocol {
+            return request
+        }
         let eligibility = PersonalLabEligibilityEngine.evaluate(
             request: request,
             experiment: experiment,
@@ -924,7 +947,8 @@ final class ProductStore: ObservableObject {
         guard let participation = PersonalLabEngine.participation(
             for: experiment,
             request: request,
-            eligibility: eligibility
+            eligibility: eligibility,
+            fuel: todaysFuelCapture ?? request.fuelContext
         ) else { return request }
         var updated = request
         updated.experimentParticipation = participation

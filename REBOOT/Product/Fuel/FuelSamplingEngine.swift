@@ -144,9 +144,17 @@ enum ContextSamplingEngine {
         guard inputs.log.lastPromptDay < FuelState.calendarDay(inputs.now) else { return nil }
 
         // An active observational comparison needs one specific field; the
-        // per-field cooldown must not block what the test itself is waiting on.
+        // generic per-field cooldown must not block what the test waits on.
+        // Repeated skips still quiet it — respect wins over impatience.
         if let needed = inputs.preferredField,
            inputs.pendingCapture?.value(for: needed) == nil {
+            if let lastShown = inputs.log.lastPromptAt[needed.rawValue] {
+                let skips = Double(inputs.log.skipCounts[needed.rawValue] ?? 0)
+                let neededCooldown = min(2.0 + skips * 2.0, 7.0)
+                if inputs.now.timeIntervalSince(lastShown) < neededCooldown * 86_400 {
+                    return nil
+                }
+            }
             return prompt(for: needed)
         }
 
