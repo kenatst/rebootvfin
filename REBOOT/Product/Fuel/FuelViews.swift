@@ -19,7 +19,7 @@ struct FuelView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
                         header
-                        MetaLabel(text: "Fuel", color: AppColors.coral)
+                        MetaLabel(text: "FUEL")
                             .padding(.top, 20)
                         EditorialHeadline(text: "What your attention runs on.")
                             .padding(.top, 12)

@@ -1,10 +1,11 @@
 import SwiftUI
 import StoreKit
 
+/// Conversion surface. Above the fold: headline → value line → yearly plan →
+/// CTA. Pillars and legal live below the purchase decision.
 struct PaywallView: View {
     @ObservedObject var subscriptionStore: SubscriptionStore
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var selectedPeriod: SubscriptionPeriod = .yearly
     @State private var showPrivacySheet = false
@@ -23,84 +24,83 @@ struct PaywallView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Top Navigation Bar
+                    // Top bar: brand eyebrow + close.
                     HStack {
-                        MetaLabel(text: "REBOOT ATTENTION SYSTEM", color: AppColors.coral)
+                        MetaLabel(text: "REBOOT")
                         Spacer()
                         Button {
                             dismiss()
                         } label: {
                             Image(systemName: "xmark")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(AppColors.ink)
-                                .frame(width: 36, height: 36)
+                                .frame(width: 38, height: 38)
                                 .background(AppColors.paperRaised)
                                 .clipShape(Circle())
                         }
+                        .accessibilityLabel("Close")
                     }
                     .padding(.top, 16)
 
-                    // Hero Headline
-                    EditorialHeadline(text: "90 Days to Rebuild Your Attention.")
-                        .padding(.top, 24)
+                    // The decision block sits above everything.
+                    EditorialHeadline(text: "90 days to rebuild your attention.")
+                        .padding(.top, 28)
 
                     Text(
-                        "A 90-day adaptive protocol that trains attention behaviors, learns your personal patterns from real sessions, and ends with an Operating Manual built from your own evidence.",
+                        "A 90-day protocol that trains attention behaviors, learns your patterns from real sessions, and ends with an Operating Manual built from your own evidence.",
                         style: .todaySentence
                     )
                     .foregroundStyle(AppColors.inkSoft)
-                    .padding(.top, 12)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 14)
 
-                    // Transformation Points
-                    transformationList
+                    pricingSelectionSection
                         .padding(.top, 28)
 
-                    // Pricing Selection Cards
-                    pricingSelectionSection
-                        .padding(.top, 32)
-
-                    // Error Message (if any)
-                    if let error = subscriptionStore.errorMessage {
-                        Text(error)
-                            .type(.footnote)
-                            .foregroundStyle(AppColors.coral)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 14)
-                    }
-
-                    // Primary CTA
                     PrimaryPillButton(
                         title: ctaTitle,
-                        symbol: "sparkles",
                         isEnabled: !subscriptionStore.isPurchasing && subscriptionStore.isStoreKitAvailable
                     ) {
                         handlePurchase()
                     }
                     .padding(.top, 20)
 
-                    // Secondary Actions & Restore
-                    HStack(spacing: 20) {
-                        Button("Restore Purchases") {
-                            Task {
-                                let restored = await subscriptionStore.restorePurchases()
-                                if restored {
-                                    dismiss()
-                                }
-                            }
+                    Button {
+                        Task {
+                            let restored = await subscriptionStore.restorePurchases()
+                            if restored { dismiss() }
                         }
-                        .type(.footnote)
-                        .foregroundStyle(AppColors.inkSoft)
+                    } label: {
+                        Text("Restore purchases")
+                            .type(.smallLink)
+                            .foregroundStyle(AppColors.inkSoft)
+                            .frame(maxWidth: .infinity, minHeight: 44)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 16)
+                    .buttonStyle(PressScaleStyle())
+                    .padding(.top, 6)
 
-                    // Legal & Terms Footer
+                    if let error = subscriptionStore.errorMessage {
+                        Text(error)
+                            .type(.footnote)
+                            .foregroundStyle(AppColors.coral)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 12)
+                    }
+
+                    // Supporting detail — quieter, below the fold decision.
+                    Divider()
+                        .overlay(AppColors.hairline)
+                        .padding(.top, 36)
+
+                    transformationList
+                        .padding(.top, 32)
+
                     footerLegalSection
-                        .padding(.top, 24)
+                        .padding(.top, 36)
                         .padding(.bottom, 40)
                 }
-                .padding(.horizontal, 24)
+                .padding(.horizontal, AppSpacing.screenPadding)
             }
         }
         .sheet(isPresented: $showPrivacySheet) {
@@ -111,114 +111,124 @@ struct PaywallView: View {
         }
     }
 
-    // MARK: - 2. Paywall Copy
-
-    private var transformationList: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            transformationRow(
-                tag: "UNDERSTAND",
-                title: "What breaks your attention",
-                detail: "Your sessions and honest self-reports surface the pulls that actually cost you focus."
-            )
-            transformationRow(
-                tag: "TRAIN",
-                title: "Staying, returning, recalling",
-                detail: "One prescribed practice a day across five attention modes, calibrated to your measured window."
-            )
-            transformationRow(
-                tag: "RESHAPE",
-                title: "Your environment",
-                detail: "Lighter friction first — phone distance, one-task browser, optional Screen Time protection."
-            )
-            transformationRow(
-                tag: "LEARN",
-                title: "The conditions that help you",
-                detail: "Energy, time of day and setup — tested against your own comparable sessions, not averages."
-            )
-            transformationRow(
-                tag: "LEAVE",
-                title: "An Operating Manual that's yours",
-                detail: "Day 90 ends with your evidence-backed manual. Own Mode keeps it useful without a program."
-            )
-        }
-    }
-
-    private func transformationRow(tag: String, title: String, detail: String) -> some View {
-        PaperCard(radius: 20, padding: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                MetaLabel(text: tag, color: AppColors.coral)
-                Text(title)
-                    .type(.heroReason)
-                    .foregroundStyle(AppColors.ink)
-                Text(detail)
-                    .type(.footnote)
-                    .foregroundStyle(AppColors.inkSoft)
-            }
-        }
-    }
-
     // MARK: - Pricing Selection
 
     private var pricingSelectionSection: some View {
-        VStack(spacing: 14) {
-            // Yearly Option (Visually Preferred)
-            Button {
-                selectedPeriod = .yearly
-            } label: {
-                PaperCard(radius: 22, padding: 18) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text("Annual Membership")
-                                    .type(.heroReason)
-                                    .foregroundStyle(AppColors.ink)
-                                GlassPill(text: "Best Value", tint: AppColors.coral)
-                            }
-                            Text(yearlyPriceSubtitle)
-                                .type(.footnote)
-                                .foregroundStyle(AppColors.inkSoft)
-                        }
-                        Spacer()
-                        Image(systemName: selectedPeriod == .yearly ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 22))
-                            .foregroundStyle(selectedPeriod == .yearly ? AppColors.coral : AppColors.inkFaint)
-                    }
-                }
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(selectedPeriod == .yearly ? AppColors.coral : Color.clear, lineWidth: 2)
-                )
-            }
-            .buttonStyle(PressScaleStyle())
+        VStack(spacing: 12) {
+            planRow(
+                title: "Yearly",
+                subtitle: yearlyPriceSubtitle,
+                badge: trialConfigured ? "7-day free trial" : "Best value",
+                isSelected: selectedPeriod == .yearly
+            ) { selectedPeriod = .yearly }
 
-            // Monthly Option
-            Button {
-                selectedPeriod = .monthly
-            } label: {
-                PaperCard(radius: 22, padding: 18) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Monthly Membership")
-                                .type(.heroReason)
-                                .foregroundStyle(AppColors.ink)
-                            Text(monthlyPriceSubtitle)
-                                .type(.footnote)
-                                .foregroundStyle(AppColors.inkSoft)
-                        }
-                        Spacer()
-                        Image(systemName: selectedPeriod == .monthly ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 22))
-                            .foregroundStyle(selectedPeriod == .monthly ? AppColors.coral : AppColors.inkFaint)
-                    }
-                }
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(selectedPeriod == .monthly ? AppColors.coral : Color.clear, lineWidth: 2)
-                )
-            }
-            .buttonStyle(PressScaleStyle())
+            planRow(
+                title: "Monthly",
+                subtitle: monthlyPriceSubtitle,
+                badge: nil,
+                isSelected: selectedPeriod == .monthly
+            ) { selectedPeriod = .monthly }
         }
     }
+
+    private func planRow(
+        title: String,
+        subtitle: String,
+        badge: String?,
+        isSelected: Bool,
+        onSelect: @escaping () -> Void
+    ) -> some View {
+        Button(action: onSelect) {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(title)
+                            .font(Font(AppTypography.plusJakarta(size: 17, weight: 700)))
+                            .foregroundStyle(AppColors.ink)
+                        if let badge {
+                            Text(badge.uppercased())
+                                .font(Font(AppTypography.plusJakarta(size: 10, weight: 700)))
+                                .tracking(0.8)
+                                .foregroundStyle(isSelected ? AppColors.paper : AppColors.coral)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(isSelected ? AppColors.coral : AppColors.coral.opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                    }
+                    Text(subtitle)
+                        .type(.footnote)
+                        .foregroundStyle(AppColors.inkSoft)
+                }
+                Spacer()
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(isSelected ? AppColors.coral : AppColors.inkFaint)
+            }
+            .padding(18)
+            .background(isSelected ? AppColors.paperRaised : AppColors.paperRaised.opacity(0.55))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.secondary, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: AppRadius.secondary, style: .continuous)
+                    .strokeBorder(isSelected ? AppColors.coral : AppColors.hairline, lineWidth: isSelected ? 1.5 : 1)
+            )
+        }
+        .buttonStyle(PressScaleStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityLabel("\(title) plan. \(subtitle)\(badge.map { ". \($0)" } ?? "")")
+    }
+
+    // MARK: - Supporting Detail (below the fold)
+
+    /// The five pillars as flat editorial rows — no cards, reduced weight.
+    private var transformationList: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(pillars.enumerated()), id: \.offset) { index, pillar in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(pillar.tag)
+                        .font(Font(AppTypography.plusJakarta(size: 10, weight: 700)))
+                        .tracking(1.5)
+                        .foregroundStyle(AppColors.coral)
+                    Text(pillar.title)
+                        .type(.heroGoal)
+                        .foregroundStyle(AppColors.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(pillar.detail)
+                        .type(.footnote)
+                        .foregroundStyle(AppColors.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 14)
+
+                if index < pillars.count - 1 {
+                    Divider().overlay(AppColors.hairline)
+                }
+            }
+        }
+    }
+
+    private struct Pillar {
+        let tag: String
+        let title: String
+        let detail: String
+    }
+
+    private var pillars: [Pillar] {
+        [
+            Pillar(tag: "UNDERSTAND", title: "What breaks your attention",
+                   detail: "Your sessions and honest self-reports surface the pulls that actually cost you focus."),
+            Pillar(tag: "TRAIN", title: "Staying, returning, recalling",
+                   detail: "One prescribed practice a day across five attention modes."),
+            Pillar(tag: "RESHAPE", title: "Your environment",
+                   detail: "Lighter friction first — distance, one-task browser, optional protection."),
+            Pillar(tag: "LEARN", title: "The conditions that help you",
+                   detail: "Tested against your own comparable sessions, not averages."),
+            Pillar(tag: "LEAVE", title: "An Operating Manual that's yours",
+                   detail: "Day 90 ends with your evidence-backed manual; Own Mode keeps it useful."),
+        ]
+    }
+
+    // MARK: - Pricing Copy
 
     private var yearlyPriceSubtitle: String {
         if let product = subscriptionStore.yearlyProduct {

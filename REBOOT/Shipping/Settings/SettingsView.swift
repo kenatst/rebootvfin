@@ -101,40 +101,40 @@ struct SettingsView: View {
 
     // MARK: - Membership Header Card
 
+    /// Membership sits directly on the paper as an editorial row — Settings
+    /// is not a product tour.
     private var membershipHeaderCard: some View {
-        PaperCard(radius: 22, padding: 18) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text(subscriptionStore.status.displayLabel)
-                            .type(.heroReason)
-                            .foregroundStyle(AppColors.ink)
-                        if subscriptionStore.status.isPremium {
-                            GlassPill(text: "Active", tint: AppColors.coral)
-                        }
-                    }
-                    if let expiry = subscriptionStore.status.formattedExpiry {
-                        Text(expiry)
-                            .type(.footnote)
-                            .foregroundStyle(AppColors.inkSoft)
-                    } else if !subscriptionStore.status.isPremium {
-                        Text("Unlock 90-day program, daily guidance & operating manual.")
-                            .type(.footnote)
-                            .foregroundStyle(AppColors.inkSoft)
-                    }
-                }
-                Spacer()
-                Button {
-                    showPaywall = true
-                } label: {
-                    GlassPill(
-                        text: subscriptionStore.status.isPremium ? "Manage" : "Upgrade",
-                        symbol: subscriptionStore.status.isPremium ? "creditcard" : "sparkles",
-                        tint: AppColors.ink
-                    )
+        VStack(alignment: .leading, spacing: 12) {
+            MetaLabel(text: "SUBSCRIPTION", color: AppColors.coral)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(subscriptionStore.status.displayLabel)
+                    .font(.system(size: 22, weight: .semibold, design: .serif))
+                    .foregroundStyle(AppColors.ink)
+                if let expiry = subscriptionStore.status.formattedExpiry {
+                    Text(expiry)
+                        .type(.footnote)
+                        .foregroundStyle(AppColors.inkSoft)
+                } else if !subscriptionStore.status.isPremium {
+                    Text("The full 90-day program, daily guidance and your Operating Manual.")
+                        .type(.footnote)
+                        .foregroundStyle(AppColors.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
+
+            Button {
+                showPaywall = true
+            } label: {
+                Text(subscriptionStore.status.isPremium ? "Manage subscription" : "See plans")
+                    .type(.smallLink)
+                    .foregroundStyle(AppColors.inkSoft)
+                    .underline()
+                    .frame(minHeight: 44, alignment: .leading)
+            }
+            .buttonStyle(PressScaleStyle())
         }
+        .padding(.vertical, 6)
     }
 
     // MARK: - 1. Program Section

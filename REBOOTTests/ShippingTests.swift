@@ -23,7 +23,7 @@ final class ShippingTests: XCTestCase {
         let freeStatus: SubscriptionStatus = .free
         XCTAssertFalse(freeStatus.isPremium)
         XCTAssertFalse(freeStatus.isTrial)
-        XCTAssertEqual(freeStatus.displayLabel, "Free Tier")
+        XCTAssertEqual(freeStatus.displayLabel, "REBOOT Free")
         XCTAssertNil(freeStatus.formattedExpiry)
 
         let trialDate = Date().addingTimeInterval(7 * 86400)
