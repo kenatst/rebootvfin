@@ -98,7 +98,7 @@ struct FlowLabView: View {
 
     private func waitSection(_ reason: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            MetaLabel(text: "Project waiting", color: AppColors.coral)
+            MetaLabel(text: "PROJECT WAITING")
             FlowText(reason, style: .heroGoal)
                 .foregroundStyle(AppColors.ink)
         }
@@ -149,7 +149,7 @@ struct FlowLabView: View {
 
     private var noticingSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            MetaLabel(text: "What REBOOT is noticing", color: AppColors.coral)
+            MetaLabel(text: "WHAT REBOOT IS NOTICING")
             FlowConditionSignature(
                 patterns: Array(product.flowPatterns.prefix(4)),
                 evidenceCount: product.flowState.evidence.count
@@ -264,7 +264,7 @@ struct FlowLabView: View {
 
     private var stillLearningSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            MetaLabel(text: "Still learning", color: AppColors.coral)
+            MetaLabel(text: "STILL LEARNING")
             FlowText(
                 product.flowPatterns.isEmpty
                     ? "Several comparable real-project blocks are needed before a condition becomes meaningful."

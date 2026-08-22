@@ -28,7 +28,7 @@ enum SubscriptionStatus: Codable, Equatable {
     var displayLabel: String {
         switch self {
         case .free:
-            return "Free Tier"
+            return "REBOOT Free"
         case .subscribed(_, _, let isTrial):
             return isTrial ? "7-Day Free Trial" : "REBOOT Premium"
         case .gracePeriod:

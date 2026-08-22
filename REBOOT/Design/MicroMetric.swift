@@ -76,7 +76,7 @@ struct FocusSparkline: View {
                 let y = h - (CGFloat(p.minutes) / CGFloat(maxMin)) * (h - 6) - 3
                 Circle()
                     .fill(i == points.count - 1 ? AppColors.coral : AppColors.paper)
-                    .overlay(Circle().stroke(AppColors.coral.opacity(0.8), lineWidth: 1.2))
+                    .overlay(Circle().stroke(AppColors.hairline, lineWidth: 1))
                     .frame(width: 6, height: 6)
                     .position(x: x, y: y)
             }

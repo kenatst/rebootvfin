@@ -12,10 +12,10 @@ struct ProgramTab: View {
                 AmbientBackground()
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
-                        MetaLabel(text: "Program", color: AppColors.coral)
+                        MetaLabel(text: "PROGRAM")
                         EditorialHeadline(
                             text: isComplete
-                                ? "90 days complete."
+                                ? "Ninety days complete."
                                 : "90 days, built around you."
                         )
                         .padding(.top, 14)
@@ -57,9 +57,9 @@ struct ProgramTab: View {
                                 .padding(.top, 12)
                         }
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, AppSpacing.screenPadding)
                     .padding(.top, max(20, geo.safeAreaInsets.top))
-                    .padding(.bottom, 180)
+                    .padding(.bottom, 160)
                 }
             }
             .ignoresSafeArea()
@@ -82,34 +82,20 @@ struct ProgramTab: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 8)
-                    ProgressRing(progress: product.programProgress, size: 56, lineWidth: 5)
+                    ProgressRing(progress: product.programProgress, size: 52, lineWidth: 3)
                         .accessibilityLabel("\(product.completedProtocolDays) of 90 program days completed")
                 }
 
-                Text(String(format: "DAY %03d / 090", product.day))
-                    .type(.calendarMeta)
-                    .foregroundStyle(AppColors.ink)
-                    .padding(.top, 18)
-
                 Text(
                     isComplete
-                        ? "The 90-day adaptive protocol is complete. Your Attention Map and Personal Rules are fully formed and preserved."
+                        ? "The protocol is complete. Your rules, windows and conditions are written down — and they stay yours."
                         : phase.description,
-                    style: .heroReason
+                    style: .todaySentence
                 )
                 .foregroundStyle(AppColors.inkSoft)
-                .padding(.top, 8)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 16)
 
-                HStack {
-                    Text("\(product.completedProtocolDays) protocol days completed")
-                        .type(.footnote)
-                        .foregroundStyle(AppColors.inkFaint)
-                    Spacer()
-                    if isComplete {
-                        GlassPill(text: "100% Complete", tint: AppColors.coral)
-                    }
-                }
-                .padding(.top, 14)
             }
         }
     }
@@ -132,46 +118,19 @@ struct ProgramTab: View {
     }
 
     private var completedSynthesisCard: some View {
-        PaperCard(radius: 24, padding: 18) {
+        PaperCard(radius: AppRadius.secondary, padding: 20) {
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Image(systemName: "sparkles")
-                        .foregroundStyle(AppColors.coral)
-                    Text("Synthesized Architecture", style: .heroGoal)
-                        .foregroundStyle(AppColors.ink)
-                }
-                Text("90 protocol days across all 6 phases have established your personalized rules, measured focus windows, and verified digital friction.", style: .heroReason)
+                MetaLabel(text: "WHAT YOU BUILT", color: AppColors.coral)
+                Text("Your rules are kept, your windows measured, your conditions written down.", style: .heroReason)
                     .foregroundStyle(AppColors.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                HStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(product.personalRules.count)")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(AppColors.coral)
-                        Text("Personal Rules")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(AppColors.inkFaint)
-                    }
-                    Spacer()
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(product.sessions.count)")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(AppColors.ink)
-                        Text("Total Sessions")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(AppColors.inkFaint)
-                    }
-                    Spacer()
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("6 / 6")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(AppColors.ink)
-                        Text("Phases Completed")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(AppColors.inkFaint)
-                    }
+                HStack(spacing: 24) {
+                    MicroMetric(label: "Rules kept", value: "\(product.personalRules.count)")
+                    MicroMetric(label: "Sessions", value: "\(product.sessions.count)")
+                    MicroMetric(label: "Phases", value: "6 of 6")
                 }
-                .padding(.top, 8)
+                .padding(.top, 10)
             }
         }
     }
@@ -362,38 +321,50 @@ struct WeeklyReviewView: View {
                 AmbientBackground()
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
-                        MetaLabel(text: "Program review", color: AppColors.coral)
-                        EditorialHeadline(text: checkpointDay == 7 ? "Your first week." : "A short review.")
+                        MetaLabel(text: "PROGRAM REVIEW", color: AppColors.coral)
+                        EditorialHeadline(text: checkpointDay == 7 ? "Your first week." : "Turning the page.")
                             .padding(.top, 16)
-                        Text("This review belongs to Day \(checkpointDay). It never adds another program day.", style: .todaySentence)
+                        Text("A short look back before Day \(min(90, checkpointDay + 1)). It never adds another program day.", style: .todaySentence)
                             .foregroundStyle(AppColors.inkSoft)
+                            .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 12)
 
-                        MetaLabel(text: "THIS WEEK REBOOT LEARNED", color: AppColors.coral)
-                            .padding(.top, 30)
+                        Divider()
+                            .overlay(AppColors.hairline)
+                            .padding(.top, 28)
+
+                        MetaLabel(text: "THIS WEEK REBOOT LEARNED")
+                            .padding(.top, 28)
                         reviewInsights
-                            .padding(.top, 12)
+                            .padding(.top, 14)
 
-                        MetaLabel(text: "NEXT WEEK'S FOCUS")
-                            .padding(.top, 24)
-                        nextWeekFocusCard
-                            .padding(.top, 10)
+                        Divider()
+                            .overlay(AppColors.hairline)
+                            .padding(.top, 28)
+
+                        MetaLabel(text: "NEXT WEEK")
+                            .padding(.top, 28)
+                        nextWeekFocus
+                            .padding(.top, 14)
 
                         reviewQuestions
-                            .padding(.top, 30)
+                            .padding(.top, 36)
 
                         PrimaryPillButton(title: "Save review", symbol: "checkmark") {
                             product.saveWeeklyReview(answers)
                         }
-                        .padding(.top, 30)
+                        .padding(.top, 32)
 
-                        Button("Skip questions") {
+                        Button {
                             product.skipWeeklyReviewQuestions()
+                        } label: {
+                            Text("Skip questions")
+                                .type(.smallLink)
+                                .foregroundStyle(AppColors.inkFaint)
+                                .frame(maxWidth: .infinity, minHeight: 44)
                         }
-                        .type(.smallLink)
-                        .foregroundStyle(AppColors.inkFaint)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 16)
+                        .buttonStyle(PressScaleStyle())
+                        .padding(.top, 8)
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, max(20, geo.safeAreaInsets.top) + 16)
@@ -410,35 +381,32 @@ struct WeeklyReviewView: View {
         if insights.isEmpty {
             Text("We're still learning which changes matter most.", style: .insightQuote)
                 .foregroundStyle(AppColors.ink)
+                .fixedSize(horizontal: false, vertical: true)
         } else {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 18) {
                 ForEach(insights.prefix(2)) { insight in
-                    HStack(alignment: .top, spacing: 10) {
-                        Circle()
-                            .fill(AppColors.coral)
-                            .frame(width: 6, height: 6)
-                            .padding(.top, 9)
-                        Text(insight.text, style: .heroReason)
-                            .foregroundStyle(AppColors.ink)
-                    }
+                    Text(insight.text, style: .insightQuote)
+                        .foregroundStyle(AppColors.ink)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
     }
 
-    private var nextWeekFocusCard: some View {
+    /// Next week sits directly on the paper: one direction, one sentence.
+    private var nextWeekFocus: some View {
         let nextDay = min(90, checkpointDay + 1)
         let nextPhase = ProgramPhase.phase(for: nextDay)
-        let topPriority = nextPhase.priorities.first?.title ?? "Sustained Focus"
-        return PaperCard(radius: 20, padding: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(topPriority)
-                    .type(.heroGoal)
-                    .foregroundStyle(AppColors.ink)
-                Text(nextPhase.description)
-                    .type(.heroReason)
-                    .foregroundStyle(AppColors.inkSoft)
-            }
+        let topPriority = nextPhase.priorities.first?.title ?? "Sustained focus"
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(topPriority)
+                .font(.system(size: 26, weight: .semibold, design: .serif))
+                .foregroundStyle(AppColors.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(nextPhase.description)
+                .type(.heroReason)
+                .foregroundStyle(AppColors.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -555,6 +523,7 @@ struct ProgramPhaseTransitionView: View {
 struct ProgramCompletionView: View {
     @ObservedObject var product: ProductStore
     @State private var showManual = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { geo in
@@ -564,47 +533,64 @@ struct ProgramCompletionView: View {
                 AmbientBackground()
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
-                        MetaLabel(text: "Protocol Complete", color: AppColors.coral)
-                        EditorialHeadline(text: "You know your attention now.")
-                            .padding(.top, 18)
+                        Spacer(minLength: max(24, geo.size.height * 0.06))
+
+                        // One quiet gesture: the completed ring, alone.
+                        HStack {
+                            ProgressRing(progress: 1.0, size: 44, lineWidth: 3)
+                                .accessibilityLabel("90 of 90 protocol days complete")
+                            Spacer()
+                        }
+                        .padding(.bottom, 28)
+
+                        MetaLabel(text: "DAY 090 / 090", color: AppColors.coral)
+                        EditorialHeadline(
+                            text: "You know your attention now.",
+                            style: .reportTitle
+                        )
+                        .padding(.top, 16)
+
                         Text(
-                            "90 days did not create a rigid perfection. It built an operating system for how your attention actually works.",
+                            "Ninety days did not create perfect focus. They taught you what breaks your attention, how you return, and which conditions hold your deepest work.",
                             style: .todaySentence
                         )
                         .foregroundStyle(AppColors.inkSoft)
-                        .padding(.top, 16)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 18)
 
-                        PaperCard(radius: 26, padding: 20) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                MetaLabel(text: "Your Operating System")
-                                Text("Attention Operating Manual", style: .cardTitle)
-                                    .foregroundStyle(AppColors.ink)
-                                Text("Evidence-backed summaries of how you start, what breaks focus, your digital environment, and your optimal conditions.", style: .heroReason)
-                                    .foregroundStyle(AppColors.inkSoft)
-                            }
-                        }
-                        .padding(.top, 30)
+                        Divider()
+                            .overlay(AppColors.hairline)
+                            .padding(.vertical, 32)
 
-                        Spacer(minLength: 30)
-                        
+                        Text("Everything REBOOT learned about you now lives in one document — written from your own sessions, still yours after today.",
+                             style: .heroReason)
+                            .foregroundStyle(AppColors.inkSoft)
+                            .fixedSize(horizontal: false, vertical: true)
+
                         PrimaryPillButton(title: "Open My Operating Manual", symbol: "book.pages") {
                             showManual = true
                         }
-                        .padding(.top, 24)
+                        .padding(.top, 32)
 
-                        Button("Enter Own Mode") {
+                        Button {
                             product.acknowledgeProgramCompletion()
+                        } label: {
+                            Text("Enter Own Mode")
+                                .type(.smallLink)
+                                .foregroundStyle(AppColors.inkSoft)
+                                .underline()
+                                .frame(maxWidth: .infinity, minHeight: 44)
                         }
-                        .type(.smallLink)
-                        .foregroundStyle(AppColors.inkSoft)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 14)
+                        .buttonStyle(PressScaleStyle())
+                        .padding(.top, 8)
                     }
                     .frame(
+                        minWidth: 0,
+                        maxWidth: .infinity,
                         minHeight: max(0, geo.size.height - topPadding - bottomPadding),
                         alignment: .top
                     )
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, AppSpacing.screenPadding)
                     .padding(.top, topPadding)
                     .padding(.bottom, bottomPadding)
                 }

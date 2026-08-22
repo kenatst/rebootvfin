@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// The Attention Operating Manual: a typeset personal document, not a stack
+/// of cards. Chapters sit directly on the paper, separated by hairlines,
+/// with quiet evidence metadata under each statement.
 struct AttentionOperatingManualView: View {
     let manual: AttentionOperatingManual
     @Environment(\.dismiss) private var dismiss
@@ -7,31 +10,31 @@ struct AttentionOperatingManualView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                AmbientBackground()
+                AppColors.paper.ignoresSafeArea()
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 28) {
+                    VStack(alignment: .leading, spacing: 0) {
                         headerSection
-                        
-                        manualSection(item: manual.howIStartBest)
-                        manualSection(item: manual.myMostCommonBreakers)
-                        manualSection(item: manual.myReturnStrategy)
-                        manualSection(item: manual.myFocusWindow)
-                        manualSection(item: manual.myDigitalEnvironment)
-                        manualSection(item: manual.myDeepWorkConditions)
-                        manualSection(item: manual.myRecallStrategy)
-                        manualSection(item: manual.myEnergyAndContext)
-                        manualSection(item: manual.myFlowConditions)
+                        chapter(manual.howIStartBest)
+                        chapter(manual.myMostCommonBreakers)
+                        chapter(manual.myReturnStrategy)
+                        chapter(manual.myFocusWindow)
+                        chapter(manual.myDigitalEnvironment)
+                        chapter(manual.myDeepWorkConditions)
+                        chapter(manual.myRecallStrategy)
+                        chapter(manual.myEnergyAndContext)
+                        chapter(manual.myFlowConditions)
 
-                        rulesSection
-                        unknownsSection
+                        rulesChapter
+                        unknownsChapter
                     }
                     .padding(.horizontal, 24)
-                    .padding(.top, 16)
+                    .padding(.top, 8)
                     .padding(.bottom, 60)
                 }
             }
             .navigationTitle("Operating Manual")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(AppColors.paper.opacity(0.9), for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
@@ -55,126 +58,132 @@ struct AttentionOperatingManualView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            MetaLabel(text: "Operating Manual", color: AppColors.coral)
+        VStack(alignment: .leading, spacing: 10) {
+            MetaLabel(text: "ATTENTION OPERATING MANUAL", color: AppColors.coral)
             Text("You know your attention now.")
-                .font(.system(size: 26, weight: .semibold, design: .serif))
+                .font(.system(size: 32, weight: .semibold, design: .serif))
                 .foregroundStyle(AppColors.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 6)
             Text("Grounded in \(manual.totalProtocolDays) protocol days and \(manual.totalSessions) sessions. Every line keeps its evidence; unknowns stay unknown. The manual keeps learning after Day 90.")
-                .type(.heroReason)
+                .type(.reportBody)
                 .foregroundStyle(AppColors.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 4)
         }
+        .padding(.vertical, 28)
     }
 
-    // MARK: - Standard Section
+    // MARK: - Chapter (one manual item, no card)
 
-    private func manualSection(item: ManualItem) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(item.sectionTitle, style: .heroGoal)
-                    .foregroundStyle(AppColors.ink)
-                Spacer()
-                maturityPill(item.maturity)
-            }
+    private func chapter(_ item: ManualItem) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider().overlay(AppColors.hairline)
 
-            PaperCard(radius: 20, padding: 18) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(item.statement)
-                        .type(.heroGoal)
-                        .foregroundStyle(AppColors.ink)
-
-                    Divider().opacity(0.3)
-
-                    HStack {
-                        Text(item.evidenceSource)
-                            .type(.footnote)
-                            .foregroundStyle(AppColors.inkFaint)
-                        Spacer()
-                        if let n = item.observationCount, n > 0 {
-                            Text("n=\(n)")
-                                .type(.footnote)
-                                .foregroundStyle(AppColors.inkFaint)
-                        }
-                    }
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(item.sectionTitle)
+                        .font(Font(AppTypography.plusJakarta(size: 12, weight: 700)))
+                        .tracking(1.6)
+                        .foregroundStyle(AppColors.inkFaint)
+                    Spacer()
+                    maturityLabel(item.maturity)
                 }
+
+                Text(item.statement)
+                    .font(.system(size: 22, weight: .regular, design: .serif))
+                    .foregroundStyle(AppColors.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
+
+                Text(evidenceLine(item))
+                    .type(.footnote)
+                    .foregroundStyle(AppColors.inkFaint)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(.vertical, 26)
         }
     }
 
-    // MARK: - Personal Rules Section
+    // MARK: - Personal Rules chapter
 
-    private var rulesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("MY PERSONAL RULES", style: .heroGoal)
-                .foregroundStyle(AppColors.ink)
+    private var rulesChapter: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider().overlay(AppColors.hairline)
 
-            if manual.myPersonalRules.isEmpty {
-                PaperCard(radius: 20, padding: 18) {
-                    Text("No personal rules kept yet. Complete experiments in Personal Lab to establish evidence-backed rules.")
+            VStack(alignment: .leading, spacing: 14) {
+                Text("MY PERSONAL RULES")
+                    .font(Font(AppTypography.plusJakarta(size: 12, weight: 700)))
+                    .tracking(1.6)
+                    .foregroundStyle(AppColors.inkFaint)
+
+                if manual.myPersonalRules.isEmpty {
+                    Text("No rules kept yet. Experiments in Personal Lab become rules once the evidence holds.")
                         .type(.heroReason)
                         .foregroundStyle(AppColors.inkSoft)
-                }
-            } else {
-                VStack(spacing: 10) {
-                    ForEach(manual.myPersonalRules) { rule in
-                        PaperCard(radius: 18, padding: 16) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Text(rule.statement)
-                                        .type(.heroGoal)
-                                        .foregroundStyle(AppColors.ink)
-                                    Spacer()
-                                    maturityPill(rule.maturity)
-                                }
-                                Text(rule.evidenceSource)
-                                    .type(.footnote)
-                                    .foregroundStyle(AppColors.inkFaint)
-                            }
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    ForEach(Array(manual.myPersonalRules.enumerated()), id: \.element.id) { index, rule in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(rule.statement)
+                                .font(.system(size: 19, weight: .regular, design: .serif))
+                                .foregroundStyle(AppColors.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(rule.evidenceSource)
+                                .type(.footnote)
+                                .foregroundStyle(AppColors.inkFaint)
                         }
+                        .padding(.top, index == 0 ? 2 : 10)
                     }
                 }
             }
+            .padding(.vertical, 26)
         }
     }
 
-    // MARK: - Unknowns Section
+    // MARK: - Unknowns chapter
 
-    private var unknownsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("WHAT I STILL DON'T KNOW", style: .heroGoal)
-                .foregroundStyle(AppColors.ink)
+    private var unknownsChapter: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider().overlay(AppColors.hairline)
 
-            VStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("WHAT I STILL DON'T KNOW")
+                    .font(Font(AppTypography.plusJakarta(size: 12, weight: 700)))
+                    .tracking(1.6)
+                    .foregroundStyle(AppColors.inkFaint)
+
                 ForEach(manual.whatRebootStillDoesNotKnow) { unknown in
-                    PaperCard(radius: 18, padding: 16) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(alignment: .top, spacing: 8) {
-                                Text("•")
-                                    .foregroundStyle(AppColors.coral)
-                                Text(unknown.statement)
-                                    .type(.heroReason)
-                                    .foregroundStyle(AppColors.ink)
-                            }
-                            Text(unknown.evidenceSource)
-                                .type(.footnote)
-                                .foregroundStyle(AppColors.inkFaint)
-                                .padding(.leading, 14)
-                        }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(unknown.statement)
+                            .font(.system(size: 19, weight: .regular, design: .serif))
+                            .foregroundStyle(AppColors.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(unknown.evidenceSource)
+                            .type(.footnote)
+                            .foregroundStyle(AppColors.inkFaint)
                     }
                 }
             }
+            .padding(.vertical, 26)
         }
     }
 
     // MARK: - Helpers
 
-    private func maturityPill(_ maturity: ManualMaturity) -> some View {
-        Text(maturity.displayLabel)
-            .type(.smallLink)
-            .foregroundStyle(maturity == .repeatedSignal ? AppColors.ink : AppColors.coral)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background((maturity == .repeatedSignal ? AppColors.ink : AppColors.coral).opacity(0.12))
-            .clipShape(Capsule())
+    /// Evidence line as quiet metadata; n-count only when real.
+    private func evidenceLine(_ item: ManualItem) -> String {
+        guard let n = item.observationCount, n > 0 else {
+            return item.evidenceSource
+        }
+        return "\(item.evidenceSource) · \(n) observations"
+    }
+
+    /// Maturity as a two-word whisper, never a badge.
+    private func maturityLabel(_ maturity: ManualMaturity) -> some View {
+        Text(maturity.displayLabel.uppercased())
+            .font(Font(AppTypography.plusJakarta(size: 10, weight: 600)))
+            .tracking(0.8)
+            .foregroundStyle(maturity == .repeatedSignal ? AppColors.coral : AppColors.inkFaint)
     }
 }

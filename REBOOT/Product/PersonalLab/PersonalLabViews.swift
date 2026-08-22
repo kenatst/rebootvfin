@@ -383,7 +383,7 @@ private struct ExperimentTemplateSheet: View {
 
     var body: some View {
         LabSheetScaffold(close: { dismiss() }) {
-            MetaLabel(text: template.shortTitle, color: AppColors.coral)
+            MetaLabel(text: template.shortTitle)
             EditorialHeadline(text: template.question)
                 .padding(.top, 14)
             Text(template.rationale, style: .todaySentence)
@@ -624,7 +624,7 @@ struct ExperimentDetailView: View {
 
     @ViewBuilder
     private func resultContent(_ experiment: PersonalExperiment, result: ExperimentResult) -> some View {
-        MetaLabel(text: "Lab result", color: AppColors.coral)
+        MetaLabel(text: "LAB RESULT")
         HStack(spacing: 10) {
             resultIcon(result.state)
             Text(resultLabel(result.state), style: .heroMode)
@@ -857,7 +857,7 @@ private struct ExperimentLibrarySheet: View {
 
     var body: some View {
         LabSheetScaffold(close: { dismiss() }) {
-            MetaLabel(text: "Test library", color: AppColors.coral)
+            MetaLabel(text: "TEST LIBRARY")
             EditorialHeadline(text: "A few useful questions.")
                 .padding(.top, 14)
             Text("Small, executable comparisons using outcomes REBOOT already records.", style: .todaySentence)
@@ -920,7 +920,7 @@ private struct CustomExperimentSheet: View {
 
     var body: some View {
         LabSheetScaffold(close: { dismiss() }) {
-            MetaLabel(text: "Your test", color: AppColors.coral)
+            MetaLabel(text: "YOUR TEST")
             EditorialHeadline(text: "Compare one real change.")
                 .padding(.top, 14)
 

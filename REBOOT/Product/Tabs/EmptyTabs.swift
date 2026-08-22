@@ -12,14 +12,15 @@ struct TrainTab: View {
                 AmbientBackground()
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
-                        MetaLabel(text: "Train", color: AppColors.coral)
-                        EditorialHeadline(text: "Train what attention needs.")
+                        MetaLabel(text: "TRAIN")
+                        EditorialHeadline(text: "Optional practice.")
                             .padding(.top, 14)
                         Text(
-                            "Practice a specific skill without moving your 90-day program forward.",
+                            "Train a specific skill without moving your program forward. Your prescribed session lives on Today.",
                             style: .todaySentence
                         )
                         .foregroundStyle(AppColors.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
 
                         MetaLabel(text: "Today's practice")
                             .padding(.top, 34)
@@ -30,22 +31,26 @@ struct TrainTab: View {
                             HStack(spacing: 10) {
                                 Image(systemName: "scope")
                                     .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(AppColors.coral)
+                                    .foregroundStyle(AppColors.ink)
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text("Flow Lab", style: .heroGoal)
                                         .foregroundStyle(AppColors.ink)
                                     Text("Use a real project and learn your deeper-work conditions.", style: .footnote)
                                         .foregroundStyle(AppColors.inkFaint)
                                         .multilineTextAlignment(.leading)
+                                        .fixedSize(horizontal: false, vertical: true)
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(AppColors.inkFaint)
                             }
-                            .padding(.vertical, 18)
+                            .padding(20)
+                            .background(AppColors.paperRaised.opacity(0.72))
+                            .clipShape(RoundedRectangle(cornerRadius: AppRadius.primary, style: .continuous))
                         }
                         .buttonStyle(PressScaleStyle())
+                        .padding(.top, 24)
 
                         MetaLabel(text: "Practice library")
                             .padding(.top, 34)
@@ -82,20 +87,22 @@ struct TrainTab: View {
     }
 
     private var todayPractice: some View {
-        PaperCard(radius: 30, padding: 22, shadow: .lift) {
+        PaperCard(radius: AppRadius.hero, padding: 24, shadow: .lift) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    GlassPill(text: product.prescription.mode.rawValue, tint: AppColors.coral)
+                    MetaLabel(text: product.prescription.mode.rawValue, color: AppColors.coral)
                     Spacer()
                     Text("\(product.prescription.minutes) min", style: .heroMode)
                         .foregroundStyle(AppColors.ink)
                 }
                 Text(product.prescription.goal, style: .heroGoal)
                     .foregroundStyle(AppColors.ink)
-                    .padding(.top, 18)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 16)
                 Text(product.prescription.reason, style: .heroReason)
                     .foregroundStyle(AppColors.inkSoft)
-                    .padding(.top, 8)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 6)
                 if product.hasCompletedCurrentProtocol {
                     GlassPill(text: "Today complete", symbol: "checkmark", tint: AppColors.coral)
                         .padding(.top, 20)
@@ -109,49 +116,48 @@ struct TrainTab: View {
         }
     }
 
+    /// One quiet editorial row per mode — same surface language as the rest of
+    /// REBOOT. The mode name carries the identity; no per-mode rainbow tints.
     private var practiceLibrary: some View {
-        VStack(spacing: 12) {
-            practiceTile(.stay, tint: AppColors.coral.opacity(0.12), minHeight: 168)
-            HStack(alignment: .top, spacing: 12) {
-                practiceTile(.recall, tint: Color.blue.opacity(0.09), minHeight: 190)
-                practiceTile(.explain, tint: Color.purple.opacity(0.07), minHeight: 190)
-            }
-            HStack(alignment: .top, spacing: 12) {
-                practiceTile(.nothing, tint: Color.mint.opacity(0.09), minHeight: 168)
-                practiceTile(.observe, tint: Color.orange.opacity(0.08), minHeight: 168)
+        VStack(spacing: 0) {
+            ForEach(Array(TrainingMode.allCases.enumerated()), id: \.element.id) { index, mode in
+                practiceRow(mode)
+                if index < TrainingMode.allCases.count - 1 {
+                    Divider()
+                        .overlay(AppColors.hairline)
+                        .padding(.leading, 20)
+                }
             }
         }
+        .background(AppColors.paperRaised.opacity(0.72))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.primary, style: .continuous))
     }
 
-    private func practiceTile(_ mode: TrainingMode, tint: Color, minHeight: CGFloat) -> some View {
+    private func practiceRow(_ mode: TrainingMode) -> some View {
         Button { selectedMode = mode } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Text(mode.rawValue, style: .heroMode)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(mode.rawValue)
+                        .font(Font(AppTypography.plusJakarta(size: 15, weight: 700)))
+                        .tracking(1.5)
                         .foregroundStyle(AppColors.ink)
                     Spacer()
                     Image(systemName: symbol(for: mode))
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(AppColors.coral)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(AppColors.inkFaint)
                 }
-                Spacer(minLength: 24)
                 Text(mode.libraryDescription, style: .heroReason)
                     .foregroundStyle(AppColors.inkSoft)
                     .multilineTextAlignment(.leading)
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(AppColors.inkFaint)
-                    .padding(.top, 14)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .leading)
-            .background(AppColors.paperRaised.opacity(0.88))
-            .background(tint)
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .appShadow(.soft)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressScaleStyle())
-        .accessibilityLabel("\(mode.display). \(mode.libraryDescription)")
+        .accessibilityLabel("\(mode.display). \(mode.libraryDescription). Suggested \(mode.freeDurations.first ?? 10) minutes.")
     }
 
     private func symbol(for mode: TrainingMode) -> String {
@@ -262,7 +268,7 @@ struct ProfileTab: View {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
                         HStack {
-                            MetaLabel(text: "Attention Profile", color: AppColors.coral)
+                            MetaLabel(text: "PROFILE")
                             Spacer()
                             Button {
                                 showSettings = true
@@ -276,34 +282,44 @@ struct ProfileTab: View {
                                     .appShadow(.soft)
                             }
                         }
-                        EditorialHeadline(text: "Your Attention Architecture")
+                        EditorialHeadline(text: "Your attention architecture.")
                             .padding(.top, 14)
                         Text(
-                            "A living personal model of your focus conditions, physical environment, and recovery strategies.",
+                            "A living model of how you start, stay, return and go deep — updated by every session.",
                             style: .todaySentence
                         )
                         .foregroundStyle(AppColors.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 8)
 
                         // Hero summary card
                         overviewCard
                             .padding(.top, 24)
 
-                        // Operating Manual Quick Entry
-                        PaperCard(radius: 22, padding: 16) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    MetaLabel(text: "Operating Manual", color: AppColors.coral)
-                                    Text("How your attention operates across 11 key dimensions.")
-                                        .type(.heroReason)
-                                        .foregroundStyle(AppColors.inkSoft)
+                        // Operating Manual entry as a quiet editorial row.
+                        Button { showOperatingManual = true } label: {
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Operating Manual")
+                                        .font(Font(AppTypography.plusJakarta(size: 15, weight: 700)))
+                                        .tracking(1)
+                                        .foregroundStyle(AppColors.ink)
+                                    Text("Everything REBOOT knows about you, in one document.")
+                                        .type(.footnote)
+                                        .foregroundStyle(AppColors.inkFaint)
+                                        .multilineTextAlignment(.leading)
+                                        .fixedSize(horizontal: false, vertical: true)
                                 }
                                 Spacer()
-                                Button { showOperatingManual = true } label: {
-                                    GlassPill(text: "Open", symbol: "book.pages", tint: AppColors.ink)
-                                }
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(AppColors.inkFaint)
                             }
+                            .padding(20)
+                            .background(AppColors.paperRaised.opacity(0.72))
+                            .clipShape(RoundedRectangle(cornerRadius: AppRadius.primary, style: .continuous))
                         }
+                        .buttonStyle(PressScaleStyle())
                         .padding(.top, 16)
 
                         flowConditionsSection
@@ -493,7 +509,7 @@ struct ProfileTab: View {
     private var energyContextSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                MetaLabel(text: "Energy & Context", color: AppColors.coral)
+                MetaLabel(text: "Energy & Context")
                 Spacer()
                 Button { product.openFuel() } label: {
                     Image(systemName: "arrow.up.right")
@@ -614,7 +630,7 @@ struct ProfileTab: View {
     private var personalRulesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                MetaLabel(text: "Personal Rules", color: AppColors.coral)
+                MetaLabel(text: "Personal Rules")
                 Spacer()
                 Button {
                     showAddRule = true
@@ -850,9 +866,10 @@ struct ProfileTab: View {
     // MARK: - Footer
 
     private var footerNote: some View {
-        Text("Sessions: \(product.sessions.count) · Evidence is strictly self-reported, observed, or from a session. No artificial scores.")
+        Text("\(product.sessions.count) sessions · every line here comes from your own evidence. No scores.")
             .type(.footnote)
             .foregroundStyle(AppColors.inkFaint)
+            .multilineTextAlignment(.leading)
     }
 
     // MARK: - Helpers
