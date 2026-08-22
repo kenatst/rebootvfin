@@ -465,6 +465,9 @@ struct TrainingSessionRequest: Codable, Identifiable, Equatable {
     var curriculumIntent: CurriculumIntentKind?
     var adaptationReason: String?
     var experimentParticipation: ExperimentParticipation?
+    /// Flow Lab participation is independent from SessionOrigin. Protocol and
+    /// free-training semantics remain authoritative.
+    var flowParticipation: FlowParticipation? = nil
     /// Pre-session Fuel context captured from one optional prompt (or a Lab
     /// observational matcher). Optional fields only; unknown stays unknown.
     var fuelContext: FuelContextSnapshot? = nil
@@ -566,6 +569,13 @@ struct SessionRecord: Codable, Identifiable, Equatable {
     /// session remains protocol while contributing one Lab observation.
     var experimentParticipation: ExperimentParticipation?
 
+    /// Flow Lab participation is also orthogonal to SessionOrigin. The linked
+    /// immutable plan carries the real-project setup for this session.
+    var flowParticipation: FlowParticipation?
+    /// Tolerant decoding preserves the canonical session when only its nested
+    /// Flow link is corrupt. Generic inference must quarantine that ambiguity.
+    var flowParticipationWasMalformed: Bool = false
+
     /// Fuel context captured before the session. Frozen once the session is
     /// saved: historical context is never rewritten from later user state.
     var fuelContext: FuelContextSnapshot? = nil
@@ -600,6 +610,8 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         adaptationReason: String? = nil,
         environment: EnvironmentSnapshot? = nil,
         experimentParticipation: ExperimentParticipation? = nil,
+        flowParticipation: FlowParticipation? = nil,
+        flowParticipationWasMalformed: Bool = false,
         fuelContext: FuelContextSnapshot? = nil
     ) {
         self.id = id
@@ -631,6 +643,8 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         self.adaptationReason = adaptationReason
         self.environment = environment
         self.experimentParticipation = experimentParticipation
+        self.flowParticipation = flowParticipation
+        self.flowParticipationWasMalformed = flowParticipationWasMalformed
         self.fuelContext = fuelContext
     }
 
@@ -639,7 +653,7 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         case elapsedSeconds, completed, endedEarly, firstDistraction, switches, difficulty
         case energy, environmentActionDone, environmentVerification, startedEasierSelfReport, firstSwitchMinute, firstSwitchTiming, evidence
         case appliedRuleIDs, environmentPreparation, programPhase, curriculumIntent, adaptationReason, environment
-        case experimentParticipation, fuelContext
+        case experimentParticipation, flowParticipation, flowParticipationWasMalformed, fuelContext
     }
 
     init(from decoder: Decoder) throws {
@@ -674,6 +688,23 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         adaptationReason = try values.decodeIfPresent(String.self, forKey: .adaptationReason)
         environment = try values.decodeIfPresent(EnvironmentSnapshot.self, forKey: .environment)
         experimentParticipation = try values.decodeIfPresent(ExperimentParticipation.self, forKey: .experimentParticipation)
+        // Flow is additive. A malformed nested Flow payload must not erase the
+        // canonical session or its Program history during tolerant recovery.
+        var malformedFlowParticipation = false
+        do {
+            flowParticipation = try values.decodeIfPresent(
+                FlowParticipation.self,
+                forKey: .flowParticipation
+            )
+        } catch {
+            flowParticipation = nil
+            malformedFlowParticipation = true
+        }
+        flowParticipationWasMalformed = malformedFlowParticipation
+            || ((try? values.decodeIfPresent(
+                Bool.self,
+                forKey: .flowParticipationWasMalformed
+            )) ?? false)
         fuelContext = try values.decodeIfPresent(FuelContextSnapshot.self, forKey: .fuelContext)
     }
 
@@ -683,7 +714,7 @@ struct SessionRecord: Codable, Identifiable, Equatable {
 }
 
 struct SessionReflection: Equatable {
-    var difficulty: Int
+    var difficulty: Int? = nil
     var energy: Int? = nil
     var firstDistraction: String? = nil
     var switches: Int? = nil
@@ -696,6 +727,7 @@ struct SessionReflection: Equatable {
     var explanationBreakdown: String? = nil
     var nothingDifficulty: NothingDifficulty? = nil
     var observation: String? = nil
+    var flowReflection: FlowBlockReflection? = nil
 }
 
 // MARK: - Prescription
@@ -886,7 +918,10 @@ enum PersonalRuleEngine {
         allSessions: [SessionRecord]
     ) {
         let isDifficult = session.endedEarly || (session.difficulty ?? 0) >= 4 || (session.switches ?? 0) >= 4
-        let isSmooth = session.completed && !session.endedEarly && (session.difficulty ?? 0) <= 2 && (session.switches ?? 0) <= 2
+        let isSmooth = session.completed
+            && !session.endedEarly
+            && session.difficulty.map { $0 <= 2 } == true
+            && session.switches.map { $0 <= 2 } == true
 
         // 1. Update any existing rules that were active during this session
         let activeRuleIDs = Set(session.appliedRuleIDs)
@@ -1025,7 +1060,15 @@ enum PersonalRuleEngine {
         rules: inout [PersonalRule],
         profile: AttentionProfile
     ) {
-        let completed = sessions.filter(\.completed)
+        // Flow discoveries stay in Flow Lab until the user deliberately routes
+        // one through Personal Lab or confirms a rule. They do not seed the
+        // generic automatic candidate heuristics.
+        let completed = sessions.filter {
+            $0.completed
+                && $0.flowParticipation == nil
+                && !$0.flowParticipationWasMalformed
+                && $0.origin != .flow
+        }
         guard completed.count >= 2 else { return }
 
         // Candidate 1: Phone outside reach
@@ -1592,7 +1635,11 @@ enum ProfileUpdater {
             profile.recall = .known(level, source: src)
         }
 
-        if session.completed, session.actualMinutes > 0 {
+        if session.completed,
+           session.actualMinutes > 0,
+           !session.flowParticipationWasMalformed,
+           session.origin != .flow,
+           (session.flowParticipation == nil || session.origin == .protocol) {
             if let window = profile.focusWindowMinutes {
                 profile.focusWindowMinutes = max(window, session.actualMinutes)
             } else {
@@ -1600,14 +1647,20 @@ enum ProfileUpdater {
             }
         }
 
-        // Personal rules & observations update
-        var currentRules = profile.personalRules
-        PersonalRuleEngine.evaluate(
-            session: session,
-            rules: &currentRules,
-            profile: &profile,
-            allSessions: allSessions.isEmpty ? [session] : allSessions
-        )
+        // Flow has its own four-signal evidence. Generic difficulty-based rule
+        // mutation would misread an early exit and silently reward or punish a
+        // confirmed setup before that Flow reflection is classified.
+        if session.flowParticipation == nil,
+           !session.flowParticipationWasMalformed,
+           session.origin != .flow {
+            var currentRules = profile.personalRules
+            PersonalRuleEngine.evaluate(
+                session: session,
+                rules: &currentRules,
+                profile: &profile,
+                allSessions: allSessions.isEmpty ? [session] : allSessions
+            )
+        }
     }
 
     private static func merge(_ a: StabilityLevel, with b: StabilityLevel) -> StabilityLevel {

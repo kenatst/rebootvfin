@@ -32,9 +32,14 @@ struct PrimaryButton: View {
 
 /// Scales to 0.985 with a 0.2s ease while pressed (web `active:scale-[0.985]`).
 struct PressScaleStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
-            .animation(.easeOut(duration: AppMotion.pressDuration), value: configuration.isPressed)
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.985 : 1))
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: AppMotion.pressDuration),
+                value: configuration.isPressed
+            )
     }
 }

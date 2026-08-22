@@ -403,12 +403,16 @@ struct SessionView: View {
     @ViewBuilder
     var body: some View {
         if let record {
-            switch record.mode {
-            case .stay: StaySessionView(product: product, record: record)
-            case .recall: RecallSessionView(product: product, record: record)
-            case .explain: ExplainSessionView(product: product, record: record)
-            case .nothing: NothingSessionView(product: product, record: record)
-            case .observe: ObserveSessionView(product: product, record: record)
+            if record.flowParticipation != nil {
+                FlowFocusedSessionView(product: product, record: record)
+            } else {
+                switch record.mode {
+                case .stay: StaySessionView(product: product, record: record)
+                case .recall: RecallSessionView(product: product, record: record)
+                case .explain: ExplainSessionView(product: product, record: record)
+                case .nothing: NothingSessionView(product: product, record: record)
+                case .observe: ObserveSessionView(product: product, record: record)
+                }
             }
         }
     }
@@ -431,10 +435,10 @@ struct SessionRecoveryView: View {
                     .foregroundStyle(AppColors.inkSoft)
                     .padding(.top, 14)
                 PrimaryPillButton(title: "Resume", symbol: "play.fill") {
-                    if record.environment?.protectionActivated == true {
-                        _ = environmentStore.applySessionProtection()
-                    }
-                    product.resumeRecoveredSession()
+                    let protectionRestored = record.environment?.protectionActivated == true
+                        ? environmentStore.applySessionProtection()
+                        : nil
+                    product.resumeRecoveredSession(protectionRestored: protectionRestored)
                 }
                 .padding(.top, 30)
                 Button {

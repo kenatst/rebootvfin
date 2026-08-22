@@ -26,6 +26,27 @@ struct TrainTab: View {
                         todayPractice
                             .padding(.top, 12)
 
+                        Button { product.openFlowLab() } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "scope")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(AppColors.coral)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Flow Lab", style: .heroGoal)
+                                        .foregroundStyle(AppColors.ink)
+                                    Text("Use a real project and learn your deeper-work conditions.", style: .footnote)
+                                        .foregroundStyle(AppColors.inkFaint)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(AppColors.inkFaint)
+                            }
+                            .padding(.vertical, 18)
+                        }
+                        .buttonStyle(PressScaleStyle())
+
                         MetaLabel(text: "Practice library")
                             .padding(.top, 34)
                         practiceLibrary
@@ -246,6 +267,9 @@ struct ProfileTab: View {
                         overviewCard
                             .padding(.top, 24)
 
+                        flowConditionsSection
+                            .padding(.top, 32)
+
                         personalLabSection
                             .padding(.top, 32)
 
@@ -298,6 +322,32 @@ struct ProfileTab: View {
                selectedRule == nil {
                 selectedRule = product.personalRules.first
             }
+        }
+    }
+
+    // MARK: - Flow Conditions
+
+    private var flowConditionsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                MetaLabel(text: "Flow Conditions", color: AppColors.coral)
+                Spacer()
+                Button { product.openFlowLab() } label: {
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppColors.coral)
+                        .frame(width: 36, height: 36)
+                }
+                .accessibilityLabel("Open Flow Lab")
+            }
+            Button { product.openFlowLab() } label: {
+                FlowConditionSignature(
+                    patterns: Array(product.flowPatterns.prefix(3)),
+                    evidenceCount: product.flowState.evidence.count
+                )
+            }
+            .buttonStyle(PressScaleStyle())
+            .accessibilityHint("Opens Flow Lab and its evidence detail")
         }
     }
 

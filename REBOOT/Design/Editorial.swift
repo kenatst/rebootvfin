@@ -7,11 +7,19 @@ struct EditorialHeadline: View {
     let text: String
     var style: AppTypography.Style = .todayHeadline
     var color: Color = AppColors.ink
+    @Environment(\.scalesAppTypographyWithDynamicType) private var scalesWithDynamicType
 
     var body: some View {
-        Text(text, style: style)
-            .foregroundStyle(color)
-            .fixedSize(horizontal: false, vertical: true)
+        Group {
+            if scalesWithDynamicType {
+                Text(text)
+                    .type(style)
+            } else {
+                Text(text, style: style)
+            }
+        }
+        .foregroundStyle(color)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 

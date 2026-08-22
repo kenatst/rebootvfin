@@ -638,7 +638,7 @@ final class PersonalLabTests: XCTestCase {
         XCTAssertEqual(store.day, 2)
         XCTAssertEqual(store.sessions.count, 1)
         XCTAssertTrue(store.labState.experiments.isEmpty)
-        XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v7"))
+        XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v8"))
         XCTAssertNil(defaults.object(forKey: "reboot.product.v5"))
     }
 
