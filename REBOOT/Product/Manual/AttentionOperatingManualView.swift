@@ -21,7 +21,7 @@ struct AttentionOperatingManualView: View {
                         manualSection(item: manual.myRecallStrategy)
                         manualSection(item: manual.myEnergyAndContext)
                         manualSection(item: manual.myFlowConditions)
-                        
+
                         rulesSection
                         unknownsSection
                     }
@@ -42,7 +42,7 @@ struct AttentionOperatingManualView: View {
                     ShareLink(
                         item: manual.exportAsText(),
                         subject: Text("REBOOT Attention Operating Manual"),
-                        message: Text("Here is my verified Attention Operating Manual derived from REBOOT.")
+                        message: Text("Here is my evidence-backed Attention Operating Manual, built in REBOOT.")
                     ) {
                         Image(systemName: "square.and.arrow.up")
                             .foregroundStyle(AppColors.ink)
@@ -57,10 +57,10 @@ struct AttentionOperatingManualView: View {
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             MetaLabel(text: "Operating Manual", color: AppColors.coral)
-            Text("How Your Attention Works")
+            Text("You know your attention now.")
                 .font(.system(size: 26, weight: .semibold, design: .serif))
                 .foregroundStyle(AppColors.ink)
-            Text("Grounded in \(manual.totalProtocolDays) protocol days and \(manual.totalSessions) sessions. No personality types or scores.")
+            Text("Grounded in \(manual.totalProtocolDays) protocol days and \(manual.totalSessions) sessions. Every line keeps its evidence; unknowns stay unknown. The manual keeps learning after Day 90.")
                 .type(.heroReason)
                 .foregroundStyle(AppColors.inkSoft)
         }
@@ -141,7 +141,7 @@ struct AttentionOperatingManualView: View {
 
     private var unknownsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("WHAT REBOOT STILL DOESN'T KNOW", style: .heroGoal)
+            Text("WHAT I STILL DON'T KNOW", style: .heroGoal)
                 .foregroundStyle(AppColors.ink)
 
             VStack(spacing: 10) {

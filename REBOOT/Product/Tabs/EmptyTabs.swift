@@ -553,7 +553,7 @@ struct ProfileTab: View {
                     }
                     Spacer()
                     GlassPill(
-                        text: isSparse ? "Learning baseline" : "\(product.sessions.count) sessions",
+                        text: maturityTitle,
                         tint: isSparse ? AppColors.coral : AppColors.ink
                     )
                 }
@@ -588,8 +588,25 @@ struct ProfileTab: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+
+                Text(maturityExplanation)
+                    .type(.footnote)
+                    .foregroundStyle(AppColors.inkFaint)
             }
         }
+    }
+
+    /// Overall evidence maturity — how much of this profile is observed versus told.
+    private var overallMaturity: ProfileEvidenceMaturity {
+        AttentionProfileEngine.overallMaturity(profile: profile, sessions: product.sessions)
+    }
+
+    private var maturityTitle: String {
+        overallMaturity.title
+    }
+
+    private var maturityExplanation: String {
+        "\(overallMaturity.explanation) \(product.sessions.count) \(product.sessions.count == 1 ? "session" : "sessions") so far."
     }
 
     // MARK: - Personal Rules Section
@@ -675,52 +692,71 @@ struct ProfileTab: View {
 
     // MARK: - Focus Span & Stability
 
+    /// The living profile: honest dimension rows with evidence maturity.
+    private var livingDimensions: [ProfileDimensionSnapshot] {
+        AttentionProfileEngine.dimensions(profile: profile, sessions: product.sessions)
+    }
+
     private var focusSpanSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            MetaLabel(text: "Focus Span & Stability")
+            MetaLabel(text: "What REBOOT knows so far")
 
-            if isSparse {
-                PaperCard(radius: 22, padding: 18) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        MetaLabel(text: "Awaiting baseline evidence", color: AppColors.inkFaint)
-                        Text("Initial protocol sessions measure how long focus stays before an urge or task switch occurs.", style: .heroReason)
-                            .foregroundStyle(AppColors.inkSoft)
-                    }
+            VStack(spacing: 10) {
+                ForEach(livingDimensions) { dim in
+                    dimensionCard(
+                        name: dim.name,
+                        value: dim.value,
+                        maturity: dim.maturity,
+                        isUnknown: dim.isUnknown
+                    )
                 }
-            } else {
-                VStack(spacing: 10) {
+                Button { product.openFuel() } label: {
                     dimensionCard(
-                        title: "Observed Focus Window",
-                        value: profile.focusWindowMinutes.map { "\($0) minutes max continuous block" } ?? "Unknown",
-                        source: "Observed from sessions"
+                        name: "FUEL PATTERNS",
+                        value: energyContextValue,
+                        maturity: .earlySignal,
+                        isUnknown: product.fuelAnalysis.patterns.isEmpty && product.fuelLinkedSessions.isEmpty
                     )
-                    dimensionCard(
-                        title: "Switch Pattern",
-                        value: switchPatternDescription,
-                        source: "Measured across protocol days"
-                    )
-                    dimensionCard(
-                        title: "Attention Stability",
-                        value: levelText(profile.attentionStability),
-                        source: profile.attentionStability.source?.label ?? "Self-reported"
-                    )
-                    dimensionCard(
-                        title: "Return After Distraction",
-                        value: levelText(profile.returnAfterDistraction),
-                        source: profile.returnAfterDistraction.source?.label ?? "Self-reported"
-                    )
-                    Button { product.openFuel() } label: {
-                        dimensionCard(
-                            title: "Energy Context",
-                            value: energyContextValue,
-                            source: "From Fuel observations"
-                        )
-                    }
-                    .buttonStyle(PressScaleStyle())
-                    .accessibilityLabel("Energy context. \(energyContextValue). Opens Fuel.")
                 }
+                .buttonStyle(PressScaleStyle())
+                .accessibilityLabel("Fuel patterns. \(energyContextValue). Opens Fuel.")
             }
         }
+    }
+
+    private func dimensionCard(
+        name: String,
+        value: String,
+        maturity: ProfileEvidenceMaturity,
+        isUnknown: Bool
+    ) -> some View {
+        PaperCard(radius: 22, padding: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(name)
+                        .font(.system(size: 11, weight: .semibold))
+                        .tracking(1.2)
+                        .foregroundStyle(isUnknown ? AppColors.inkFaint : AppColors.inkSoft)
+                    Spacer()
+                    if !isUnknown {
+                        Text(maturity.title.uppercased())
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(0.8)
+                            .foregroundStyle(maturity == .repeatedSignal ? AppColors.coral : AppColors.inkFaint)
+                    }
+                }
+                Text(value)
+                    .type(.calendarMeta)
+                    .foregroundStyle(isUnknown ? AppColors.inkFaint : AppColors.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(maturity.explanation)
+                    .type(.footnote)
+                    .foregroundStyle(AppColors.inkFaint)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(name). \(value). \(maturity.title).")
     }
 
     // MARK: - Distraction & Triggers
@@ -731,15 +767,17 @@ struct ProfileTab: View {
 
             VStack(spacing: 10) {
                 dimensionCard(
-                    title: "Reported Distractors",
+                    name: "REPORTED DISTRACTORS",
                     value: profileList(profile.distractors.value),
-                    source: profile.distractors.source?.label ?? "Self-reported"
+                    maturity: .startingPoint,
+                    isUnknown: (profile.distractors.value ?? []).isEmpty
                 )
                 if !isSparse {
                     dimensionCard(
-                        title: "Observed Switch Triggers",
+                        name: "OBSERVED SWITCH TRIGGERS",
                         value: observedDistractorSummary,
-                        source: "Session logs"
+                        maturity: .earlySignal,
+                        isUnknown: false
                     )
                 }
             }
@@ -819,34 +857,9 @@ struct ProfileTab: View {
 
     // MARK: - Helpers
 
-    private func dimensionCard(title: String, value: String, source: String) -> some View {
-        PaperCard(radius: 22, padding: 16) {
-            VStack(alignment: .leading, spacing: 5) {
-                HStack {
-                    MetaLabel(text: title, color: AppColors.inkFaint)
-                    Spacer()
-                    Text(source)
-                        .font(.system(size: 11, weight: .regular))
-                        .foregroundStyle(AppColors.inkFaint)
-                }
-                Text(value)
-                    .type(.calendarMeta)
-                    .foregroundStyle(AppColors.ink)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
 
-    private var switchPatternDescription: String {
-        let early = product.sessions.filter { $0.firstSwitchTiming == .underFive }.count
-        let mid = product.sessions.filter { $0.firstSwitchTiming == .fiveToTen || $0.firstSwitchTiming == .tenToTwenty }.count
-        if early > mid && early >= 2 {
-            return "Switches typically occur early (< 5 min)"
-        } else if mid >= 2 {
-            return "Initial focus holds 10–20 min before switching"
-        }
-        return "Steady return pattern across sessions"
-    }
+
+
 
     /// Attention Map Energy Context: meaningful only when Fuel evidence
     /// exists; otherwise honestly unknown.

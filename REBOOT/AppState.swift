@@ -18,7 +18,9 @@ final class AppState: ObservableObject {
     @Published var answers: Answers
 
     private static let storageKey = "reboot.state.v1"
+    #if DEBUG
     private var watchTimer: Timer?
+    #endif
 
     init() {
         let initial = AppState.load()
@@ -70,19 +72,19 @@ final class AppState: ObservableObject {
     }
 
     private static func load() -> (phase: Phase, screen: Int, step: Int, answers: Answers) {
-#if DEBUG
+        #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-qaToday")
             || ProcessInfo.processInfo.arguments.contains("-qaSeed")
             || ProcessInfo.processInfo.arguments.contains("-qaTab") {
             return (.today, 0, 0, [:])
         }
-#endif
         // QA state override for simulator screenshot runs: `-qaState <json file path>`.
         if let path = ProcessInfo.processInfo.arguments.valueAfter("-qaState"),
            let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
            let state = decodeState(data, preserveDissolve: true) {
             return state
         }
+        #endif
         guard let raw = UserDefaults.standard.dictionary(forKey: storageKey),
               let state = decodeState(raw) else {
             return (.cinematic, 0, 0, [:])
@@ -111,7 +113,9 @@ final class AppState: ObservableObject {
 
     /// QA harness: `-qaWatch <dir>` polls `<dir>/current.json` and applies it
     /// at runtime, so screenshot runs don't relaunch the app per state.
+    /// Development-only: production installs never start the watcher.
     private func startQaWatchIfNeeded() {
+        #if DEBUG
         guard let dir = ProcessInfo.processInfo.arguments.valueAfter("-qaWatch") else { return }
         let url = URL(fileURLWithPath: dir).appendingPathComponent("current.json")
         var lastMod: Date?
@@ -131,6 +135,7 @@ final class AppState: ObservableObject {
             }
         }
         watchTimer?.tolerance = 0.05
+        #endif
     }
 }
 

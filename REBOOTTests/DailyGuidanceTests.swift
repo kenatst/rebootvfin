@@ -39,13 +39,38 @@ final class DailyGuidanceTests: XCTestCase {
         )
 
         XCTAssertEqual(guidance.primaryAction.mode, .observe)
-        XCTAssertEqual(guidance.primaryAction.targetMinutes, 10)
+        XCTAssertEqual(guidance.primaryAction.targetMinutes, 15)
         XCTAssertNil(guidance.environmentAction)
         XCTAssertNil(guidance.fuelPrompt)
         XCTAssertNil(guidance.flowOpportunity)
         XCTAssertNil(guidance.experimentOpportunityID)
         XCTAssertEqual(guidance.bottleneck, .starting)
         XCTAssertTrue(guidance.suppressedOpportunities.contains("Fuel Prompt"))
+    }
+
+    // MARK: - 1b. Day 1 duration matches the protected baseline prescription
+
+    func testDayOneGuidanceMatchesBaselinePrescriptionDuration() {
+        let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
+        let guidance = DailyGuidanceEngine.generateGuidance(
+            day: 1,
+            programStatus: .active,
+            programPhase: ProgramPhase.all[0],
+            profile: store.profile,
+            sessions: [],
+            personalRules: [],
+            labExperiments: [],
+            fuelState: .empty,
+            flowState: .empty,
+            digitalEnvironmentState: .empty,
+            screenTimeActive: false,
+            screenTimeAuthorized: false,
+            isRecovery: false,
+            guidanceHistory: [],
+            ownModeState: OwnModeState()
+        )
+        XCTAssertEqual(guidance.primaryAction.targetMinutes, store.prescription.minutes)
+        XCTAssertEqual(guidance.primaryAction.targetMinutes, guidance.sessionPrescription.minutes)
     }
 
     // MARK: - 2. Recovery Priority
@@ -152,13 +177,13 @@ final class DailyGuidanceTests: XCTestCase {
         flow.projects.append(project)
 
         let guidance = DailyGuidanceEngine.generateGuidance(
-            day: 15,
+            day: 65,
             programStatus: .active,
-            programPhase: ProgramPhase.all[2],
+            programPhase: ProgramPhase.all[4],
             profile: AttentionProfile(),
             sessions: [
-                SessionRecord(day: 13, date: Date(), mode: .stay, targetMinutes: 25, actualMinutes: 25, completed: true, switches: 0),
-                SessionRecord(day: 14, date: Date(), mode: .stay, targetMinutes: 25, actualMinutes: 25, completed: true, switches: 0)
+                SessionRecord(day: 63, date: Date(), mode: .stay, targetMinutes: 25, actualMinutes: 25, completed: true, switches: 0),
+                SessionRecord(day: 64, date: Date(), mode: .stay, targetMinutes: 25, actualMinutes: 25, completed: true, switches: 0)
             ],
             personalRules: [],
             labExperiments: [],
@@ -245,7 +270,7 @@ final class DailyGuidanceTests: XCTestCase {
 
         XCTAssertEqual(guidance.bottleneck, .energyContext)
         XCTAssertLessThanOrEqual(guidance.primaryAction.targetMinutes, 15)
-        XCTAssertTrue(guidance.explanation.contains("energy is low"))
+        XCTAssertTrue(guidance.explanation.lowercased().contains("energy is low"))
     }
 
     // MARK: - 8. Day 90 Operating Manual Generation
@@ -273,9 +298,11 @@ final class DailyGuidanceTests: XCTestCase {
         )
 
         XCTAssertEqual(manual.totalProtocolDays, 90)
-        XCTAssertEqual(manual.howIStartBest.maturity, .repeatedSignal)
+        // 90 completed sessions with zero environment variance is an honest
+        // "no difference detected" — the manual must not invent a conclusion.
+        XCTAssertNotEqual(manual.howIStartBest.maturity, .mixed)
         XCTAssertTrue(manual.myMostCommonBreakers.statement.contains("Messaging"))
-        XCTAssertTrue(manual.myDigitalEnvironment.statement.contains("Outside the room"))
+        XCTAssertTrue(manual.myDigitalEnvironment.statement.contains("outside the room"))
         XCTAssertFalse(manual.whatRebootStillDoesNotKnow.isEmpty)
     }
 

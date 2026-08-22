@@ -202,22 +202,11 @@ struct TodayView: View {
     private var primaryActionArea: some View {
         Group {
             if isCompleted {
-                PaperCard(radius: 28, padding: 22) {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text("Your attention system is formed.")
-                            .type(.heroGoal)
-                            .foregroundStyle(AppColors.ink)
-                        Text("Practice freely or review your Attention Operating Manual.")
-                            .type(.heroReason)
-                            .foregroundStyle(AppColors.inkSoft)
-
-                        HStack(spacing: 12) {
-                            PrimaryPillButton(title: "Open Operating Manual", symbol: "book.pages") {
-                                showManual = true
-                            }
-                        }
-                    }
-                }
+                OwnModeTodayCard(
+                    guidance: guidance,
+                    onManual: { showManual = true },
+                    onStart: { startPrimaryAction() }
+                )
             } else if product.hasCompletedCurrentProtocol {
                 PaperCard(radius: 24, padding: 18) {
                     HStack {
@@ -229,19 +218,30 @@ struct TodayView: View {
                         Spacer()
                     }
                 }
-            } else {
+            } else if !guidance.primaryAction.ctaTitle.isEmpty {
                 PrimaryPillButton(
                     title: guidance.primaryAction.ctaTitle,
                     symbol: guidance.primaryAction.kind == .projectFlowBlock ? "arrow.up.forward.app" : "play.fill"
                 ) {
                     startPrimaryAction()
                 }
+            } else {
+                PaperCard(radius: 24, padding: 18) {
+                    HStack {
+                        Image(systemName: "leaf")
+                            .foregroundStyle(AppColors.inkFaint)
+                        Text(guidance.primaryAction.title)
+                            .type(.heroGoal)
+                            .foregroundStyle(AppColors.ink)
+                        Spacer()
+                    }
+                }
             }
         }
     }
 
     private func startPrimaryAction() {
-        if !SubscriptionGating.isProgramDayAccessible(day: product.day, status: subscriptionStore?.status ?? .free) {
+        guard SubscriptionGating.isProgramDayAccessible(day: product.day, status: subscriptionStore?.status ?? .free) else {
             showPaywall = true
             return
         }
@@ -257,10 +257,15 @@ struct TodayView: View {
 
     private func supportingActionCard(supporting: DailyGuidanceSecondaryAction) -> some View {
         Button(action: {
-            if supporting.actionType == "flow" {
+            switch supporting.actionType {
+            case "flow":
                 product.openFlowLab(origin: .protocol)
-            } else if supporting.actionType == "experiment" {
+            case "experiment":
                 product.tab = .profile
+            case "manual":
+                showManual = true
+            default:
+                break
             }
         }) {
             PaperCard(radius: 18, padding: 14) {
@@ -347,5 +352,50 @@ struct TodayView: View {
         .foregroundStyle(AppColors.inkFaint)
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)
+    }
+}
+
+/// Own Mode's Today card. Two honest states: a light self-directed suggestion,
+/// or a deliberate quiet day. Never an endless curriculum.
+struct OwnModeTodayCard: View {
+    let guidance: DailyGuidance
+    var onManual: () -> Void
+    var onStart: () -> Void
+
+    var body: some View {
+        PaperCard(radius: 28, padding: 22) {
+            VStack(alignment: .leading, spacing: 14) {
+                if guidance.noInterventionNeeded {
+                    Text("Nothing needs adjusting today.")
+                        .type(.heroGoal)
+                        .foregroundStyle(AppColors.ink)
+                    Text(guidance.explanation)
+                        .type(.heroReason)
+                        .foregroundStyle(AppColors.inkSoft)
+
+                    HStack(spacing: 12) {
+                        PrimaryPillButton(title: "Open Operating Manual", symbol: "book.pages") {
+                            onManual()
+                        }
+                    }
+                } else {
+                    Text(guidance.primaryAction.title)
+                        .type(.heroGoal)
+                        .foregroundStyle(AppColors.ink)
+                    Text(guidance.explanation)
+                        .type(.heroReason)
+                        .foregroundStyle(AppColors.inkSoft)
+
+                    HStack(spacing: 12) {
+                        PrimaryPillButton(
+                            title: guidance.primaryAction.ctaTitle,
+                            symbol: "play.fill"
+                        ) {
+                            onStart()
+                        }
+                    }
+                }
+            }
+        }
     }
 }

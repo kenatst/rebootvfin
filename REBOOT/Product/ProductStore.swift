@@ -215,6 +215,9 @@ final class ProductStore: ObservableObject {
             persist()
         }
 
+        // QA seeding is development-only: launch arguments cannot inject demo
+        // state into a production install.
+        #if DEBUG
         if let seed = Self.loadQASeed() {
             apply(seed)
         }
@@ -222,6 +225,7 @@ final class ProductStore: ObservableObject {
            let seed = QASeeds.named(name) {
             apply(seed)
         }
+        #endif
 #if DEBUG
         if let tabName = ProcessInfo.processInfo.arguments.valueAfter("-qaTab"),
            let qaTab = ProductTab.allCases.first(where: { $0.rawValue.caseInsensitiveCompare(tabName) == .orderedSame }) {
@@ -1725,6 +1729,8 @@ final class ProductStore: ObservableObject {
 
     func saveDoneSession(_ reflection: SessionReflection) {
         guard case .done(var record) = phase else { return }
+        // Captured before the save advances the day: this is what Today showed.
+        let decisionBottleneck = dailyGuidance.bottleneck
         let alreadySaved = sessions.contains { saved in
             saved.id == record.id
                 || (record.requestID != nil && saved.requestID == record.requestID)
@@ -1854,6 +1860,21 @@ final class ProductStore: ObservableObject {
         }
 
         environmentPreparation = nil
+        // Record the guidance decision for anti-oscillation hysteresis.
+        if record.completed {
+            let decision = GuidanceDecision(
+                programDay: record.day,
+                bottleneck: decisionBottleneck,
+                selectedAction: prescription.mode.rawValue,
+                evidenceIDs: [],
+                outcomeSessionID: record.id
+            )
+            guidanceDecisions.append(decision)
+            // Keep the hysteresis window bounded — recent history only.
+            if guidanceDecisions.count > 14 {
+                guidanceDecisions.removeFirst(guidanceDecisions.count - 14)
+            }
+        }
         tab = record.flowParticipation != nil
             ? .profile
             : (record.origin == .freeTraining ? .train : .today)

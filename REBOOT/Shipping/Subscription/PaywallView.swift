@@ -45,7 +45,7 @@ struct PaywallView: View {
                         .padding(.top, 24)
 
                     Text(
-                        "An adaptive, evidence-backed protocol to retrain focus, protect your cognitive boundaries, and graduate with a personalized Operating Manual.",
+                        "A 90-day adaptive protocol that trains attention behaviors, learns your personal patterns from real sessions, and ends with an Operating Manual built from your own evidence.",
                         style: .todaySentence
                     )
                     .foregroundStyle(AppColors.inkSoft)
@@ -111,34 +111,34 @@ struct PaywallView: View {
         }
     }
 
-    // MARK: - Transformation List
+    // MARK: - 2. Paywall Copy
 
     private var transformationList: some View {
         VStack(alignment: .leading, spacing: 16) {
             transformationRow(
                 tag: "UNDERSTAND",
-                title: "What Breaks Your Attention",
-                detail: "Isolate your primary digital pulls, reflex habits, and fatigue triggers with honest on-device sampling."
+                title: "What breaks your attention",
+                detail: "Your sessions and honest self-reports surface the pulls that actually cost you focus."
             )
             transformationRow(
                 tag: "TRAIN",
-                title: "Stability, Recall & Depth",
-                detail: "Progress daily through 5 distinct attention modes calibrated to your expanding focus window."
+                title: "Staying, returning, recalling",
+                detail: "One prescribed practice a day across five attention modes, calibrated to your measured window."
             )
             transformationRow(
                 tag: "RESHAPE",
-                title: "Your Digital Environment",
-                detail: "Deploy adaptive friction boundaries and automated Screen Time shields before task-switching starts."
+                title: "Your environment",
+                detail: "Lighter friction first — phone distance, one-task browser, optional Screen Time protection."
             )
             transformationRow(
                 tag: "LEARN",
-                title: "Your Optimal Working Context",
-                detail: "Discover the exact sleep, daypart, and energy conditions that maximize your deep-work output."
+                title: "The conditions that help you",
+                detail: "Energy, time of day and setup — tested against your own comparable sessions, not averages."
             )
             transformationRow(
                 tag: "LEAVE",
-                title: "Your Attention Operating Manual",
-                detail: "Graduate on Day 90 with a synthesized 11-dimension operating guide for self-directed Own Mode."
+                title: "An Operating Manual that's yours",
+                detail: "Day 90 ends with your evidence-backed manual. Own Mode keeps it useful without a program."
             )
         }
     }
@@ -222,9 +222,9 @@ struct PaywallView: View {
 
     private var yearlyPriceSubtitle: String {
         if let product = subscriptionStore.yearlyProduct {
-            return "\(product.displayPrice)/year · Includes 7-day free trial"
+            return "\(product.displayPrice)/year"
         }
-        return "$79.99/year · $6.67/month (7-day free trial)"
+        return "$79.99/year · about $6.67 a month"
     }
 
     private var monthlyPriceSubtitle: String {
@@ -234,12 +234,22 @@ struct PaywallView: View {
         return "$14.99/month · Billed monthly"
     }
 
+    /// Trial copy appears only when the StoreKit product actually carries an
+    /// introductory offer. No invented discounts, no fake urgency.
     private var ctaTitle: String {
-        if selectedPeriod == .yearly {
+        if selectedPeriod == .yearly, trialConfigured {
             return "Start 7-Day Free Trial"
-        } else {
-            return "Unlock Full Program"
         }
+        return "Continue the full program"
+    }
+
+    private var trialConfigured: Bool {
+        guard let product = subscriptionStore.yearlyProduct else { return false }
+        if #available(iOS 17.2, *) {
+            return product.subscription?.introductoryOffer != nil
+        }
+        return product.subscription?.promotionalOffers.isEmpty == false
+            || product.subscription?.introductoryOffer != nil
     }
 
     private func handlePurchase() {
