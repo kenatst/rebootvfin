@@ -46,6 +46,7 @@ final class ProductStore: ObservableObject {
     @Published private(set) var labState: PersonalLabState = .empty
     @Published var fuelState: FuelState = .empty
     @Published private(set) var flowState: FlowState = .empty
+    @Published var digitalEnvironmentState: DigitalEnvironmentState = .empty
 
     var onObservationSaved: ((EnvironmentObservation) -> Void)?
 
@@ -131,6 +132,10 @@ final class ProductStore: ObservableObject {
             labState = stored.labState
             fuelState = stored.fuelState
             flowState = stored.flowState
+            digitalEnvironmentState = stored.digitalEnvironmentState
+            if digitalEnvironmentState.profile.knownDimensionsCount > 0 {
+                profile.digitalEnvironment = digitalEnvironmentState.profile
+            }
             if let pending = stored.pendingReflectionSession {
                 phase = .done(pending)
             } else if let active = stored.activeSession {
@@ -166,6 +171,7 @@ final class ProductStore: ObservableObject {
             labState = .empty
             fuelState = .empty
             flowState = .empty
+            digitalEnvironmentState = .empty
             persist()
         }
 
@@ -209,6 +215,12 @@ final class ProductStore: ObservableObject {
         if let sessions = seed.sessions { self.sessions = sessions }
         if let labState = seed.labState { self.labState = labState }
         if let flowState = seed.flowState { self.flowState = flowState }
+        if let digitalState = seed.digitalEnvironmentState {
+            self.digitalEnvironmentState = digitalState
+            if digitalState.profile.knownDimensionsCount > 0 {
+                self.profile.digitalEnvironment = digitalState.profile
+            }
+        }
         if let programState = seed.programState {
             self.programState = programState
         } else if let day = seed.day {
@@ -1736,6 +1748,31 @@ final class ProductStore: ObservableObject {
 
         sessions.append(record)
 
+        if (record.switches ?? 0) > 0 {
+            let dist = record.firstDistraction ?? ""
+            let pull = DigitalEnvironmentProfileEngine.mapStringToPull(dist)
+            let event = InterruptionEvent(
+                sessionID: record.id,
+                programDay: record.day,
+                mode: record.mode,
+                taskContext: nil,
+                trigger: .unknown,
+                digitalCategory: pull,
+                isIntentional: false,
+                phonePosition: record.environment?.phoneLocationSelfReport.map { DigitalEnvironmentProfileEngine.mapStringToProximity($0) } ?? .unknown,
+                screenTimeProtectionState: record.environment?.protectionActivated == true,
+                firstSwitchTiming: record.firstSwitchTiming,
+                switchCount: record.switches ?? 1,
+                returnObserved: record.completed && !record.endedEarly,
+                earlyExit: record.endedEarly,
+                userExplanation: record.firstDistraction,
+                environmentCondition: record.environment?.environmentCondition,
+                truthSource: .userReported
+            )
+            digitalEnvironmentState.interruptionEvents.append(event)
+        }
+        updateDigitalEnvironmentProfile()
+
         if let observation = EnvironmentObservationFactory.observation(from: record) {
             EnvironmentUpdater.apply(session: record, observation: observation, to: &profile.environmentEvidence)
             onObservationSaved?(observation)
@@ -1775,7 +1812,7 @@ final class ProductStore: ObservableObject {
             ? .profile
             : (record.origin == .freeTraining ? .train : .today)
         if record.origin == .protocol, record.completed, programState.hasPendingRequiredFlow {
-            flowState.returnToLabAfterProgramFlow = true
+            flowState.returnToLabAfterProgramFlow = record.flowParticipation != nil
             routePendingProgramFlow()
         } else if record.experimentParticipation != nil {
             phase = .lab
@@ -1888,6 +1925,111 @@ final class ProductStore: ObservableObject {
         }
     }
 
+    // MARK: - Digital Environment V2
+
+    func updateDigitalEnvironmentProfile() {
+        let derived = DigitalEnvironmentProfileEngine.deriveProfile(
+            history: sessions,
+            events: digitalEnvironmentState.interruptionEvents,
+            checkIns: [],
+            currentProfile: digitalEnvironmentState.profile,
+            diagnosisDistractors: profile.distractors.value
+        )
+        digitalEnvironmentState.profile = derived
+        profile.digitalEnvironment = derived
+    }
+
+    func recordInterruptionEvent(_ event: InterruptionEvent) {
+        digitalEnvironmentState.interruptionEvents.append(event)
+        updateDigitalEnvironmentProfile()
+        persist(activeSession: nil)
+    }
+
+    func recordDigitalCheckIn(_ checkIn: DigitalCheckInResponse, sessionID: UUID) {
+        if let idx = sessions.firstIndex(where: { $0.id == sessionID }) {
+            if checkIn.startedEasierWithProtection != nil {
+                sessions[idx].environment?.startedEasierSelfReport = checkIn.startedEasierWithProtection
+            }
+        }
+        if checkIn.pull != nil || checkIn.trigger != nil {
+            let event = InterruptionEvent(
+                sessionID: sessionID,
+                programDay: day,
+                mode: prescription.mode,
+                trigger: checkIn.trigger ?? .unknown,
+                digitalCategory: checkIn.pull ?? .unknown,
+                isIntentional: checkIn.wasIntentional ?? false,
+                phonePosition: checkIn.phonePosition ?? .unknown,
+                returnObserved: checkIn.returnedToTask ?? true,
+                userExplanation: checkIn.notes
+            )
+            digitalEnvironmentState.interruptionEvents.append(event)
+        }
+        updateDigitalEnvironmentProfile()
+        persist(activeSession: nil)
+    }
+
+    func completeRequiredAction(done: Bool, refusalReason: String? = nil) {
+        let actionKind = prescription.environmentAction?.kind.rawValue ?? "manual"
+        if done {
+            digitalEnvironmentState.interventionLog.recordAccept(actionKind: actionKind)
+            setEnvironmentActionDone(true)
+        } else {
+            let reason = refusalReason ?? "declined"
+            digitalEnvironmentState.interventionLog.recordDecline(actionKind: actionKind, reason: reason)
+            setEnvironmentPreparation(
+                EnvironmentPreparation(
+                    action: prescription.action,
+                    fallback: prescription.actionFallback,
+                    outcome: .declined
+                )
+            )
+        }
+        persist(activeSession: nil)
+    }
+
+    func upsertFocusWindow(_ window: FocusWindow) {
+        if let idx = digitalEnvironmentState.focusWindows.firstIndex(where: { $0.id == window.id }) {
+            digitalEnvironmentState.focusWindows[idx] = window
+        } else {
+            digitalEnvironmentState.focusWindows.append(window)
+        }
+        persist(activeSession: nil)
+    }
+
+    func deleteFocusWindow(_ window: FocusWindow) {
+        digitalEnvironmentState.focusWindows.removeAll { $0.id == window.id }
+        persist(activeSession: nil)
+    }
+
+    func completeResetMission(id: UUID, reflection: String? = nil) {
+        if let idx = digitalEnvironmentState.resetMissions.firstIndex(where: { $0.id == id }) {
+            digitalEnvironmentState.resetMissions[idx].completed = true
+            digitalEnvironmentState.resetMissions[idx].completedAt = Date()
+            digitalEnvironmentState.resetMissions[idx].reflection = reflection
+        } else if let mission = DigitalResetMissionLibrary.allMissions.first(where: { $0.id == id }) {
+            var completedMission = mission
+            completedMission.completed = true
+            completedMission.completedAt = Date()
+            completedMission.reflection = reflection
+            digitalEnvironmentState.resetMissions.append(completedMission)
+        }
+        persist(activeSession: nil)
+    }
+
+    func saveAppLimitGuidanceResult(pull: DigitalPull, completed: Bool, failureReason: String? = nil) {
+        let record = AppLimitGuidance(
+            pull: pull,
+            durationMinutes: 20,
+            status: completed ? .completed : .declined,
+            failureReason: failureReason,
+            createdAt: Date(),
+            completedAt: completed ? Date() : nil
+        )
+        digitalEnvironmentState.appLimitGuidances.append(record)
+        persist(activeSession: nil)
+    }
+
     /// Compatibility wrapper for deterministic QA seeds.
     func saveDoneSession(
         difficulty: Int,
@@ -1994,6 +2136,7 @@ final class ProductStore: ObservableObject {
             "pendingReflectionSession": (try? JSONEncoder().encode(pendingReflection)) ?? Data(),
             "fuel": (try? JSONEncoder().encode(fuelState)) ?? Data(),
             "flow": (try? JSONEncoder().encode(flowState)) ?? Data(),
+            "digitalEnvironment": (try? JSONEncoder().encode(digitalEnvironmentState)) ?? Data(),
         ]
         defaults.set(payload, forKey: Self.storageKey)
     }
@@ -2007,7 +2150,8 @@ final class ProductStore: ObservableObject {
         pendingReflectionSession: SessionRecord?,
         labState: PersonalLabState,
         fuelState: FuelState,
-        flowState: FlowState
+        flowState: FlowState,
+        digitalEnvironmentState: DigitalEnvironmentState
     )
 
     private static func load(defaults: UserDefaults) -> (state: StoredState?, migrated: Bool) {
@@ -2042,7 +2186,7 @@ final class ProductStore: ObservableObject {
     /// authoritative and never rolls back to a stale v7 snapshot.
     private static func decodeV8(defaults: UserDefaults) -> StoredState? {
         guard let raw = defaults.dictionary(forKey: storageKey) else {
-            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty)
+            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty, .empty)
         }
         let base = decodeCore(raw: raw)
         let fuelState = (raw["fuel"] as? Data).flatMap {
@@ -2051,28 +2195,31 @@ final class ProductStore: ObservableObject {
         let flowState = (raw["flow"] as? Data).flatMap {
             try? JSONDecoder().decode(FlowState.self, from: $0)
         } ?? .empty
-        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, fuelState, flowState)
+        let digitalEnvironmentState = (raw["digitalEnvironment"] as? Data).flatMap {
+            try? JSONDecoder().decode(DigitalEnvironmentState.self, from: $0)
+        } ?? .empty
+        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, fuelState, flowState, digitalEnvironmentState)
     }
 
     /// v7 decode is intentionally field-tolerant for Fuel and supplies a new,
     /// empty Flow state during migration.
     private static func decodeV7(defaults: UserDefaults) -> StoredState? {
         guard let raw = defaults.dictionary(forKey: v7StorageKey) else {
-            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty)
+            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty, .empty)
         }
         let base = decodeCore(raw: raw)
         let fuelState = (raw["fuel"] as? Data).flatMap {
             try? JSONDecoder().decode(FuelState.self, from: $0)
         } ?? .empty
-        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, fuelState, .empty)
+        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, fuelState, .empty, .empty)
     }
 
     private static func decodeV6(defaults: UserDefaults, key: String = "reboot.product.v6") -> StoredState? {
         guard let raw = defaults.dictionary(forKey: key) else {
-            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty)
+            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty, .empty)
         }
         let base = decodeCore(raw: raw)
-        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, .empty, .empty)
+        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, .empty, .empty, .empty)
     }
 
     /// Shared v6/v7 body: profile, sessions, program, rules, observations,
@@ -2130,18 +2277,18 @@ final class ProductStore: ObservableObject {
 
     private static func decodeV5(defaults: UserDefaults) -> StoredState? {
         guard let raw = defaults.dictionary(forKey: v5StorageKey) else {
-            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty)
+            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty, .empty)
         }
         let base = decodePreLab(raw: raw)
-        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, .empty, .empty)
+        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, .empty, .empty, .empty)
     }
 
     private static func decodeV4(from key: String, defaults: UserDefaults) -> StoredState? {
         guard let raw = defaults.dictionary(forKey: key) else {
-            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty)
+            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty, .empty)
         }
         let base = decodePreLab(raw: raw)
-        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, .empty, .empty)
+        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, .empty, .empty, .empty)
     }
 
     private static func decodeLegacy(
@@ -2177,6 +2324,7 @@ final class ProductStore: ObservableObject {
             preparation,
             active,
             nil,
+            .empty,
             .empty,
             .empty,
             .empty

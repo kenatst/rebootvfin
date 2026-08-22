@@ -236,6 +236,9 @@ struct AttentionProfile: Codable, Equatable {
     /// Digital-environment evidence (Screen Time / manual interventions).
     var environmentEvidence: EnvironmentEvidence?
 
+    /// Digital Environment V2 Profile (evidence-backed dimensions).
+    var digitalEnvironment: DigitalEnvironmentProfile?
+
     /// Active or candidate personal rules discovered from sessions or user-defined.
     var personalRules: [PersonalRule] = []
 

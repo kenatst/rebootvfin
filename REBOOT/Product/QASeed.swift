@@ -11,6 +11,7 @@ struct QASeed: Codable {
     var programState: ProgramState? = nil
     var labState: PersonalLabState? = nil
     var flowState: FlowState? = nil
+    var digitalEnvironmentState: DigitalEnvironmentState? = nil
 }
 
 enum QASeeds {

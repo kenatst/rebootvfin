@@ -23,6 +23,9 @@
 		B33C58416BD65C7261E93F2B /* Surfaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04BB67B893186F75F27B9442 /* Surfaces.swift */; };
 		72D49F8161660230EAF11ACD /* DigitalResetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE799B759DAA11204233835 /* DigitalResetView.swift */; };
 		822D14E0E4473301D5004F7D /* EnvironmentEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3078B61AE9F12257D9035B6 /* EnvironmentEngine.swift */; };
+		9E0000000000000000000001 /* DigitalEnvironmentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E0000000000000000000002 /* DigitalEnvironmentModels.swift */; };
+		9E0000000000000000000003 /* DigitalEnvironmentEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E0000000000000000000004 /* DigitalEnvironmentEngine.swift */; };
+		9E0000000000000000000005 /* DigitalEnvironmentViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E0000000000000000000006 /* DigitalEnvironmentViews.swift */; };
 		052EB4AE015457D8EA3A6DFB /* EnvironmentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8DEB26E5E1003D209131CC4 /* EnvironmentModels.swift */; };
 		2115E40D512A0F26F310ABB8 /* EnvironmentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08822C1962441693D4FE2DDF /* EnvironmentProvider.swift */; };
 		77F617EFF000250930958AD1 /* EnvironmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ECBDC76AE60617D29B664DF /* EnvironmentStore.swift */; };
@@ -85,6 +88,7 @@
 		9F0000000000000000000003 /* FlowConditionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0000000000000000000004 /* FlowConditionEngine.swift */; };
 		9F0000000000000000000005 /* FlowViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0000000000000000000006 /* FlowViews.swift */; };
 		9F0000000000000000000007 /* FlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0000000000000000000008 /* FlowTests.swift */; };
+		9E0000000000000000000021 /* DigitalEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E0000000000000000000022 /* DigitalEnvironmentTests.swift */; };
 	/* End PBXBuildFile section */
 
 	/* Begin PBXContainerItemProxy section */
@@ -150,6 +154,9 @@
 		04BB67B893186F75F27B9442 /* Surfaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Surfaces.swift; sourceTree = "<group>"; };
 		ADE799B759DAA11204233835 /* DigitalResetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitalResetView.swift; sourceTree = "<group>"; };
 		F3078B61AE9F12257D9035B6 /* EnvironmentEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentEngine.swift; sourceTree = "<group>"; };
+		9E0000000000000000000002 /* DigitalEnvironmentModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitalEnvironmentModels.swift; sourceTree = "<group>"; };
+		9E0000000000000000000004 /* DigitalEnvironmentEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitalEnvironmentEngine.swift; sourceTree = "<group>"; };
+		9E0000000000000000000006 /* DigitalEnvironmentViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitalEnvironmentViews.swift; sourceTree = "<group>"; };
 		D8DEB26E5E1003D209131CC4 /* EnvironmentModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentModels.swift; sourceTree = "<group>"; };
 		08822C1962441693D4FE2DDF /* EnvironmentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentProvider.swift; sourceTree = "<group>"; };
 		7ECBDC76AE60617D29B664DF /* EnvironmentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentStore.swift; sourceTree = "<group>"; };
@@ -217,6 +224,7 @@
 		9F0000000000000000000004 /* FlowConditionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowConditionEngine.swift; sourceTree = "<group>"; };
 		9F0000000000000000000006 /* FlowViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowViews.swift; sourceTree = "<group>"; };
 		9F0000000000000000000008 /* FlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTests.swift; sourceTree = "<group>"; };
+		9E0000000000000000000022 /* DigitalEnvironmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitalEnvironmentTests.swift; sourceTree = "<group>"; };
 	/* End PBXFileReference section */
 
 	/* Begin PBXGroup section */
@@ -281,6 +289,9 @@
 			children = (
 				ADE799B759DAA11204233835,
 				F3078B61AE9F12257D9035B6,
+				9E0000000000000000000002 /* DigitalEnvironmentModels.swift */,
+				9E0000000000000000000004 /* DigitalEnvironmentEngine.swift */,
+				9E0000000000000000000006 /* DigitalEnvironmentViews.swift */,
 				D8DEB26E5E1003D209131CC4,
 				08822C1962441693D4FE2DDF,
 				7ECBDC76AE60617D29B664DF,
@@ -518,6 +529,7 @@
 				9C0000000000000000000007 /* PersonalLabTests.swift */,
 				9E0000000000000000000012 /* FuelTests.swift */,
 				9F0000000000000000000008 /* FlowTests.swift */,
+				9E0000000000000000000022 /* DigitalEnvironmentTests.swift */,
 			);
 			path = REBOOTTests;
 			sourceTree = "<group>";
@@ -606,6 +618,9 @@
 				B33C58416BD65C7261E93F2B /* Surfaces.swift in Sources */,
 				72D49F8161660230EAF11ACD /* DigitalResetView.swift in Sources */,
 				822D14E0E4473301D5004F7D /* EnvironmentEngine.swift in Sources */,
+				9E0000000000000000000001 /* DigitalEnvironmentModels.swift in Sources */,
+				9E0000000000000000000003 /* DigitalEnvironmentEngine.swift in Sources */,
+				9E0000000000000000000005 /* DigitalEnvironmentViews.swift in Sources */,
 				052EB4AE015457D8EA3A6DFB /* EnvironmentModels.swift in Sources */,
 				2115E40D512A0F26F310ABB8 /* EnvironmentProvider.swift in Sources */,
 				77F617EFF000250930958AD1 /* EnvironmentStore.swift in Sources */,
@@ -673,6 +688,7 @@
 				9C0000000000000000000006 /* PersonalLabTests.swift in Sources */,
 				9E0000000000000000000011 /* FuelTests.swift in Sources */,
 				9F0000000000000000000007 /* FlowTests.swift in Sources */,
+				9E0000000000000000000021 /* DigitalEnvironmentTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

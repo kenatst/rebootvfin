@@ -243,6 +243,7 @@ struct ProfileTab: View {
     @State private var selectedRule: PersonalRule?
     @State private var showAddRule = false
     @State private var selectedLabExperiment: PersonalExperiment?
+    @State private var showEnvironmentLab = false
 
     private var profile: AttentionProfile { product.profile }
     private var isSparse: Bool { product.sessions.count < 3 }
@@ -316,6 +317,9 @@ struct ProfileTab: View {
             ExperimentDetailView(product: product, experimentID: experiment.id)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showEnvironmentLab) {
+            EnvironmentLabView(product: product, environmentStore: EnvironmentStore())
         }
         .onAppear {
             if ProcessInfo.processInfo.arguments.valueAfter("-qaSeed") == "rulesWhyThisRule",
@@ -693,31 +697,62 @@ struct ProfileTab: View {
 
     private var environmentDynamicsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            MetaLabel(text: "Digital Environment")
-
-            let env = profile.environmentEvidence
-            let isConnected = env?.screenTimeConnected == true
-
-            PaperCard(radius: 22, padding: 18) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        MetaLabel(text: "Screen Time Intervention", color: isConnected ? AppColors.coral : AppColors.inkFaint)
-                        Spacer()
-                        GlassPill(
-                            text: isConnected ? "System-confirmed" : "Unconnected",
-                            tint: isConnected ? AppColors.coral : AppColors.inkFaint
-                        )
+            HStack {
+                MetaLabel(text: "Digital Environment")
+                Spacer()
+                Button { showEnvironmentLab = true } label: {
+                    HStack(spacing: 4) {
+                        Text("Environment Lab")
+                            .font(.system(size: 13, weight: .semibold))
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 11, weight: .semibold))
                     }
+                    .foregroundStyle(AppColors.coral)
+                }
+            }
 
-                    if isConnected {
-                        Text("Active app protection and scheduled windows are supported by device policies.", style: .heroReason)
-                            .foregroundStyle(AppColors.inkSoft)
-                    } else {
-                        Text("Physical friction (phone outside reach) operates via self-reported manual verification.", style: .heroReason)
-                            .foregroundStyle(AppColors.inkSoft)
+            let digEnv = product.digitalEnvironmentState.profile
+            let pullName = digEnv.primaryDigitalPull.isKnown && digEnv.primaryDigitalPull.value != .unknown
+                ? digEnv.primaryDigitalPull.value.displayName
+                : "Measuring"
+            let triggerName = digEnv.triggerType.isKnown && digEnv.triggerType.value != .unknown
+                ? digEnv.triggerType.value.displayName
+                : "Measuring"
+
+            Button { showEnvironmentLab = true } label: {
+                PaperCard(radius: 22, padding: 18) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Primary Pull", style: .heroReason)
+                                    .foregroundStyle(AppColors.inkSoft)
+                                Text(pullName, style: .heroGoal)
+                                    .foregroundStyle(AppColors.ink)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("Main Trigger", style: .heroReason)
+                                    .foregroundStyle(AppColors.inkSoft)
+                                Text(triggerName, style: .heroGoal)
+                                    .foregroundStyle(AppColors.ink)
+                            }
+                        }
+
+                        Divider().opacity(0.3)
+
+                        HStack {
+                            Text(digEnv.matureSignals.first ?? "Tap to explore focus windows & boundaries.")
+                                .type(.heroReason)
+                                .foregroundStyle(AppColors.inkSoft)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(AppColors.inkFaint)
+                        }
                     }
                 }
             }
+            .buttonStyle(PressScaleStyle())
         }
     }
 

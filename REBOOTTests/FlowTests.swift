@@ -1398,7 +1398,8 @@ final class FlowTests: XCTestCase {
         XCTAssertTrue(record.appliedRuleIDs.isEmpty)
         finishAndSaveFlow(store, signal: .strongerSignal)
 
-        XCTAssertEqual(store.personalRules.count, 1)
+        XCTAssertEqual(store.personalRules.count, 2)
+        XCTAssertEqual(store.personalRules, originalRules)
         XCTAssertEqual(store.personalRules.first?.id, existingRule.id)
         XCTAssertEqual(store.personalRules.first?.lifecycle, .kept)
         XCTAssertEqual(store.personalRules.first?.timesKept, existingRule.timesKept)
@@ -1409,7 +1410,12 @@ final class FlowTests: XCTestCase {
         let history = [protocolRecord(day: 1, mode: .observe)]
         var profile = deepWorkProfile
         let existingRule = keptRule()
-        profile.personalRules = [existingRule]
+        var recallOnlyRule = keptRule()
+        recallOnlyRule.id = UUID()
+        recallOnlyRule.title = "Use this only for recall"
+        recallOnlyRule.matchingContexts = [.recall]
+        let originalRules = [existingRule, recallOnlyRule]
+        profile.personalRules = originalRules
         writeV8(
             profile: profile,
             sessions: history,
