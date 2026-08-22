@@ -16,10 +16,12 @@ struct PrimaryPillButton: View {
                 }
                 Text(title)
                     .type(.buttonLabel)
+                    .multilineTextAlignment(.center)
             }
             .foregroundStyle(AppColors.paper)
             .frame(maxWidth: .infinity)
-            .frame(height: 58)
+            .frame(minHeight: 58)
+            .padding(.vertical, 2)
             .background(AppColors.ink)
             .clipShape(Capsule())
             .opacity(isEnabled ? 1 : 0.35)
@@ -34,19 +36,37 @@ struct PrimaryPillButton: View {
 struct TonalPillButton: View {
     let title: String
     var isSelected: Bool = false
+    var showsSelectionIndicator: Bool = false
     var action: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .type(.smallLink)
+            HStack(spacing: 6) {
+                if showsSelectionIndicator {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .opacity(isSelected ? 1 : 0)
+                        .accessibilityHidden(true)
+                }
+                Text(title)
+                    .type(.smallLink)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
                 .foregroundStyle(isSelected ? AppColors.paper : AppColors.ink)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .background(isSelected ? AppColors.ink : AppColors.ink.opacity(0.05))
                 .clipShape(Capsule())
-                .animation(.easeOut(duration: AppMotion.selectMorph), value: isSelected)
+                .animation(
+                    reduceMotion ? nil : .easeOut(duration: AppMotion.selectMorph),
+                    value: isSelected
+                )
         }
         .buttonStyle(PressScaleStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
     }
 }

@@ -4,6 +4,7 @@ import SwiftUI
 struct ProductRootView: View {
     @ObservedObject var product: ProductStore
     @ObservedObject var environmentStore: EnvironmentStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -16,6 +17,12 @@ struct ProductRootView: View {
                     .transition(.opacity)
             case .fuel:
                 FuelView(product: product)
+                    .transition(.opacity)
+            case .flowLab:
+                FlowLabView(product: product, environmentStore: environmentStore)
+                    .transition(.opacity)
+            case .flowSetup:
+                FlowBlockSetupView(product: product, environmentStore: environmentStore)
                     .transition(.opacity)
             case .preparing(let request):
                 SessionPreparationView(product: product, environmentStore: environmentStore, request: request)
@@ -40,8 +47,8 @@ struct ProductRootView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.35), value: product.phase)
-        .animation(.easeInOut(duration: 0.25), value: product.tab)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: product.phase)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: product.tab)
         .onChange(of: product.phase, initial: false) { old, new in
             if case .running = old, case .running = new {} else if case .running = old {
                 // Session ended or was abandoned: protection must end too.

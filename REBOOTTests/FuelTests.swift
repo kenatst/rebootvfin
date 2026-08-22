@@ -775,9 +775,9 @@ final class FuelTests: XCTestCase {
         }
     }
 
-    // MARK: - Persistence v7
+    // MARK: - Persistence v8
 
-    func testV6ToV7MigrationPreservesEverything() throws {
+    func testV6ToV8MigrationPreservesEverything() throws {
         let profile = AttentionProfile()
         let session = completedProtocolDay(4, snapshot: nil)
         let labExperiment = PersonalLabEngine.makeExperiment(
@@ -795,7 +795,7 @@ final class FuelTests: XCTestCase {
         defaults.set(legacy, forKey: "reboot.product.v6")
 
         let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
-        XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v7"), "v7 key must be written")
+        XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v8"), "v8 key must be written")
         XCTAssertNil(defaults.object(forKey: "reboot.product.v6"), "v6 key must be cleaned")
         XCTAssertEqual(store.sessions.count, 1)
         XCTAssertEqual(store.labState.experiments.count, 1)
@@ -804,7 +804,7 @@ final class FuelTests: XCTestCase {
         XCTAssertEqual(store.fuelState, .empty)
     }
 
-    func testV7RoundTripIncludingFuel() {
+    func testV8RoundTripIncludingFuel() {
         let store = dayTwoStore()
         guard let prompt = store.currentFuelPrompt else { return XCTFail("prompt") }
         store.answerFuelPrompt(prompt, rawValue: FuelEnergyLevel.low.rawValue)
@@ -825,35 +825,35 @@ final class FuelTests: XCTestCase {
         XCTAssertEqual(reloaded.completedProtocolDays, 2)
         XCTAssertEqual(reloaded.sessions.last?.fuelContext?.energy, .low)
         XCTAssertEqual(reloaded.fuelState.sampling.answeredCounts[FuelContextField.energy.rawValue], 1)
-        XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v7"))
+        XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v8"))
     }
 
-    func testCorruptedV7FuelDegradesWithoutLosingSessions() throws {
+    func testCorruptedV8FuelDegradesWithoutLosingSessions() throws {
         let store = dayTwoStore()
         store.setFuelPromptsEnabled(false)
-        var raw = tryUnwrap(defaults.dictionary(forKey: "reboot.product.v7"))
+        var raw = tryUnwrap(defaults.dictionary(forKey: "reboot.product.v8"))
         raw["fuel"] = Data("not_json_at_all".utf8)
-        defaults.set(raw, forKey: "reboot.product.v7")
+        defaults.set(raw, forKey: "reboot.product.v8")
 
         let reloaded = ProductStore(diagnosisAnswers: [:], defaults: defaults)
         XCTAssertEqual(reloaded.sessions.count, dayTwoStore().sessions.count)
         XCTAssertEqual(reloaded.fuelState, .empty, "Corrupt Fuel payload degrades to defaults")
     }
 
-    func testCorruptedV7DoesNotRollBackToStaleV6() throws {
-        let v6Session = completedProtocolDay(3, snapshot: nil)
+    func testCorruptedV8DoesNotRollBackToStaleV7() throws {
+        let v7Session = completedProtocolDay(3, snapshot: nil)
         let legacy: [String: Any] = [
             "profile": try JSONEncoder().encode(AttentionProfile()),
-            "sessions": try JSONEncoder().encode([v6Session]),
+            "sessions": try JSONEncoder().encode([v7Session]),
             "day": 4,
         ]
-        defaults.set(legacy, forKey: "reboot.product.v6")
-        // A v7 payload exists but its sessions blob is garbage.
-        defaults.set(["sessions": Data("garbage".utf8)], forKey: "reboot.product.v7")
+        defaults.set(legacy, forKey: "reboot.product.v7")
+        // A v8 payload exists but its sessions blob is garbage.
+        defaults.set(["sessions": Data("garbage".utf8)], forKey: "reboot.product.v8")
 
         let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
-        XCTAssertEqual(store.sessions.count, 0, "Corrupt v7 wins over stale v6 — never silent rollback")
-        XCTAssertNotNil(defaults.object(forKey: "reboot.product.v6"), "v6 was not consumed by a corrupt v7")
+        XCTAssertEqual(store.sessions.count, 0, "Corrupt v8 wins over stale v7 - never silent rollback")
+        XCTAssertNotNil(defaults.object(forKey: "reboot.product.v7"), "v7 was not consumed by a corrupt v8")
     }
 
     func testPerElementSessionRecoveryKeepsHealthyNeighbors() throws {
@@ -871,7 +871,7 @@ final class FuelTests: XCTestCase {
             "sessions": corrupted,
             "day": 5,
         ]
-        defaults.set(legacy, forKey: "reboot.product.v7")
+        defaults.set(legacy, forKey: "reboot.product.v8")
         let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
         XCTAssertEqual(store.sessions.count, 2, "One bad record must not wipe its neighbors")
         XCTAssertTrue(store.sessions.contains { $0.fuelContext?.energy == .okay })

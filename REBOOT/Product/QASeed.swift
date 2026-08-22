@@ -10,6 +10,7 @@ struct QASeed: Codable {
     var record: SessionRecord?
     var programState: ProgramState? = nil
     var labState: PersonalLabState? = nil
+    var flowState: FlowState? = nil
 }
 
 enum QASeeds {
@@ -684,6 +685,92 @@ enum QASeeds {
         return labSeed(experiment: experiment)
     }
 
+    static var flowEmpty: QASeed {
+        flowSeed(state: .empty, phase: "flowLab")
+    }
+
+    static var flowProjectNew: QASeed {
+        let project = flowProject(value: 1, title: "REBOOT iOS")
+        return flowSeed(
+            state: FlowState(
+                projects: [project],
+                activeProjectID: project.id
+            ),
+            phase: "flowLab"
+        )
+    }
+
+    static var flowBlockSetup: QASeed {
+        let project = flowProject(value: 2, title: "REBOOT iOS")
+        let draft = FlowSetupDraft(
+            id: stableUUID(prefix: 85, track: .flow, value: 1),
+            projectID: project.id,
+            sessionOrigin: .flow,
+            programDay: nil,
+            task: "Refine the Flow Lab project screen",
+            definitionOfDone: "The project screen reads clearly at a glance",
+            challenge: .stretching,
+            skillConfidence: .capable,
+            feedbackMechanism: .visibleOutput,
+            customFeedback: "",
+            selectedDuration: 35,
+            phoneSetup: .outsideReach,
+            soundContext: .quiet,
+            browserScope: "Xcode and Simulator",
+            createdAt: fixtureReferenceDate
+        )
+        return flowSeed(
+            state: FlowState(
+                projects: [project],
+                pendingSetup: draft,
+                activeProjectID: project.id
+            ),
+            phase: "flowSetup"
+        )
+    }
+
+    static var flowBlockRunning: QASeed {
+        let fixture = activeFlowBlockFixture(completed: false)
+        return flowSeed(
+            state: FlowState(
+                projects: [fixture.project],
+                plans: [fixture.plan],
+                activeBlockID: fixture.plan.blockID,
+                activeProjectID: fixture.project.id
+            ),
+            phase: "running",
+            record: fixture.record
+        )
+    }
+
+    static var flowReflection: QASeed {
+        let fixture = activeFlowBlockFixture(completed: true)
+        return flowSeed(
+            state: FlowState(
+                projects: [fixture.project],
+                plans: [fixture.plan],
+                activeBlockID: fixture.plan.blockID,
+                activeProjectID: fixture.project.id
+            ),
+            phase: "done",
+            record: fixture.record
+        )
+    }
+
+    static var flowMaturePatterns: QASeed {
+        flowEvidenceSeed(signalSequence: Array(repeating: .strongerSignal, count: 4), value: 4)
+    }
+
+    static var flowMixedPatterns: QASeed {
+        flowEvidenceSeed(
+            signalSequence: [
+                .strongerSignal, .strongerSignal, .strongerSignal,
+                .lowerSignal, .lowerSignal, .lowerSignal,
+            ],
+            value: 5
+        )
+    }
+
     private static func activeLabExperiment(
         template: ExperimentTemplate = ExperimentTemplateLibrary.phoneDistance
     ) -> PersonalExperiment {
@@ -705,6 +792,269 @@ enum QASeeds {
         seed.phase = "lab"
         seed.labState = PersonalLabState(experiments: [experiment])
         return seed
+    }
+
+    private static func flowSeed(
+        state: FlowState,
+        phase: String,
+        record: SessionRecord? = nil,
+        completedFlowSessions: [SessionRecord] = []
+    ) -> QASeed {
+        var seed = activeProgramSeed(day: 65, profile: flowProfile, track: .flow)
+        seed.phase = phase
+        seed.record = record
+        seed.flowState = state
+        seed.sessions = (seed.sessions ?? []) + completedFlowSessions
+        return seed
+    }
+
+    private static func flowProject(value: Int, title: String) -> FlowProject {
+        let date = fixtureReferenceDate.addingTimeInterval(Double(value) * 60)
+        return FlowProject(
+            id: stableUUID(prefix: 80, track: .flow, value: value),
+            title: title,
+            category: .coding,
+            createdAt: date.addingTimeInterval(-86_400 * 8),
+            updatedAt: date,
+            status: .active,
+            note: "A real product project used to compare deep-work conditions.",
+            recentBlockIDs: [],
+            archivedAt: nil
+        )
+    }
+
+    private static func activeFlowBlockFixture(
+        completed: Bool
+    ) -> (project: FlowProject, plan: FlowBlockPlan, record: SessionRecord) {
+        var project = flowProject(value: 3, title: "REBOOT iOS")
+        let plan = flowPlan(projectID: project.id, value: 1, dateOffset: 0)
+        project.recentBlockIDs = [plan.blockID]
+        let actualMinutes = completed ? plan.selectedDuration : 0
+        let elapsedSeconds = completed ? plan.selectedDuration * 60 : 11 * 60 + 24
+        var record = flowSessionRecord(
+            plan: plan,
+            value: 1,
+            date: fixtureReferenceDate,
+            actualMinutes: actualMinutes,
+            elapsedSeconds: elapsedSeconds,
+            completed: completed
+        )
+        if !completed {
+            record.date = Date().addingTimeInterval(-Double(elapsedSeconds))
+        }
+        return (project, plan, record)
+    }
+
+    private static func flowEvidenceSeed(
+        signalSequence: [FlowEngagementSignal],
+        value: Int
+    ) -> QASeed {
+        var project = flowProject(value: value, title: "REBOOT iOS")
+        var plans: [FlowBlockPlan] = []
+        var evidence: [FlowBlockEvidence] = []
+        var records: [SessionRecord] = []
+
+        for (index, signal) in signalSequence.enumerated() {
+            let itemValue = value * 100 + index + 1
+            let dateOffset = index - signalSequence.count
+            let date = fixtureReferenceDate.addingTimeInterval(Double(dateOffset) * 86_400)
+            let plan = flowPlan(
+                projectID: project.id,
+                value: itemValue,
+                dateOffset: dateOffset
+            )
+            let record = flowSessionRecord(
+                plan: plan,
+                value: itemValue,
+                date: date,
+                actualMinutes: signal == .lowerSignal ? 18 : plan.selectedDuration,
+                elapsedSeconds: (signal == .lowerSignal ? 18 : plan.selectedDuration) * 60,
+                completed: signal != .lowerSignal,
+                endedEarly: signal == .lowerSignal
+            )
+            let item = FlowBlockEvidence(
+                id: stableUUID(prefix: 84, track: .flow, value: itemValue),
+                blockID: plan.blockID,
+                projectID: project.id,
+                planID: plan.id,
+                sessionID: record.id,
+                reflection: flowReflection(signal: signal),
+                challengeBefore: plan.challengeBefore,
+                skillBefore: plan.skillConfidenceBefore,
+                feedbackMechanism: plan.feedbackMechanism,
+                environment: flowEnvironmentSnapshot,
+                fuelContext: plan.fuelContext,
+                switches: FlowSwitchEvidence(
+                    count: signal == .lowerSignal ? 6 : 1,
+                    firstSwitchTiming: signal == .lowerSignal ? .underFive : .twentyPlus
+                ),
+                actualDuration: record.actualMinutes,
+                completed: record.completed,
+                endedEarly: record.endedEarly,
+                date: date
+            )
+            plans.append(plan)
+            records.append(record)
+            evidence.append(item)
+        }
+
+        project.recentBlockIDs = plans.map(\.blockID)
+        project.updatedAt = fixtureReferenceDate
+        return flowSeed(
+            state: FlowState(
+                projects: [project],
+                plans: plans,
+                evidence: evidence,
+                activeProjectID: project.id
+            ),
+            phase: "flowLab",
+            completedFlowSessions: records
+        )
+    }
+
+    private static func flowPlan(
+        projectID: UUID,
+        value: Int,
+        dateOffset: Int
+    ) -> FlowBlockPlan {
+        let date = fixtureReferenceDate.addingTimeInterval(Double(dateOffset) * 86_400)
+        return FlowBlockPlan(
+            id: stableUUID(prefix: 82, track: .flow, value: value),
+            blockID: stableUUID(prefix: 81, track: .flow, value: value),
+            projectID: projectID,
+            task: "Refine the Flow Lab project screen",
+            definitionOfDone: "The project screen reads clearly at a glance",
+            challengeBefore: .stretching,
+            skillConfidenceBefore: .capable,
+            feedbackMechanism: .visibleOutput,
+            customFeedback: nil,
+            suggestedDuration: 35,
+            selectedDuration: 35,
+            environmentPlan: FlowEnvironmentPlan(
+                phoneSetup: .screenTimeProtected,
+                soundContext: .quiet,
+                browserScope: "Xcode and Simulator",
+                appliedRuleIDs: [],
+                verification: .screenTimeIntervention,
+                protectionActivated: true
+            ),
+            fuelContext: FlowFuelFixture.snapshot(date: date),
+            baseMode: .stay,
+            sessionOrigin: .flow,
+            programDay: nil,
+            createdAt: date
+        )
+    }
+
+    private static func flowSessionRecord(
+        plan: FlowBlockPlan,
+        value: Int,
+        date: Date,
+        actualMinutes: Int,
+        elapsedSeconds: Int,
+        completed: Bool,
+        endedEarly: Bool = false
+    ) -> SessionRecord {
+        let participation = FlowParticipation(
+            flowBlockID: plan.blockID,
+            flowProjectID: plan.projectID,
+            flowPlanID: plan.id,
+            contextSnapshot: FlowContextSnapshot(
+                challengeSkillRelation: plan.challengeSkillRelation,
+                environmentPlan: plan.environmentPlan,
+                fuelContext: plan.fuelContext,
+                capturedAt: plan.createdAt
+            ),
+            attachedAt: plan.createdAt
+        )
+        return SessionRecord(
+            id: stableUUID(prefix: 83, track: .flow, value: value),
+            origin: .flow,
+            requestID: stableUUID(prefix: 86, track: .flow, value: value),
+            day: 65,
+            date: date,
+            mode: .stay,
+            targetMinutes: plan.selectedDuration,
+            actualMinutes: actualMinutes,
+            elapsedSeconds: elapsedSeconds,
+            completed: completed,
+            endedEarly: endedEarly,
+            firstDistraction: endedEarly ? Distractor.notifications : nil,
+            switches: endedEarly ? 6 : 1,
+            difficulty: nil,
+            energy: nil,
+            environmentActionDone: true,
+            environmentVerification: .screenTimeIntervention,
+            startedEasierSelfReport: true,
+            firstSwitchTiming: endedEarly ? .underFive : .twentyPlus,
+            appliedRuleIDs: [],
+            environment: flowEnvironmentSnapshot,
+            flowParticipation: participation,
+            fuelContext: plan.fuelContext
+        )
+    }
+
+    private static func flowReflection(
+        signal: FlowEngagementSignal
+    ) -> FlowBlockReflection {
+        switch signal {
+        case .strongerSignal:
+            return FlowBlockReflection(
+                absorption: .high,
+                timePerception: .faster,
+                desireToContinue: .continue,
+                definitionOfDoneOutcome: .reached,
+                note: "The clear finish line kept the block concrete."
+            )
+        case .lowerSignal:
+            return FlowBlockReflection(
+                absorption: .low,
+                timePerception: .slower,
+                desireToContinue: .stop,
+                definitionOfDoneOutcome: .partly,
+                note: "Attention kept returning to unfinished inputs."
+            )
+        case .mixed, .insufficient:
+            return FlowBlockReflection(
+                absorption: .some,
+                timePerception: .normal,
+                desireToContinue: .neutral,
+                definitionOfDoneOutcome: .partly,
+                note: nil
+            )
+        }
+    }
+
+    private static var flowEnvironmentSnapshot: EnvironmentSnapshot {
+        var snapshot = EnvironmentSnapshot.none
+        snapshot.protectionOffered = true
+        snapshot.protectionAccepted = true
+        snapshot.protectionActivated = true
+        snapshot.manualIntervention = "Phone outside reach"
+        snapshot.phoneLocationSelfReport = "Outside the room"
+        snapshot.environmentCondition = EnvironmentCondition.protected.rawValue
+        snapshot.startedEasierSelfReport = true
+        return snapshot
+    }
+
+    private enum FlowFuelFixture {
+        static func snapshot(date: Date) -> FuelContextSnapshot {
+            FuelContextSnapshot(
+                energy: .high,
+                sleepQuality: .good,
+                sleepDurationBand: .usual,
+                caffeineRecency: .earlier,
+                mealTiming: .betweenMeals,
+                satiety: .neutral,
+                movement: .shortWalkBefore,
+                breakState: .returningFromBreak,
+                breakType: .walk,
+                hydrationFeeling: .fine,
+                taskContext: .coding,
+                captureSource: .manual,
+                capturedAt: date.addingTimeInterval(-300)
+            )
+        }
     }
 
     private static func appendLabPair(
@@ -846,6 +1196,13 @@ enum QASeeds {
         case "labActiveMidway": return labActiveMidway
         case "labResultKeep": return labResultKeep
         case "labResultInconclusive": return labResultInconclusive
+        case "flowEmpty": return flowEmpty
+        case "flowProjectNew": return flowProjectNew
+        case "flowBlockSetup": return flowBlockSetup
+        case "flowBlockRunning": return flowBlockRunning
+        case "flowReflection": return flowReflection
+        case "flowMaturePatterns": return flowMaturePatterns
+        case "flowMixedPatterns": return flowMixedPatterns
 #endif
         default: return nil
         }

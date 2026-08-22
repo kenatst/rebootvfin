@@ -4,6 +4,8 @@ enum ProductPhase: Equatable {
     case today
     case lab
     case fuel
+    case flowLab
+    case flowSetup
     case preparing(TrainingSessionRequest)
     case running(SessionRecord)
     case recovery(SessionRecord)
@@ -43,10 +45,12 @@ final class ProductStore: ObservableObject {
     @Published private(set) var observations: [EvidenceObservation] = []
     @Published private(set) var labState: PersonalLabState = .empty
     @Published var fuelState: FuelState = .empty
+    @Published private(set) var flowState: FlowState = .empty
 
     var onObservationSaved: ((EnvironmentObservation) -> Void)?
 
-    private static let storageKey = "reboot.product.v7"
+    private static let storageKey = "reboot.product.v8"
+    private static let v7StorageKey = "reboot.product.v7"
     private static let v6StorageKey = "reboot.product.v6"
     private static let v5StorageKey = "reboot.product.v5"
     private static let v4StorageKey = "reboot.product.v4"
@@ -126,11 +130,25 @@ final class ProductStore: ObservableObject {
             observations = profile.observations
             labState = stored.labState
             fuelState = stored.fuelState
-            if let active = stored.activeSession {
+            flowState = stored.flowState
+            if let pending = stored.pendingReflectionSession {
+                phase = .done(pending)
+            } else if let active = stored.activeSession {
                 phase = .recovery(active)
+            } else if let reviewDay = programState.pendingReviewDay {
+                phase = .weeklyReview(reviewDay)
+            } else if let transition = programState.pendingPhaseTransition {
+                phase = .phaseTransition(transition)
+            } else if programState.pendingCompletion {
+                phase = .programCompletion
+            } else if stored.flowState.pendingSetup != nil {
+                phase = .flowSetup
+            } else if stored.flowState.pendingEntryOrigin != nil {
+                phase = .flowLab
             }
             if loaded.migrated {
                 persist()
+                defaults.removeObject(forKey: Self.v7StorageKey)
                 defaults.removeObject(forKey: Self.v6StorageKey)
                 defaults.removeObject(forKey: Self.v5StorageKey)
                 defaults.removeObject(forKey: Self.v4StorageKey)
@@ -147,6 +165,7 @@ final class ProductStore: ObservableObject {
             observations = []
             labState = .empty
             fuelState = .empty
+            flowState = .empty
             persist()
         }
 
@@ -171,7 +190,11 @@ final class ProductStore: ObservableObject {
         }
 #endif
         if case .today = phase {
+            let wasReturningToFlowLab = flowState.returnToLabAfterProgramFlow
             routePendingProgramFlow()
+            if wasReturningToFlowLab, !flowState.returnToLabAfterProgramFlow {
+                persist(activeSession: nil)
+            }
         }
     }
 
@@ -185,6 +208,7 @@ final class ProductStore: ObservableObject {
         }
         if let sessions = seed.sessions { self.sessions = sessions }
         if let labState = seed.labState { self.labState = labState }
+        if let flowState = seed.flowState { self.flowState = flowState }
         if let programState = seed.programState {
             self.programState = programState
         } else if let day = seed.day {
@@ -197,6 +221,10 @@ final class ProductStore: ObservableObject {
             if let record = seed.record { phase = .done(record) }
         case "lab":
             phase = .lab
+        case "flowLab":
+            phase = .flowLab
+        case "flowSetup":
+            phase = .flowSetup
         default:
             phase = .today
         }
@@ -297,6 +325,503 @@ final class ProductStore: ObservableObject {
     func closeFuel() {
         tab = .profile
         phase = .today
+    }
+
+    // MARK: - Flow Lab
+
+    var activeFlowProjects: [FlowProject] {
+        flowState.activeProjects.sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    var archivedFlowProjects: [FlowProject] {
+        flowState.projects
+            .filter { $0.status == .archived }
+            .sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    var recentFlowEvidence: [FlowBlockEvidence] {
+        flowState.evidence.sorted { $0.date > $1.date }
+    }
+
+    var flowPatterns: [FlowConditionPattern] {
+        FlowConditionEngine.evaluate(state: flowState)
+    }
+
+    func flowPatterns(projectID: UUID) -> [FlowConditionPattern] {
+        FlowConditionEngine.evaluate(state: flowState, projectID: projectID)
+    }
+
+    func flowProject(id: UUID) -> FlowProject? {
+        flowState.project(id: id)
+    }
+
+    func flowPlan(id: UUID) -> FlowBlockPlan? {
+        flowState.plan(id: id)
+    }
+
+    func openFlowLab(origin: SessionOrigin = .flow) {
+        flowState.pendingEntryOrigin = origin == .protocol && currentProtocolCanParticipateInFlow
+            ? .protocol
+            : nil
+        phase = .flowLab
+        persist()
+    }
+
+    func closeFlowLab() {
+        if flowState.pendingEntryOrigin == .protocol {
+            tab = .today
+        } else if tab != .train, tab != .profile {
+            tab = .profile
+        }
+        flowState.pendingEntryOrigin = nil
+        phase = .today
+        persist()
+    }
+
+    @discardableResult
+    func createFlowProject(
+        title: String,
+        category: FlowProjectCategory,
+        note: String? = nil
+    ) -> FlowProject? {
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTitle.isEmpty else { return nil }
+        let cleanNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let project = FlowProject(
+            title: cleanTitle,
+            category: category,
+            note: cleanNote?.isEmpty == false ? cleanNote : nil
+        )
+        flowState.projects.append(project)
+        flowState.activeProjectID = project.id
+        persist()
+        return project
+    }
+
+    func archiveFlowProject(id: UUID, at date: Date = Date()) {
+        guard let index = flowState.projects.firstIndex(where: { $0.id == id }) else { return }
+        flowState.projects[index].archive(at: date)
+        if flowState.activeProjectID == id {
+            flowState.activeProjectID = flowState.activeProjects.first?.id
+        }
+        persist()
+    }
+
+    var suggestedFlowDuration: Int {
+        let baseline = nearestFlowDuration(to: min(profile.focusWindowMinutes ?? 25, 45))
+        let recentStrongDurations = recentFlowEvidence
+            .filter { $0.engagementSignal == .strongerSignal }
+            .prefix(6)
+            .map(\.actualDuration)
+            .filter { (10...120).contains($0) }
+        guard recentStrongDurations.count >= 3 else { return baseline }
+        let sorted = recentStrongDurations.sorted()
+        let observed = nearestFlowDuration(to: sorted[sorted.count / 2])
+        return oneStepFlowDuration(from: baseline, toward: observed)
+    }
+
+    var flowDurationOptions: [Int] {
+        Array(Set([20, 25, 30, 35, 45, 60, suggestedFlowDuration])).sorted()
+    }
+
+    var flowWaitReason: String? {
+        if day == 1, completedProtocolDays == 0 {
+            return "Day 1 stays a natural baseline. Flow Lab will be ready after it."
+        }
+        if programStatus == .active, isRecoveryPrescribed, !hasCompletedCurrentProtocol {
+            return "We'll come back to this block when focused work fits the plan again."
+        }
+        return nil
+    }
+
+    var currentProtocolCanParticipateInFlow: Bool {
+        guard flowWaitReason == nil,
+              let request = protocolRequest(),
+              request.mode == .stay,
+              (10...120).contains(request.targetMinutes),
+              let intent = request.curriculumIntent else { return false }
+        return intent == .observeFlowCondition
+            || intent == .testDeepWorkCondition
+            || intent == .protectDeepBlock
+            || intent == .independentSetup
+    }
+
+    @discardableResult
+    func beginFlowSetup(
+        projectID: UUID? = nil,
+        origin: SessionOrigin = .flow
+    ) -> Bool {
+        let resolvedOrigin = origin == .flow
+            ? (flowState.pendingEntryOrigin ?? origin)
+            : origin
+        guard flowWaitReason == nil,
+              resolvedOrigin == .flow || resolvedOrigin == .protocol || resolvedOrigin == .freeTraining else { return false }
+        if resolvedOrigin == .protocol, !currentProtocolCanParticipateInFlow { return false }
+
+        let selectedID = projectID
+            ?? flowState.activeProjectID
+            ?? activeFlowProjects.first?.id
+        if let selectedID,
+           flowState.project(id: selectedID)?.status != .active {
+            return false
+        }
+
+        flowState.pendingSetup = FlowSetupDraft(
+            projectID: selectedID,
+            sessionOrigin: resolvedOrigin,
+            programDay: resolvedOrigin == .protocol ? day : nil,
+            selectedDuration: resolvedOrigin == .protocol ? prescription.minutes : suggestedFlowDuration
+        )
+        flowState.pendingEntryOrigin = nil
+        phase = .flowSetup
+        persist()
+        return true
+    }
+
+    func updateFlowSetup(_ draft: FlowSetupDraft) {
+        guard let pending = flowState.pendingSetup, pending.id == draft.id else { return }
+        var safe = draft
+        safe.sessionOrigin = pending.sessionOrigin
+        safe.programDay = pending.programDay
+        flowState.pendingSetup = safe
+        persist()
+    }
+
+    func cancelFlowSetup() {
+        let origin = flowState.pendingSetup?.sessionOrigin
+        flowState.pendingSetup = nil
+        persist()
+        if origin == .protocol {
+            phase = .today
+        } else {
+            phase = .flowLab
+        }
+    }
+
+    @discardableResult
+    func startFlowBlock(
+        environmentPlan _: FlowEnvironmentPlan,
+        environmentArm: SessionEnvironmentArm?
+    ) -> Bool {
+        guard flowWaitReason == nil,
+              let draft = flowState.pendingSetup,
+              draft.isComplete,
+              let projectID = draft.projectID,
+              let projectIndex = flowState.projects.firstIndex(where: {
+                  $0.id == projectID && $0.status == .active
+              }) else { return false }
+        let originalProject = flowState.projects[projectIndex]
+        let originalActiveProjectID = flowState.activeProjectID
+
+        var request: TrainingSessionRequest
+        switch draft.sessionOrigin {
+        case .protocol:
+            guard currentProtocolCanParticipateInFlow,
+                  draft.programDay == day,
+                  let current = protocolRequest() else { return false }
+            request = current
+        case .freeTraining:
+            request = .freeTraining(mode: .stay)
+        case .flow:
+            request = TrainingSessionRequest(
+                origin: .flow,
+                mode: .stay,
+                programDay: nil,
+                targetMinutes: draft.selectedDuration,
+                goal: "Work on one real project."
+            )
+        case .experiment:
+            return false
+        }
+
+        let cleanTask = draft.task.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanDone = draft.definitionOfDone.trimmingCharacters(in: .whitespacesAndNewlines)
+        let pendingFuel = todaysFuelCapture
+        let usedPendingFuel = request.fuelContext == nil && pendingFuel != nil
+        var flowFuelContext = request.fuelContext ?? pendingFuel ?? FuelContextSnapshot()
+        if flowFuelContext.taskContext == nil {
+            flowFuelContext.taskContext = flowState.projects[projectIndex].category.fuelTaskContext
+        }
+        let eligibleRuleIDs = Set(personalRules.filter { rule in
+            rule.isActivelyInfluencing && (
+                rule.matchingContexts.contains(.stay)
+                    || rule.matchingContexts.contains(.deepWork)
+                    || rule.matchingContexts.contains(.general)
+            )
+        }.map(\.id))
+        let confirmedRuleIDs = draft.confirmedRuleIDs.reduce(into: [UUID]()) { confirmed, id in
+            if eligibleRuleIDs.contains(id), !confirmed.contains(id) { confirmed.append(id) }
+        }
+        guard let canonicalEnvironment = canonicalFlowEnvironment(
+            draft: draft,
+            proposedArm: environmentArm
+        ) else { return false }
+        var capturedEnvironmentPlan = canonicalEnvironment.0
+        let canonicalEnvironmentArm = canonicalEnvironment.1
+        capturedEnvironmentPlan.appliedRuleIDs = confirmedRuleIDs
+        let plan = FlowBlockPlan(
+            projectID: projectID,
+            task: cleanTask,
+            definitionOfDone: cleanDone,
+            challengeBefore: draft.challenge,
+            skillConfidenceBefore: draft.skillConfidence,
+            feedbackMechanism: draft.feedbackMechanism,
+            customFeedback: draft.feedbackMechanism == .other
+                ? draft.customFeedback.trimmingCharacters(in: .whitespacesAndNewlines)
+                : nil,
+            suggestedDuration: draft.sessionOrigin == .protocol ? request.targetMinutes : suggestedFlowDuration,
+            selectedDuration: draft.sessionOrigin == .protocol ? request.targetMinutes : draft.selectedDuration,
+            environmentPlan: capturedEnvironmentPlan,
+            fuelContext: flowFuelContext,
+            baseMode: request.mode,
+            sessionOrigin: request.origin,
+            programDay: request.programDay
+        )
+        let participation = FlowParticipation(
+            flowBlockID: plan.blockID,
+            flowProjectID: projectID,
+            flowPlanID: plan.id,
+            contextSnapshot: FlowContextSnapshot(
+                challengeSkillRelation: plan.challengeSkillRelation,
+                environmentPlan: capturedEnvironmentPlan,
+                fuelContext: plan.fuelContext
+            )
+        )
+
+        request.targetMinutes = plan.selectedDuration
+        request.task = plan.task
+        request.completionDefinition = plan.definitionOfDone
+        request.goal = plan.task
+        request.flowParticipation = participation
+        request.fuelContext = plan.fuelContext
+        request.appliedRuleIDs = confirmedRuleIDs
+
+        // Clear before begin() persists the running session. Rollback below
+        // restores it if canonical session validation rejects the block.
+        if usedPendingFuel { fuelState.pendingCapture = nil }
+        flowState.plans.append(plan)
+        flowState.activeBlockID = plan.blockID
+        flowState.activeProjectID = projectID
+        flowState.pendingSetup = nil
+        if !flowState.projects[projectIndex].recentBlockIDs.contains(plan.blockID) {
+            flowState.projects[projectIndex].recentBlockIDs.append(plan.blockID)
+        }
+        flowState.projects[projectIndex].updatedAt = Date()
+        begin(request: request, environment: canonicalEnvironmentArm)
+
+        guard case .running(let started) = phase,
+              started.flowParticipation?.flowBlockID == plan.blockID else {
+            flowState.plans.removeAll { $0.id == plan.id }
+            flowState.projects[projectIndex] = originalProject
+            flowState.activeBlockID = nil
+            flowState.activeProjectID = originalActiveProjectID
+            flowState.pendingSetup = draft
+            if usedPendingFuel { fuelState.pendingCapture = pendingFuel }
+            phase = .flowSetup
+            persist(activeSession: nil)
+            return false
+        }
+        return true
+    }
+
+    private func canonicalFlowEnvironment(
+        draft: FlowSetupDraft,
+        proposedArm: SessionEnvironmentArm?
+    ) -> (FlowEnvironmentPlan, SessionEnvironmentArm)? {
+        let browserScope = draft.browserScope.trimmingCharacters(in: .whitespacesAndNewlines)
+        var plan = FlowEnvironmentPlan(
+            phoneSetup: draft.phoneSetup,
+            soundContext: draft.soundContext,
+            browserScope: browserScope.isEmpty ? nil : browserScope,
+            appliedRuleIDs: [],
+            verification: .userReported,
+            protectionActivated: false
+        )
+
+        switch draft.phoneSetup {
+        case .usual:
+            return (plan, SessionEnvironmentArm(
+                condition: .unrestricted,
+                manualIntervention: "Usual phone setup",
+                protectedSelectionID: nil,
+                protectionOffered: false,
+                protectionAccepted: false,
+                protectionActivated: false,
+                phoneLocationSelfReport: "Usual setup"
+            ))
+        case .outsideReach:
+            return (plan, SessionEnvironmentArm(
+                condition: .phoneAway,
+                manualIntervention: "Phone outside reach",
+                protectedSelectionID: nil,
+                protectionOffered: false,
+                protectionAccepted: false,
+                protectionActivated: false,
+                phoneLocationSelfReport: "Outside reach"
+            ))
+        case .screenTimeProtected:
+            guard var arm = proposedArm,
+                  arm.condition == .protected,
+                  arm.protectionAccepted,
+                  arm.protectionActivated,
+                  arm.protectedSelectionID != nil else { return nil }
+            arm.protectionOffered = true
+            arm.phoneLocationSelfReport = nil
+            plan.verification = .screenTimeIntervention
+            plan.protectionActivated = true
+            return (plan, arm)
+        }
+    }
+
+    private func flowEnvironmentArmMatches(
+        plan: FlowEnvironmentPlan,
+        proposedArm: SessionEnvironmentArm?
+    ) -> Bool {
+        guard let arm = proposedArm else { return false }
+        switch plan.phoneSetup {
+        case .usual:
+            return plan.verification == .userReported
+                && !plan.protectionActivated
+                && arm.condition == .unrestricted
+                && !arm.protectionAccepted
+                && !arm.protectionActivated
+                && arm.protectedSelectionID == nil
+        case .outsideReach:
+            return plan.verification == .userReported
+                && !plan.protectionActivated
+                && arm.condition == .phoneAway
+                && !arm.protectionAccepted
+                && !arm.protectionActivated
+                && arm.protectedSelectionID == nil
+        case .screenTimeProtected:
+            return plan.verification == .screenTimeIntervention
+                && plan.protectionActivated
+                && arm.condition == .protected
+                && arm.protectionAccepted
+                && arm.protectionActivated
+                && arm.protectedSelectionID != nil
+        }
+    }
+
+    func canTestFlowPattern(
+        _ pattern: FlowConditionPattern,
+        screenTimeAvailable: Bool = false
+    ) -> Bool {
+        canTestFlowDimension(
+            pattern.dimension,
+            screenTimeAvailable: screenTimeAvailable
+        )
+    }
+
+    func canTestFlowDimension(
+        _ dimension: FlowConditionDimension,
+        screenTimeAvailable: Bool = false
+    ) -> Bool {
+        experimentTemplate(for: dimension) != nil
+            && (dimension != .screenTimeProtection || screenTimeAvailable)
+    }
+
+    @discardableResult
+    func testFlowPattern(
+        _ pattern: FlowConditionPattern,
+        screenTimeAvailable: Bool = false
+    ) -> ExperimentStartOutcome {
+        guard let evidenceIDs = validatedFlowEvidenceIDs(
+            pattern.supportingEvidenceIDs + pattern.contradictingEvidenceIDs
+        ) else { return .unavailable }
+        return startFlowExperiment(
+            dimension: pattern.dimension,
+            sourceID: pattern.id,
+            evidenceIDs: evidenceIDs,
+            screenTimeAvailable: screenTimeAvailable
+        )
+    }
+
+    @discardableResult
+    func testFlowDimension(
+        _ dimension: FlowConditionDimension,
+        evidenceIDs: [UUID],
+        screenTimeAvailable: Bool = false
+    ) -> ExperimentStartOutcome {
+        guard let evidenceIDs = validatedFlowEvidenceIDs(evidenceIDs) else {
+            return .unavailable
+        }
+        return startFlowExperiment(
+            dimension: dimension,
+            sourceID: "open.\(dimension.rawValue)",
+            evidenceIDs: evidenceIDs,
+            screenTimeAvailable: screenTimeAvailable
+        )
+    }
+
+    private func validatedFlowEvidenceIDs(_ ids: [UUID]) -> [UUID]? {
+        let requested = Set(ids)
+        let actual = flowState.evidence.filter { requested.contains($0.id) }
+        let cohort = FlowComparabilityEngine.strongestMutuallyComparableCohort(
+            actual,
+            state: flowState
+        )
+        guard cohort.count >= 3 else { return nil }
+        return cohort.map(\.id)
+    }
+
+    private func startFlowExperiment(
+        dimension: FlowConditionDimension,
+        sourceID: String,
+        evidenceIDs: [UUID],
+        screenTimeAvailable: Bool
+    ) -> ExperimentStartOutcome {
+        guard dimension != .screenTimeProtection || screenTimeAvailable else {
+            return .unavailable
+        }
+        guard let template = experimentTemplate(for: dimension) else { return .unavailable }
+        var experiment = PersonalLabEngine.makeExperiment(
+            template: template,
+            origin: .evidenceSuggestion
+        )
+        experiment.sourceFlowPatternID = sourceID
+        experiment.discoveryEvidenceIDs = evidenceIDs.reduce(into: []) { unique, id in
+            if !unique.contains(id) { unique.append(id) }
+        }
+        let outcome = PersonalLabEngine.start(
+            experiment,
+            in: &labState,
+            rules: personalRules
+        )
+        if case .started = outcome {
+            phase = .lab
+            persist()
+        }
+        return outcome
+    }
+
+    private func experimentTemplate(for dimension: FlowConditionDimension) -> ExperimentTemplate? {
+        switch dimension {
+        case .finishLine: return ExperimentTemplateLibrary.clearFinishLine
+        case .phoneSetup: return ExperimentTemplateLibrary.phoneDistance
+        case .screenTimeProtection: return ExperimentTemplateLibrary.sessionProtection
+        case .sound: return ExperimentTemplateLibrary.sound
+        case .movement: return ExperimentTemplateLibrary.shortWalkBeforeFocus
+        case .breakState: return ExperimentTemplateLibrary.noInputBreak
+        default: return nil
+        }
+    }
+
+    private func nearestFlowDuration(to minutes: Int) -> Int {
+        let safeMinutes = min(max(minutes, 10), 120)
+        return [20, 25, 30, 35, 45, 60].min {
+            abs($0 - safeMinutes) < abs($1 - safeMinutes)
+        } ?? 25
+    }
+
+    private func oneStepFlowDuration(from baseline: Int, toward observed: Int) -> Int {
+        let options = [20, 25, 30, 35, 45, 60]
+        guard let baselineIndex = options.firstIndex(of: baseline), observed != baseline else {
+            return baseline
+        }
+        return options[observed > baseline
+            ? min(baselineIndex + 1, options.count - 1)
+            : max(baselineIndex - 1, 0)]
     }
 
     func setFuelPromptsEnabled(_ enabled: Bool) {
@@ -805,6 +1330,7 @@ final class ProductStore: ObservableObject {
 
         if isProtectedRecovery(request) {
             request.experimentParticipation = nil
+            request.flowParticipation = nil
             labState.pendingParticipation = nil
         } else if let participation = request.experimentParticipation {
             let valid = activeExperiment.map { experiment in
@@ -819,11 +1345,64 @@ final class ProductStore: ObservableObject {
         }
 
         let isNaturalBaseline = request.origin == .protocol && request.programDay == 1
+        let flowIsProtectedNow = request.flowParticipation != nil && flowWaitReason != nil
+        if flowIsProtectedNow, request.origin == .flow || request.origin == .protocol {
+            flowState.activeBlockID = nil
+            persist(activeSession: nil)
+            return
+        }
+        if isNaturalBaseline || isProtectedRecovery(request) || flowIsProtectedNow {
+            request.flowParticipation = nil
+            flowState.activeBlockID = nil
+        } else if let participation = request.flowParticipation {
+            let validPlan = flowState.plan(id: participation.flowPlanID).map { plan in
+                plan.blockID == participation.flowBlockID
+                    && plan.projectID == participation.flowProjectID
+                    && request.origin != .experiment
+                    && plan.sessionOrigin == request.origin
+                    && plan.baseMode == request.mode
+                    && plan.selectedDuration == request.targetMinutes
+                    && plan.task == request.task
+                    && plan.task == request.goal
+                    && plan.definitionOfDone == request.completionDefinition
+                    && plan.fuelContext == request.fuelContext
+                    && plan.environmentPlan == participation.contextSnapshot.environmentPlan
+                    && plan.challengeSkillRelation == participation.contextSnapshot.challengeSkillRelation
+                    && plan.fuelContext == participation.contextSnapshot.fuelContext
+                    && plan.environmentPlan.appliedRuleIDs == request.appliedRuleIDs
+                    && flowEnvironmentArmMatches(
+                        plan: plan.environmentPlan,
+                        proposedArm: arm
+                    )
+                    && flowState.activeBlockID == participation.flowBlockID
+                    && (10...120).contains(plan.selectedDuration)
+                    && (request.origin != .protocol
+                        || (currentProtocolCanParticipateInFlow
+                            && plan.programDay == day
+                            && request.programDay == day))
+            } ?? false
+            let alreadyRecorded = sessions.contains {
+                $0.flowParticipation?.flowBlockID == participation.flowBlockID
+            }
+            if !validPlan || alreadyRecorded {
+                flowState.activeBlockID = nil
+                if request.origin == .flow || request.origin == .protocol {
+                    persist(activeSession: nil)
+                    return
+                }
+                request.flowParticipation = nil
+            }
+        }
+        guard request.origin != .flow || request.flowParticipation != nil else {
+            persist(activeSession: nil)
+            return
+        }
+
         // Fuel context attaches only when honestly captured today, never on
         // Day 1. Protocol sessions consume the day's optional prompt; a
         // standalone Lab session consumes it only when an observational
-        // comparison needs the field. Free training and deliberate
-        // intervention tests never touch it.
+        // comparison needs the field. A Flow block consumes a snapshot it
+        // explicitly carries below, so the same pending answer is not reused.
         let standaloneNeedsFuel = request.origin == .experiment
             && activeExperiment?.comparisonKind == .observationalComparison
         if request.fuelContext == nil, !isNaturalBaseline,
@@ -857,7 +1436,14 @@ final class ProductStore: ObservableObject {
             : (request.origin == .protocol
                 ? (request.environmentPreparation ?? environmentPreparation)
                 : request.environmentPreparation)
-        let capturedArm = isNaturalBaseline ? nil : (arm ?? capturedPreparation?.arm)
+        let proposedArm = isNaturalBaseline ? nil : (arm ?? capturedPreparation?.arm)
+        let capturedArm: SessionEnvironmentArm? = proposedArm.map { proposed in
+            var truthful = proposed
+            if truthful.condition == .protected, !truthful.protectionActivated {
+                truthful.condition = .unrestricted
+            }
+            return truthful
+        }
         var evidence = SessionEvidence()
         switch request.mode {
         case .stay:
@@ -879,11 +1465,24 @@ final class ProductStore: ObservableObject {
         }
 
         let verification: EnvironmentVerificationState?
-        switch request.experimentParticipation?.conditionSnapshot.truthSource {
-        case .userReported: verification = .userReported
-        case .systemConfirmed: verification = .systemConfirmed
-        case .notConfirmed: verification = nil
-        case nil: verification = capturedArm != nil ? .systemConfirmed : (capturedPreparation?.actionWasDone == true ? .userReported : nil)
+        if let flowVerification = request.flowParticipation?.contextSnapshot.environmentPlan.verification {
+            verification = flowVerification
+        } else {
+            switch request.experimentParticipation?.conditionSnapshot.truthSource {
+            case .userReported: verification = .userReported
+            case .systemConfirmed: verification = .systemConfirmed
+            case .notConfirmed: verification = nil
+            case nil:
+                verification = capturedArm != nil
+                    ? .systemConfirmed
+                    : (capturedPreparation?.actionWasDone == true ? .userReported : nil)
+            }
+        }
+
+        if let pending = todaysFuelCapture,
+           request.flowParticipation != nil,
+           request.fuelContext == pending {
+            fuelState.pendingCapture = nil
         }
 
         var record = SessionRecord(
@@ -905,6 +1504,7 @@ final class ProductStore: ObservableObject {
             curriculumIntent: request.curriculumIntent,
             adaptationReason: request.adaptationReason,
             experimentParticipation: request.experimentParticipation,
+            flowParticipation: request.flowParticipation,
             fuelContext: request.fuelContext
         )
         if let capturedArm {
@@ -1012,10 +1612,12 @@ final class ProductStore: ObservableObject {
     /// Deterministic entry point for tests and the existing QA auto-loop.
     func finishRunning(actualMinutes: Int, endedEarly: Bool) {
         guard case .running(var record) = phase else { return }
+        let safeMinutes = max(0, actualMinutes)
+        let (elapsedSeconds, overflow) = safeMinutes.multipliedReportingOverflow(by: 60)
         finish(
             &record,
-            elapsedSeconds: max(0, actualMinutes * 60),
-            endedEarly: endedEarly,
+            elapsedSeconds: overflow ? 0 : elapsedSeconds,
+            endedEarly: endedEarly || overflow,
             semanticCompletion: !record.mode.usesStrictTimer
         )
     }
@@ -1029,7 +1631,10 @@ final class ProductStore: ObservableObject {
         record.elapsedSeconds = elapsedSeconds
         record.actualMinutes = elapsedSeconds / 60
         record.endedEarly = endedEarly
-        let reachedTarget = elapsedSeconds >= record.targetMinutes * 60
+        let (targetSeconds, targetOverflow) = record.targetMinutes.multipliedReportingOverflow(by: 60)
+        let reachedTarget = !targetOverflow
+            && record.targetMinutes > 0
+            && elapsedSeconds >= targetSeconds
         record.completed = !endedEarly && (record.mode.usesStrictTimer ? reachedTarget : semanticCompletion)
         if record.environment != nil {
             record.environment?.protectionEndedEarly = endedEarly
@@ -1038,8 +1643,14 @@ final class ProductStore: ObservableObject {
         persist(activeSession: nil)
     }
 
-    func resumeRecoveredSession() {
-        guard case .recovery(let record) = phase else { return }
+    func resumeRecoveredSession(protectionRestored: Bool? = nil) {
+        guard case .recovery(var record) = phase else { return }
+        if record.environment?.protectionActivated == true,
+           protectionRestored != true {
+            record.environment?.protectionActivated = false
+            record.environment?.environmentCondition = EnvironmentCondition.unrestricted.rawValue
+            record.environmentVerification = .unknown
+        }
         phase = .running(record)
         persist()
     }
@@ -1061,7 +1672,16 @@ final class ProductStore: ObservableObject {
                 || (record.requestID != nil && saved.requestID == record.requestID)
         }
         guard !alreadySaved else {
-            routePendingProgramFlow()
+            if record.origin == .protocol, record.completed, programState.hasPendingRequiredFlow {
+                flowState.returnToLabAfterProgramFlow = record.flowParticipation != nil
+                routePendingProgramFlow()
+            } else if record.flowParticipation != nil {
+                tab = .profile
+                phase = .flowLab
+            } else {
+                routePendingProgramFlow()
+            }
+            persist(activeSession: nil)
             return
         }
 
@@ -1105,8 +1725,11 @@ final class ProductStore: ObservableObject {
 
         if record.origin.advancesProgram, record.completed {
             let outcome = programState.registerCompletedProtocolSession(id: record.id, day: record.day)
-            guard outcome != .ignored else {
+            if outcome == .ignored,
+               !programState.processedProtocolSessionIDs.contains(record.id) {
+                flowState.activeBlockID = nil
                 routePendingProgramFlow()
+                persist(activeSession: nil)
                 return
             }
         }
@@ -1134,17 +1757,78 @@ final class ProductStore: ObservableObject {
             )
         }
 
+        if record.flowParticipation != nil {
+            recordFlowEvidence(
+                session: record,
+                reflection: reflection.flowReflection ?? FlowBlockReflection(
+                    absorption: nil,
+                    timePerception: nil,
+                    desireToContinue: nil,
+                    definitionOfDoneOutcome: nil,
+                    note: nil
+                )
+            )
+        }
+
         environmentPreparation = nil
-        tab = record.origin == .freeTraining ? .train : .today
-        persist(activeSession: nil)
+        tab = record.flowParticipation != nil
+            ? .profile
+            : (record.origin == .freeTraining ? .train : .today)
         if record.origin == .protocol, record.completed, programState.hasPendingRequiredFlow {
+            flowState.returnToLabAfterProgramFlow = true
             routePendingProgramFlow()
         } else if record.experimentParticipation != nil {
             phase = .lab
+        } else if record.flowParticipation != nil {
+            phase = .flowLab
         } else if record.origin == .freeTraining || record.origin == .experiment || !record.completed {
             phase = .today
         } else {
             routePendingProgramFlow()
+        }
+        persist(activeSession: nil)
+    }
+
+    private func recordFlowEvidence(
+        session: SessionRecord,
+        reflection: FlowBlockReflection
+    ) {
+        guard let participation = session.flowParticipation,
+              let plan = flowState.plan(id: participation.flowPlanID),
+              plan.blockID == participation.flowBlockID,
+              !flowState.evidence.contains(where: {
+                  $0.blockID == participation.flowBlockID || $0.sessionID == session.id
+              }) else {
+            flowState.activeBlockID = nil
+            return
+        }
+
+        flowState.evidence.append(FlowBlockEvidence(
+            blockID: participation.flowBlockID,
+            projectID: participation.flowProjectID,
+            planID: participation.flowPlanID,
+            sessionID: session.id,
+            reflection: reflection,
+            challengeBefore: plan.challengeBefore,
+            skillBefore: plan.skillConfidenceBefore,
+            feedbackMechanism: plan.feedbackMechanism,
+            environment: session.environment,
+            fuelContext: session.fuelContext,
+            switches: FlowSwitchEvidence(
+                count: session.switches,
+                firstSwitchTiming: session.firstSwitchTiming
+            ),
+            actualDuration: session.actualMinutes,
+            completed: session.completed,
+            endedEarly: session.endedEarly,
+            date: session.date
+        ))
+        flowState.activeBlockID = nil
+        if let index = flowState.projects.firstIndex(where: { $0.id == participation.flowProjectID }) {
+            flowState.projects[index].updatedAt = Date()
+            if !flowState.projects[index].recentBlockIDs.contains(participation.flowBlockID) {
+                flowState.projects[index].recentBlockIDs.append(participation.flowBlockID)
+            }
         }
     }
 
@@ -1162,8 +1846,8 @@ final class ProductStore: ObservableObject {
             answers: answers
         )
         programState.recordReview(review)
-        persist(activeSession: nil)
         routePendingProgramFlow()
+        persist(activeSession: nil)
     }
 
     func skipWeeklyReviewQuestions() {
@@ -1173,15 +1857,15 @@ final class ProductStore: ObservableObject {
     func acknowledgePhaseTransition() {
         guard case .phaseTransition(let phaseID) = phase else { return }
         programState.acknowledgePhaseTransition(phaseID)
-        persist(activeSession: nil)
         routePendingProgramFlow()
+        persist(activeSession: nil)
     }
 
     func acknowledgeProgramCompletion() {
         guard case .programCompletion = phase else { return }
         programState.acknowledgeCompletion()
+        routePendingProgramFlow()
         persist(activeSession: nil)
-        phase = .today
     }
 
     private func routePendingProgramFlow() {
@@ -1191,6 +1875,14 @@ final class ProductStore: ObservableObject {
             phase = .phaseTransition(transition)
         } else if programState.pendingCompletion {
             phase = .programCompletion
+        } else if flowState.pendingSetup != nil {
+            phase = .flowSetup
+        } else if flowState.pendingEntryOrigin != nil {
+            phase = .flowLab
+        } else if flowState.returnToLabAfterProgramFlow {
+            flowState.returnToLabAfterProgramFlow = false
+            tab = .profile
+            phase = .flowLab
         } else {
             phase = .today
         }
@@ -1266,6 +1958,7 @@ final class ProductStore: ObservableObject {
         observations = []
         labState = .empty
         fuelState = .empty
+        flowState = .empty
         tab = .today
         phase = .today
         persist(activeSession: nil)
@@ -1273,6 +1966,7 @@ final class ProductStore: ObservableObject {
 
     private func persist(activeSession explicitActive: SessionRecord? = nil) {
         let active: SessionRecord?
+        let pendingReflection: SessionRecord?
         if let explicitActive {
             active = explicitActive
         } else if case .running(let record) = phase {
@@ -1281,6 +1975,11 @@ final class ProductStore: ObservableObject {
             active = record
         } else {
             active = nil
+        }
+        if case .done(let record) = phase {
+            pendingReflection = record
+        } else {
+            pendingReflection = nil
         }
         let payload: [String: Any] = [
             "profile": (try? JSONEncoder().encode(profile)) ?? Data(),
@@ -1292,7 +1991,9 @@ final class ProductStore: ObservableObject {
             "observations": (try? JSONEncoder().encode(observations)) ?? Data(),
             "personalLab": (try? JSONEncoder().encode(labState)) ?? Data(),
             "activeSession": (try? JSONEncoder().encode(active)) ?? Data(),
+            "pendingReflectionSession": (try? JSONEncoder().encode(pendingReflection)) ?? Data(),
             "fuel": (try? JSONEncoder().encode(fuelState)) ?? Data(),
+            "flow": (try? JSONEncoder().encode(flowState)) ?? Data(),
         ]
         defaults.set(payload, forKey: Self.storageKey)
     }
@@ -1303,13 +2004,18 @@ final class ProductStore: ObservableObject {
         programState: ProgramState,
         preparation: EnvironmentPreparation?,
         activeSession: SessionRecord?,
+        pendingReflectionSession: SessionRecord?,
         labState: PersonalLabState,
-        fuelState: FuelState
+        fuelState: FuelState,
+        flowState: FlowState
     )
 
     private static func load(defaults: UserDefaults) -> (state: StoredState?, migrated: Bool) {
         if defaults.object(forKey: storageKey) != nil {
-            return (decodeV7(defaults: defaults), false)
+            return (decodeV8(defaults: defaults), false)
+        }
+        if defaults.object(forKey: v7StorageKey) != nil {
+            return (decodeV7(defaults: defaults), true)
         }
         if defaults.object(forKey: v6StorageKey) != nil {
             return (decodeV6(defaults: defaults, key: v6StorageKey), true)
@@ -1332,26 +2038,41 @@ final class ProductStore: ObservableObject {
         return (nil, false)
     }
 
-    /// v7 decode is intentionally field-tolerant: a corrupted Fuel payload
-    /// degrades to defaults without discarding the rest of the state, and
-    /// never rolls back to a stale v6 snapshot.
-    private static func decodeV7(defaults: UserDefaults) -> StoredState? {
+    /// A corrupt Flow payload degrades independently. The v8 key remains
+    /// authoritative and never rolls back to a stale v7 snapshot.
+    private static func decodeV8(defaults: UserDefaults) -> StoredState? {
         guard let raw = defaults.dictionary(forKey: storageKey) else {
-            return (AttentionProfile(), [], .fresh, nil, nil, .empty, .empty)
+            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty)
         }
         let base = decodeCore(raw: raw)
         let fuelState = (raw["fuel"] as? Data).flatMap {
             try? JSONDecoder().decode(FuelState.self, from: $0)
         } ?? .empty
-        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.labState, fuelState)
+        let flowState = (raw["flow"] as? Data).flatMap {
+            try? JSONDecoder().decode(FlowState.self, from: $0)
+        } ?? .empty
+        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, fuelState, flowState)
+    }
+
+    /// v7 decode is intentionally field-tolerant for Fuel and supplies a new,
+    /// empty Flow state during migration.
+    private static func decodeV7(defaults: UserDefaults) -> StoredState? {
+        guard let raw = defaults.dictionary(forKey: v7StorageKey) else {
+            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty)
+        }
+        let base = decodeCore(raw: raw)
+        let fuelState = (raw["fuel"] as? Data).flatMap {
+            try? JSONDecoder().decode(FuelState.self, from: $0)
+        } ?? .empty
+        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, fuelState, .empty)
     }
 
     private static func decodeV6(defaults: UserDefaults, key: String = "reboot.product.v6") -> StoredState? {
         guard let raw = defaults.dictionary(forKey: key) else {
-            return (AttentionProfile(), [], .fresh, nil, nil, .empty, .empty)
+            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty)
         }
         let base = decodeCore(raw: raw)
-        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.labState, .empty)
+        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, .empty, .empty)
     }
 
     /// Shared v6/v7 body: profile, sessions, program, rules, observations,
@@ -1362,6 +2083,7 @@ final class ProductStore: ObservableObject {
         programState: ProgramState,
         preparation: EnvironmentPreparation?,
         active: SessionRecord?,
+        pendingReflection: SessionRecord?,
         labState: PersonalLabState
     ) {
         let profileData = raw["profile"] as? Data
@@ -1397,26 +2119,29 @@ final class ProductStore: ObservableObject {
         let active = (raw["activeSession"] as? Data).flatMap {
             try? JSONDecoder().decode(SessionRecord?.self, from: $0)
         } ?? nil
+        let pendingReflection = (raw["pendingReflectionSession"] as? Data).flatMap {
+            try? JSONDecoder().decode(SessionRecord?.self, from: $0)
+        } ?? nil
         let labState = (raw["personalLab"] as? Data).flatMap {
             try? JSONDecoder().decode(PersonalLabState.self, from: $0)
         } ?? .empty
-        return (profile, sessions, programState, preparation, active, labState)
+        return (profile, sessions, programState, preparation, active, pendingReflection, labState)
     }
 
     private static func decodeV5(defaults: UserDefaults) -> StoredState? {
         guard let raw = defaults.dictionary(forKey: v5StorageKey) else {
-            return (AttentionProfile(), [], .fresh, nil, nil, .empty, .empty)
+            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty)
         }
         let base = decodePreLab(raw: raw)
-        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.labState, .empty)
+        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, .empty, .empty)
     }
 
     private static func decodeV4(from key: String, defaults: UserDefaults) -> StoredState? {
         guard let raw = defaults.dictionary(forKey: key) else {
-            return (AttentionProfile(), [], .fresh, nil, nil, .empty, .empty)
+            return (AttentionProfile(), [], .fresh, nil, nil, nil, .empty, .empty, .empty)
         }
         let base = decodePreLab(raw: raw)
-        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.labState, .empty)
+        return (base.profile, base.sessions, base.programState, base.preparation, base.active, base.pendingReflection, base.labState, .empty, .empty)
     }
 
     private static func decodeLegacy(
@@ -1451,6 +2176,8 @@ final class ProductStore: ObservableObject {
             ProgramState.migrated(day: legacyDay, sessions: sessions),
             preparation,
             active,
+            nil,
+            .empty,
             .empty,
             .empty
         )
@@ -1462,6 +2189,7 @@ final class ProductStore: ObservableObject {
         programState: ProgramState,
         preparation: EnvironmentPreparation?,
         active: SessionRecord?,
+        pendingReflection: SessionRecord?,
         labState: PersonalLabState
     ) {
         let profileData = raw["profile"] as? Data
@@ -1490,7 +2218,10 @@ final class ProductStore: ObservableObject {
         let active = (raw["activeSession"] as? Data).flatMap {
             try? JSONDecoder().decode(SessionRecord?.self, from: $0)
         } ?? nil
-        return (profile, sessions, programState, preparation, active, .empty)
+        let pendingReflection = (raw["pendingReflectionSession"] as? Data).flatMap {
+            try? JSONDecoder().decode(SessionRecord?.self, from: $0)
+        } ?? nil
+        return (profile, sessions, programState, preparation, active, pendingReflection, .empty)
     }
 
     private func timing(forElapsedSeconds elapsed: Int) -> FirstSwitchTiming {

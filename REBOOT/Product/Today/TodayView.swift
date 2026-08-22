@@ -47,6 +47,9 @@ struct TodayView: View {
                             if experimentCardEligible {
                                 TodayExperimentCard(product: product, environmentStore: environmentStore)
                                     .padding(.top, 14)
+                            } else if product.currentProtocolCanParticipateInFlow {
+                                TodayFlowBlockCard(product: product)
+                                    .padding(.top, 14)
                             }
                             if prescription.mode == .nothing {
                                 resetEntry

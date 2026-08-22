@@ -502,6 +502,10 @@ struct PersonalExperiment: Codable, Identifiable, Equatable {
     var plan: ExperimentPlan
     var status: ExperimentStatus
     var origin: ExperimentOrigin
+    /// Optional provenance when Flow Lab surfaced the question. The Lab still
+    /// owns the comparison and result semantics.
+    var sourceFlowPatternID: String? = nil
+    var discoveryEvidenceIDs: [UUID] = []
     var comparisonKind: ExperimentComparisonKind = .interventionTest
     var targetVariable: ExperimentTargetVariable? = nil
     var observations: [ExperimentObservation] = []
@@ -532,6 +536,8 @@ struct PersonalExperiment: Codable, Identifiable, Equatable {
         plan: ExperimentPlan,
         status: ExperimentStatus,
         origin: ExperimentOrigin,
+        sourceFlowPatternID: String? = nil,
+        discoveryEvidenceIDs: [UUID] = [],
         comparisonKind: ExperimentComparisonKind = .interventionTest,
         targetVariable: ExperimentTargetVariable? = nil,
         observations: [ExperimentObservation] = [],
@@ -559,6 +565,8 @@ struct PersonalExperiment: Codable, Identifiable, Equatable {
         self.plan = plan
         self.status = status
         self.origin = origin
+        self.sourceFlowPatternID = sourceFlowPatternID
+        self.discoveryEvidenceIDs = discoveryEvidenceIDs
         self.comparisonKind = comparisonKind
         self.targetVariable = targetVariable
         self.observations = observations
@@ -576,7 +584,8 @@ struct PersonalExperiment: Codable, Identifiable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, templateID, version, question, rationale, normalArm, testArm
         case eligibleModes, preferredDuration, primaryOutcome, secondaryOutcomes
-        case plan, status, origin, comparisonKind, targetVariable
+        case plan, status, origin, sourceFlowPatternID, discoveryEvidenceIDs
+        case comparisonKind, targetVariable
         case observations, pairs, result, historicalResults
         case approvedRuleExceptionIDs, linkedPersonalRuleID, ruleDraft
         case createdAt, updatedAt, completedAt
@@ -598,6 +607,11 @@ struct PersonalExperiment: Codable, Identifiable, Equatable {
         plan = try values.decode(ExperimentPlan.self, forKey: .plan)
         status = try values.decode(ExperimentStatus.self, forKey: .status)
         origin = try values.decode(ExperimentOrigin.self, forKey: .origin)
+        sourceFlowPatternID = try? values.decodeIfPresent(String.self, forKey: .sourceFlowPatternID)
+        discoveryEvidenceIDs = (try? values.decodeIfPresent(
+            [UUID].self,
+            forKey: .discoveryEvidenceIDs
+        )) ?? []
         // v6 experiments predate Fuel: absent keys decode to safe defaults.
         comparisonKind = try values.decodeIfPresent(ExperimentComparisonKind.self, forKey: .comparisonKind) ?? .interventionTest
         targetVariable = try values.decodeIfPresent(ExperimentTargetVariable.self, forKey: .targetVariable)

@@ -23,8 +23,12 @@ struct SessionDoneView: View {
         return nil
     }
 
+    @ViewBuilder
     var body: some View {
-        GeometryReader { geo in
+        if let record, record.flowParticipation != nil {
+            FlowBlockReflectionView(product: product, record: record)
+        } else {
+            GeometryReader { geo in
             ZStack {
                 AmbientBackground()
                 ScrollView(showsIndicators: false) {
@@ -43,6 +47,7 @@ struct SessionDoneView: View {
                 .scrollDismissesKeyboard(.interactively)
             }
             .ignoresSafeArea()
+            }
         }
     }
 

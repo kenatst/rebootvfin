@@ -185,17 +185,41 @@ extension AppTypography.Style {
 /// Applies a `AppTypography.Style` (font + line-height + kerning) to any view.
 struct TypographyModifier: ViewModifier {
     let style: AppTypography.Style
+    @Environment(\.scalesAppTypographyWithDynamicType) private var scalesWithDynamicType
 
     func body(content: Content) -> some View {
         content
-            .font(style.fontSwiftUI)
+            .font(
+                scalesWithDynamicType
+                    ? .custom(
+                        style.font.fontName,
+                        size: style.font.pointSize,
+                        relativeTo: .body
+                    )
+                    : style.fontSwiftUI
+            )
             .kerning(style.kerning)
             .lineSpacing(style.lineSpacing)
+    }
+}
+
+private struct ScalesAppTypographyWithDynamicTypeKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var scalesAppTypographyWithDynamicType: Bool {
+        get { self[ScalesAppTypographyWithDynamicTypeKey.self] }
+        set { self[ScalesAppTypographyWithDynamicTypeKey.self] = newValue }
     }
 }
 
 extension View {
     func type(_ style: AppTypography.Style) -> some View {
         modifier(TypographyModifier(style: style))
+    }
+
+    func scalableAppTypography() -> some View {
+        environment(\.scalesAppTypographyWithDynamicType, true)
     }
 }
