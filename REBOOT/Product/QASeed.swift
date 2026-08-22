@@ -341,7 +341,51 @@ enum QASeeds {
     }
 
     private static var matureProfile: AttentionProfile {
-        AttentionProfile(
+        let phoneRule = PersonalRule(
+            id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
+            title: "Keep phone outside reach during focus sessions",
+            detail: "Physical distance prevents subconscious checking between tasks.",
+            category: .environment,
+            matchingContexts: [.stay, .deepWork],
+            lifecycle: .kept,
+            sourceType: .discoveredFromEvidence,
+            confidence: .strong,
+            supportingObservations: [
+                "Your phone was outside reach in 8 recent comparable focus sessions.",
+                "Sessions with physical distance involved 60% fewer recorded switches."
+            ],
+            contradictingObservations: [
+                "One later session still felt difficult during low energy."
+            ],
+            recencyStatus: .repeatedRecent,
+            createdDay: 12,
+            lastTestedDay: 44,
+            timesTested: 10,
+            timesKept: 1
+        )
+
+        let tabRule = PersonalRule(
+            id: UUID(uuidString: "22222222-3333-4444-5555-666666666666")!,
+            title: "Close unrelated browser tabs before Stay blocks",
+            detail: "Single-window setups reduce accidental switching during sustained work.",
+            category: .taskSetup,
+            matchingContexts: [.stay, .recall],
+            lifecycle: .candidate,
+            sourceType: .discoveredFromEvidence,
+            confidence: .emerging,
+            supportingObservations: [
+                "Unrelated tabs were noted as a switch trigger in 4 recent sessions.",
+                "Single-task focus blocks showed longer initial stretches before the first switch."
+            ],
+            contradictingObservations: [],
+            recencyStatus: .recent,
+            createdDay: 35,
+            lastTestedDay: 42,
+            timesTested: 3,
+            timesKept: 0
+        )
+
+        return AttentionProfile(
             primaryGoal: .known("deep_work", source: .selfReport),
             goals: .known(["deep_work", "remember_more", "build_flow"], source: .selfReport),
             distractors: .known([Distractor.notifications, Distractor.tabs], source: .selfReport),
@@ -353,6 +397,7 @@ enum QASeeds {
             environment: .known("A prepared project desk", source: .selfReport),
             flowConditions: .known(["One defined outcome", "Phone outside", "Morning"], source: .repeated),
             energyContext: .known("Morning", source: .repeated),
+            personalRules: [phoneRule, tabRule],
             focusWindowMinutes: 40
         )
     }
@@ -618,7 +663,12 @@ enum QASeeds {
         case "rest": return rest
         case "running": return running
         case "done": return done
+        case "profileSparse": return day1
 #if DEBUG
+        case "profileMature": return programDay82Mature
+        case "rulesWhyThisRule": return programDay82Mature
+        case "programMidPhase": return programDay45Memory
+        case "programDay90Complete": return programCompleted
         case "programDay1": return programDay1
         case "programDay7Checkpoint": return programDay7Checkpoint
         case "programDay8Transition": return programDay8Transition

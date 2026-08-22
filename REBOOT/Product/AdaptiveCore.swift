@@ -45,6 +45,173 @@ enum ReturnLevel: String, Codable, Equatable { case weak, fair, strong }
 enum RecallLevel: String, Codable, Equatable { case weak, fair, strong }
 enum DepthLevel: String, Codable, Equatable { case shallow, fair, deep }
 
+// MARK: - Recency & Evidence Labels
+
+enum RecencyStatus: String, Codable, CaseIterable, Equatable {
+    case recent = "recent"
+    case current = "current"
+    case older = "older"
+    case mixedRecently = "mixedRecently"
+    case repeatedRecent = "repeatedRecent"
+    case repeatedOlder = "repeatedOlder"
+
+    var humanLabel: String {
+        switch self {
+        case .recent: return "Recent"
+        case .current: return "Still current"
+        case .older: return "Older evidence"
+        case .mixedRecently: return "Mixed recently"
+        case .repeatedRecent: return "Repeated signal · recent"
+        case .repeatedOlder: return "Repeated signal · older evidence"
+        }
+    }
+}
+
+enum RuleCategory: String, Codable, CaseIterable, Equatable {
+    case environment = "Environment"
+    case friction = "Friction"
+    case timing = "Timing"
+    case taskSetup = "Task Setup"
+}
+
+enum RuleContext: String, Codable, CaseIterable, Equatable {
+    case stay = "STAY"
+    case recall = "RECALL"
+    case explain = "EXPLAIN"
+    case rest = "NOTHING"
+    case observe = "OBSERVE"
+    case deepWork = "deep_work"
+    case highDistraction = "high_distraction"
+    case general = "general"
+}
+
+enum RuleLifecycle: String, Codable, CaseIterable, Equatable {
+    case candidate = "candidate"
+    case testing = "testing"
+    case kept = "kept"
+    case rejected = "rejected"
+    case retired = "retired"
+
+    var displayLabel: String {
+        switch self {
+        case .candidate: return "Suggested rule"
+        case .testing: return "Testing"
+        case .kept: return "Kept"
+        case .rejected: return "Dismissed"
+        case .retired: return "Retired"
+        }
+    }
+}
+
+enum RuleSourceType: String, Codable, CaseIterable, Equatable {
+    case discoveredFromEvidence = "discovered"
+    case userCreated = "userCreated"
+
+    var displayLabel: String {
+        switch self {
+        case .discoveredFromEvidence: return "Discovered from your sessions"
+        case .userCreated: return "Created by you"
+        }
+    }
+}
+
+enum RuleConfidence: String, Codable, CaseIterable, Equatable {
+    case emerging = "emerging"
+    case moderate = "moderate"
+    case strong = "strong"
+    case needsReview = "needsReview"
+
+    var displayLabel: String {
+        switch self {
+        case .emerging: return "Early pattern"
+        case .moderate: return "Consistent signal"
+        case .strong: return "Strong pattern"
+        case .needsReview: return "Needs another look"
+        }
+    }
+}
+
+enum EnvironmentVerificationState: String, Codable, CaseIterable, Equatable {
+    case userReported = "userReported"
+    case systemConfirmed = "systemConfirmed"
+    case screenTimeIntervention = "screenTimeIntervention"
+    case unknown = "unknown"
+
+    var displayLabel: String {
+        switch self {
+        case .userReported: return "Self-reported"
+        case .systemConfirmed: return "System-confirmed"
+        case .screenTimeIntervention: return "Screen Time shield"
+        case .unknown: return "Unverified"
+        }
+    }
+}
+
+struct EvidenceObservation: Codable, Identifiable, Equatable {
+    var id: UUID = UUID()
+    var sessionID: UUID?
+    var day: Int
+    var mode: TrainingMode
+    var date: Date = Date()
+    var source: EvidenceSource
+    var verificationState: EnvironmentVerificationState
+    var finding: String
+    var sentiment: String // "positive", "neutral", "contradictory"
+    var context: RuleContext
+    var recency: RecencyStatus = .recent
+}
+
+struct PersonalRule: Codable, Identifiable, Equatable {
+    var id: UUID = UUID()
+    var title: String
+    var detail: String
+    var category: RuleCategory
+    var matchingContexts: [RuleContext]
+    var lifecycle: RuleLifecycle
+    var sourceType: RuleSourceType
+    var confidence: RuleConfidence
+    var supportingObservations: [String]
+    var contradictingObservations: [String]
+    var recencyStatus: RecencyStatus
+    var createdDay: Int
+    var lastTestedDay: Int?
+    var timesTested: Int
+    var timesKept: Int
+
+    var isActivelyInfluencing: Bool {
+        lifecycle == .kept && confidence != .needsReview
+    }
+
+    var whyRebootSuggested: WhyThisRuleExplanation {
+        WhyThisRuleExplanation(rule: self)
+    }
+}
+
+struct WhyThisRuleExplanation: Equatable {
+    let ruleTitle: String
+    let sourceDescription: String
+    let supportingPoints: [String]
+    let contradictionPoint: String?
+    let maturityAndRecency: String
+    let disclaimer: String
+
+    init(rule: PersonalRule) {
+        self.ruleTitle = rule.title
+        self.sourceDescription = rule.sourceType == .userCreated ? "Created by you." : "WHY REBOOT SUGGESTED THIS"
+        if rule.sourceType == .userCreated {
+            self.supportingPoints = []
+            self.contradictionPoint = nil
+            self.maturityAndRecency = rule.recencyStatus.humanLabel
+            self.disclaimer = "This is a rule created directly by you."
+        } else {
+            self.supportingPoints = Array(rule.supportingObservations.prefix(3))
+            self.contradictionPoint = rule.contradictingObservations.first
+            self.maturityAndRecency = "\(rule.confidence.displayLabel) · \(rule.recencyStatus.humanLabel.lowercased())"
+            self.disclaimer = "This is an association from your recent sessions, not proof of cause."
+        }
+    }
+}
+
 // MARK: - Attention Profile
 
 struct AttentionProfile: Codable, Equatable {
@@ -61,6 +228,12 @@ struct AttentionProfile: Codable, Equatable {
     var energyContext: Knowledge<String> = .unknown
     /// Digital-environment evidence (Screen Time / manual interventions).
     var environmentEvidence: EnvironmentEvidence?
+
+    /// Active or candidate personal rules discovered from sessions or user-defined.
+    var personalRules: [PersonalRule] = []
+
+    /// Discovered observations ledger.
+    var observations: [EvidenceObservation] = []
 
     /// Derived focus window in minutes from diagnosis or sessions.
     var focusWindowMinutes: Int? = nil
@@ -268,6 +441,7 @@ struct EnvironmentPreparation: Codable, Equatable {
 
 struct TrainingSessionRequest: Codable, Identifiable, Equatable {
     var id = UUID()
+    var prescriptionID: UUID?
     var origin: SessionOrigin
     var mode: TrainingMode
     var programDay: Int?
@@ -279,6 +453,7 @@ struct TrainingSessionRequest: Codable, Identifiable, Equatable {
     var topic: String?
     var observationMission: String?
     var environmentPreparation: EnvironmentPreparation?
+    var appliedRuleIDs: [UUID] = []
     var programPhase: ProgramPhaseID?
     var curriculumIntent: CurriculumIntentKind?
     var adaptationReason: String?
@@ -290,6 +465,8 @@ struct TrainingSessionRequest: Codable, Identifiable, Equatable {
         environmentPreparation: EnvironmentPreparation?
     ) -> TrainingSessionRequest {
         TrainingSessionRequest(
+            id: UUID(),
+            prescriptionID: prescription.id,
             origin: .protocol,
             mode: prescription.mode,
             programDay: day,
@@ -299,6 +476,7 @@ struct TrainingSessionRequest: Codable, Identifiable, Equatable {
                 ? (prescription.observationMission ?? "Work normally.")
                 : nil,
             environmentPreparation: environmentPreparation,
+            appliedRuleIDs: prescription.appliedRuleIDs,
             programPhase: prescription.programPhase,
             curriculumIntent: prescription.curriculumIntent,
             adaptationReason: prescription.adaptationReason
@@ -307,13 +485,16 @@ struct TrainingSessionRequest: Codable, Identifiable, Equatable {
 
     static func freeTraining(mode: TrainingMode) -> TrainingSessionRequest {
         TrainingSessionRequest(
+            id: UUID(),
+            prescriptionID: nil,
             origin: .freeTraining,
             mode: mode,
             programDay: nil,
             targetMinutes: mode.freeDurations.first ?? 10,
             goal: mode.libraryDescription,
             observationMission: mode == .observe ? ObservationMission.all.first : nil,
-            environmentPreparation: nil
+            environmentPreparation: nil,
+            appliedRuleIDs: []
         )
     }
 }
@@ -331,6 +512,7 @@ struct SessionRecord: Codable, Identifiable, Equatable {
     var id = UUID()
     var origin: SessionOrigin = .protocol
     var requestID: UUID?
+    var prescriptionID: UUID?
     var day: Int
     var date: Date
     var mode: TrainingMode
@@ -344,6 +526,7 @@ struct SessionRecord: Codable, Identifiable, Equatable {
     var difficulty: Int?
     var energy: Int?
     var environmentActionDone: Bool?
+    var environmentVerification: EnvironmentVerificationState?
 
     /// Minutes into the session when the first switch was noticed, if remembered.
     var firstSwitchMinute: Int?
@@ -352,6 +535,12 @@ struct SessionRecord: Codable, Identifiable, Equatable {
     var firstSwitchTiming: FirstSwitchTiming?
 
     var evidence: SessionEvidence?
+
+    /// Captured rules applied during this session.
+    var appliedRuleIDs: [UUID] = []
+
+    /// Environment preparation setup at start.
+    var environmentPreparation: EnvironmentPreparation?
 
     /// Curriculum context captured when the protocol request was created.
     var programPhase: ProgramPhaseID?
@@ -365,6 +554,7 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         id: UUID = UUID(),
         origin: SessionOrigin = .protocol,
         requestID: UUID? = nil,
+        prescriptionID: UUID? = nil,
         day: Int,
         date: Date,
         mode: TrainingMode,
@@ -378,9 +568,12 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         difficulty: Int? = nil,
         energy: Int? = nil,
         environmentActionDone: Bool? = nil,
+        environmentVerification: EnvironmentVerificationState? = nil,
         firstSwitchMinute: Int? = nil,
         firstSwitchTiming: FirstSwitchTiming? = nil,
         evidence: SessionEvidence? = nil,
+        appliedRuleIDs: [UUID] = [],
+        environmentPreparation: EnvironmentPreparation? = nil,
         programPhase: ProgramPhaseID? = nil,
         curriculumIntent: CurriculumIntentKind? = nil,
         adaptationReason: String? = nil,
@@ -389,6 +582,7 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         self.id = id
         self.origin = origin
         self.requestID = requestID
+        self.prescriptionID = prescriptionID
         self.day = day
         self.date = date
         self.mode = mode
@@ -402,9 +596,12 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         self.difficulty = difficulty
         self.energy = energy
         self.environmentActionDone = environmentActionDone
+        self.environmentVerification = environmentVerification
         self.firstSwitchMinute = firstSwitchMinute
         self.firstSwitchTiming = firstSwitchTiming ?? FirstSwitchTiming.from(legacyMinute: firstSwitchMinute)
         self.evidence = evidence
+        self.appliedRuleIDs = appliedRuleIDs
+        self.environmentPreparation = environmentPreparation
         self.programPhase = programPhase
         self.curriculumIntent = curriculumIntent
         self.adaptationReason = adaptationReason
@@ -412,10 +609,10 @@ struct SessionRecord: Codable, Identifiable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, origin, requestID, day, date, mode, targetMinutes, actualMinutes
+        case id, origin, requestID, prescriptionID, day, date, mode, targetMinutes, actualMinutes
         case elapsedSeconds, completed, endedEarly, firstDistraction, switches, difficulty
-        case energy, environmentActionDone, firstSwitchMinute, firstSwitchTiming, evidence
-        case programPhase, curriculumIntent, adaptationReason, environment
+        case energy, environmentActionDone, environmentVerification, firstSwitchMinute, firstSwitchTiming, evidence
+        case appliedRuleIDs, environmentPreparation, programPhase, curriculumIntent, adaptationReason, environment
     }
 
     init(from decoder: Decoder) throws {
@@ -423,6 +620,7 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         id = try values.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         origin = try values.decodeIfPresent(SessionOrigin.self, forKey: .origin) ?? .protocol
         requestID = try values.decodeIfPresent(UUID.self, forKey: .requestID)
+        prescriptionID = try values.decodeIfPresent(UUID.self, forKey: .prescriptionID)
         day = try values.decode(Int.self, forKey: .day)
         date = try values.decode(Date.self, forKey: .date)
         mode = try values.decode(TrainingMode.self, forKey: .mode)
@@ -436,10 +634,13 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         difficulty = try values.decodeIfPresent(Int.self, forKey: .difficulty)
         energy = try values.decodeIfPresent(Int.self, forKey: .energy)
         environmentActionDone = try values.decodeIfPresent(Bool.self, forKey: .environmentActionDone)
+        environmentVerification = try values.decodeIfPresent(EnvironmentVerificationState.self, forKey: .environmentVerification)
         firstSwitchMinute = try values.decodeIfPresent(Int.self, forKey: .firstSwitchMinute)
         firstSwitchTiming = try values.decodeIfPresent(FirstSwitchTiming.self, forKey: .firstSwitchTiming)
             ?? FirstSwitchTiming.from(legacyMinute: firstSwitchMinute)
         evidence = try values.decodeIfPresent(SessionEvidence.self, forKey: .evidence)
+        appliedRuleIDs = try values.decodeIfPresent([UUID].self, forKey: .appliedRuleIDs) ?? []
+        environmentPreparation = try values.decodeIfPresent(EnvironmentPreparation.self, forKey: .environmentPreparation)
         programPhase = try values.decodeIfPresent(ProgramPhaseID.self, forKey: .programPhase)
         curriculumIntent = try values.decodeIfPresent(CurriculumIntentKind.self, forKey: .curriculumIntent)
         adaptationReason = try values.decodeIfPresent(String.self, forKey: .adaptationReason)
@@ -470,6 +671,7 @@ struct SessionReflection: Equatable {
 // MARK: - Prescription
 
 struct DailyPrescription: Codable, Equatable {
+    var id: UUID = UUID()
     var day: Int
     var mode: TrainingMode
     var minutes: Int
@@ -483,6 +685,8 @@ struct DailyPrescription: Codable, Equatable {
     var adaptationReason: String
     /// Optional environment intervention (friction ladder 0–4).
     var environmentAction: EnvironmentAction?
+    var appliedRuleIDs: [UUID] = []
+    var appliedRuleTitle: String? = nil
     var programPhase: ProgramPhaseID? = nil
     var curriculumIntent: CurriculumIntentKind? = nil
     var curriculumReason: String? = nil
@@ -491,6 +695,7 @@ struct DailyPrescription: Codable, Equatable {
     var requiresEnvironmentPreparation: Bool = true
 
     static let empty = DailyPrescription(
+        id: UUID(),
         day: 1,
         mode: .observe,
         minutes: 15,
@@ -502,7 +707,9 @@ struct DailyPrescription: Codable, Equatable {
         actionFallback: "If you can't work normally, just do 5 focused minutes.",
         environmentChange: nil,
         adaptationReason: "No sessions yet — first observation.",
-        environmentAction: nil
+        environmentAction: nil,
+        appliedRuleIDs: [],
+        appliedRuleTitle: nil
     )
 }
 
@@ -638,6 +845,215 @@ enum ProfileBuilder {
     }
 }
 
+// MARK: - Personal Rule Engine
+
+enum PersonalRuleEngine {
+    /// Evaluates completed sessions to discover new candidate rules or update confidence / recency on existing rules.
+    static func evaluate(
+        session: SessionRecord,
+        rules: inout [PersonalRule],
+        profile: inout AttentionProfile,
+        allSessions: [SessionRecord]
+    ) {
+        let isDifficult = session.endedEarly || (session.difficulty ?? 0) >= 4 || (session.switches ?? 0) >= 4
+        let isSmooth = session.completed && !session.endedEarly && (session.difficulty ?? 0) <= 2 && (session.switches ?? 0) <= 2
+
+        // 1. Update any existing rules that were active during this session
+        let activeRuleIDs = Set(session.appliedRuleIDs)
+        for i in 0..<rules.count {
+            let wasActive = activeRuleIDs.contains(rules[i].id)
+            if wasActive {
+                rules[i].lastTestedDay = session.day
+                rules[i].timesTested += 1
+
+                if isDifficult {
+                    let note = "One later session still felt difficult."
+                    if !rules[i].contradictingObservations.contains(note) {
+                        rules[i].contradictingObservations.append(note)
+                    }
+                    rules[i].recencyStatus = .mixedRecently
+                    // Downgrade confidence, but NEVER silently delete or retire the user's kept rule:
+                    if rules[i].confidence == .strong {
+                        rules[i].confidence = .moderate
+                    } else if rules[i].confidence == .moderate || rules[i].confidence == .emerging {
+                        rules[i].confidence = .needsReview
+                    }
+                } else if isSmooth {
+                    if rules[i].confidence == .needsReview {
+                        rules[i].confidence = .moderate
+                    } else if rules[i].confidence == .moderate {
+                        rules[i].confidence = .strong
+                    }
+                    rules[i].recencyStatus = rules[i].timesTested >= 3 ? .repeatedRecent : .recent
+                }
+            } else {
+                // Rule wasn't tested in this session. If it has not been tested in over 8 sessions, mark recency status as older.
+                if let last = rules[i].lastTestedDay, session.day - last >= 8 {
+                    if rules[i].recencyStatus == .repeatedRecent {
+                        rules[i].recencyStatus = .repeatedOlder
+                    } else if rules[i].recencyStatus == .recent || rules[i].recencyStatus == .current {
+                        rules[i].recencyStatus = .older
+                    }
+                }
+            }
+        }
+
+        // 2. Discover new candidate rules from session history
+        discoverCandidateRules(sessions: allSessions, rules: &rules, profile: profile)
+
+        // 3. Record an observation
+        let observation = EvidenceObservation(
+            id: UUID(),
+            sessionID: session.id,
+            day: session.day,
+            mode: session.mode,
+            date: session.date,
+            source: session.origin == .protocol ? .session : .selfReport,
+            verificationState: session.environmentVerification ?? (session.environmentActionDone == true ? .userReported : .unknown),
+            finding: findingText(for: session),
+            sentiment: isDifficult ? "contradictory" : (isSmooth ? "positive" : "neutral"),
+            context: context(for: session.mode),
+            recency: .recent
+        )
+        profile.observations.append(observation)
+        profile.personalRules = rules
+    }
+
+    static func keep(id: UUID, in rules: inout [PersonalRule]) {
+        guard let index = rules.firstIndex(where: { $0.id == id }) else { return }
+        rules[index].lifecycle = .kept
+        rules[index].timesKept += 1
+        if rules[index].confidence == .needsReview {
+            rules[index].confidence = .moderate
+        }
+    }
+
+    static func test(id: UUID, in rules: inout [PersonalRule]) {
+        guard let index = rules.firstIndex(where: { $0.id == id }) else { return }
+        rules[index].lifecycle = .testing
+        rules[index].timesTested += 1
+    }
+
+    static func retire(id: UUID, in rules: inout [PersonalRule]) {
+        guard let index = rules.firstIndex(where: { $0.id == id }) else { return }
+        rules[index].lifecycle = .retired
+    }
+
+    static func reject(id: UUID, in rules: inout [PersonalRule]) {
+        guard let index = rules.firstIndex(where: { $0.id == id }) else { return }
+        rules[index].lifecycle = .rejected
+    }
+
+    static func addCustom(
+        title: String,
+        detail: String,
+        category: RuleCategory,
+        contexts: [RuleContext],
+        day: Int,
+        into rules: inout [PersonalRule]
+    ) {
+        let newRule = PersonalRule(
+            id: UUID(),
+            title: title,
+            detail: detail,
+            category: category,
+            matchingContexts: contexts.isEmpty ? [.general] : contexts,
+            lifecycle: .kept,
+            sourceType: .userCreated,
+            confidence: .strong,
+            supportingObservations: [],
+            contradictingObservations: [],
+            recencyStatus: .recent,
+            createdDay: day,
+            lastTestedDay: day,
+            timesTested: 0,
+            timesKept: 1
+        )
+        rules.append(newRule)
+    }
+
+    private static func context(for mode: TrainingMode) -> RuleContext {
+        switch mode {
+        case .stay: return .stay
+        case .recall: return .recall
+        case .explain: return .explain
+        case .nothing: return .rest
+        case .observe: return .observe
+        }
+    }
+
+    private static func findingText(for session: SessionRecord) -> String {
+        if let switches = session.switches {
+            return "\(session.mode.rawValue) session (\(session.actualMinutes)m) completed with \(switches) switch\(switches == 1 ? "" : "es")."
+        }
+        return "\(session.mode.rawValue) session completed (\(session.actualMinutes) min)."
+    }
+
+    private static func discoverCandidateRules(
+        sessions: [SessionRecord],
+        rules: inout [PersonalRule],
+        profile: AttentionProfile
+    ) {
+        let completed = sessions.filter(\.completed)
+        guard completed.count >= 2 else { return }
+
+        // Candidate 1: Phone outside reach
+        let phoneAwaySessions = completed.filter {
+            $0.environmentActionDone == true || $0.environment?.manualIntervention?.contains("reach") == true
+        }
+        if phoneAwaySessions.count >= 2 && !rules.contains(where: { $0.title.lowercased().contains("phone") }) {
+            let avgSwitches = Double(phoneAwaySessions.compactMap(\.switches).reduce(0, +)) / Double(max(1, phoneAwaySessions.compactMap(\.switches).count))
+            let candidate = PersonalRule(
+                id: UUID(),
+                title: "Keep phone outside reach during focus sessions",
+                detail: "Leaving your phone out of reach is associated with fewer switches in recent focus sessions.",
+                category: .environment,
+                matchingContexts: [.stay, .deepWork, .highDistraction],
+                lifecycle: .candidate,
+                sourceType: .discoveredFromEvidence,
+                confidence: phoneAwaySessions.count >= 3 ? .moderate : .emerging,
+                supportingObservations: [
+                    "Your phone was outside reach in \(phoneAwaySessions.count) recent comparable focus sessions.",
+                    "\(phoneAwaySessions.count > 1 ? "\(phoneAwaySessions.count - 1) of those" : "Those") sessions involved fewer reported switches (avg \(Int(avgSwitches.rounded())))."
+                ],
+                contradictingObservations: [],
+                recencyStatus: .recent,
+                createdDay: sessions.last?.day ?? 1,
+                lastTestedDay: sessions.last?.day,
+                timesTested: phoneAwaySessions.count,
+                timesKept: 0
+            )
+            rules.append(candidate)
+        }
+
+        // Candidate 2: Single tab / clear desk
+        let tabsReported = completed.filter { $0.firstDistraction == "tabs" || $0.mode == .stay }
+        if tabsReported.count >= 3 && !rules.contains(where: { $0.title.lowercased().contains("tab") }) {
+            let candidate = PersonalRule(
+                id: UUID(),
+                title: "Close unrelated tabs before starting Stay blocks",
+                detail: "Single-window setups reduce accidental switching during sustained work.",
+                category: .taskSetup,
+                matchingContexts: [.stay, .recall],
+                lifecycle: .candidate,
+                sourceType: .discoveredFromEvidence,
+                confidence: .emerging,
+                supportingObservations: [
+                    "Unrelated tabs were noted as a trigger in \(tabsReported.count) recent sessions.",
+                    "Single-task focus blocks showed longer initial stretches before the first switch."
+                ],
+                contradictingObservations: [],
+                recencyStatus: .current,
+                createdDay: sessions.last?.day ?? 1,
+                lastTestedDay: sessions.last?.day,
+                timesTested: 1,
+                timesKept: 0
+            )
+            rules.append(candidate)
+        }
+    }
+}
+
 // MARK: - Prescription Engine
 
 enum PrescriptionEngine {
@@ -667,11 +1083,13 @@ enum PrescriptionEngine {
         definition: ProgramDayDefinition,
         reviews: [WeeklyReviewRecord] = []
     ) -> DailyPrescription {
+        // Day 1 baseline is protected from all rules and environment interventions
         if definition.day == 1,
            !protocolHistory.contains(where: { $0.day == 1 && $0.completed }) {
             return baseline(definition: definition)
         }
 
+        // Recovery is protected from rules
         if let last = protocolHistory.last,
            last.mode != .nothing,
            last.endedEarly || (last.difficulty ?? 0) >= 4 {
@@ -694,6 +1112,7 @@ enum PrescriptionEngine {
 
     private static func baseline(definition: ProgramDayDefinition) -> DailyPrescription {
         return DailyPrescription(
+            id: UUID(),
             day: 1,
             mode: .observe,
             minutes: 15,
@@ -706,6 +1125,8 @@ enum PrescriptionEngine {
             environmentChange: nil,
             adaptationReason: "Day 1 protects a natural baseline before any intervention.",
             environmentAction: nil,
+            appliedRuleIDs: [],
+            appliedRuleTitle: nil,
             programPhase: definition.phase.id,
             curriculumIntent: definition.intent.kind,
             curriculumReason: definition.intent.editorialReason,
@@ -727,6 +1148,7 @@ enum PrescriptionEngine {
             phase: definition.phase
         )
         return DailyPrescription(
+            id: UUID(),
             day: definition.day,
             mode: .nothing,
             minutes: recommendation.minutes,
@@ -737,12 +1159,14 @@ enum PrescriptionEngine {
             action: "Choose a quiet place with no new input.",
             actionFallback: "If even that feels like too much, skip it — the program waits.",
             environmentChange: nil,
-            adaptationReason: "Recovery override from the most recent protocol evidence.",
+            adaptationReason: "A lighter recovery block following a demanding session.",
             environmentAction: nil,
+            appliedRuleIDs: [],
+            appliedRuleTitle: nil,
             programPhase: definition.phase.id,
             curriculumIntent: .tolerateLessStimulus,
             curriculumReason: definition.intent.editorialReason,
-            recentEvidenceReason: "The last protocol session was difficult or ended early.",
+            recentEvidenceReason: "Your last session felt demanding, so we're resetting with a lighter block.",
             observationMission: nil,
             requiresEnvironmentPreparation: false
         )
@@ -760,14 +1184,34 @@ enum PrescriptionEngine {
             protocolHistory: history,
             phase: definition.phase
         )
-        let copy = copy(for: mode, profile: profile, minutes: duration.minutes, definition: definition)
-        let environment = environmentPlan(
+        var copy = copy(for: mode, profile: profile, minutes: duration.minutes, definition: definition)
+        var environment = environmentPlan(
             mode: mode,
             profile: profile,
             minutes: duration.minutes,
             phase: definition.phase
         )
+
+        // Matching Personal Rules (Kept rules only, valid context only, no retired/rejected/testing):
+        let matchingRules = profile.personalRules.filter { rule in
+            rule.isActivelyInfluencing && (
+                rule.matchingContexts.contains(where: { $0.rawValue == mode.rawValue })
+                || rule.matchingContexts.contains(.general)
+                || (mode == .stay && rule.matchingContexts.contains(.deepWork))
+            )
+        }
+        let appliedRuleIDs = matchingRules.map(\.id)
+        let appliedRuleTitle = matchingRules.first?.title
+
+        if let rule = matchingRules.first {
+            copy.reason = "You chose to keep this rule for focused work: \(rule.title)."
+            if rule.category == .environment {
+                environment.action = rule.detail
+            }
+        }
+
         return DailyPrescription(
+            id: UUID(),
             day: definition.day,
             mode: mode,
             minutes: duration.minutes,
@@ -780,6 +1224,8 @@ enum PrescriptionEngine {
             environmentChange: environmentChange(for: profile),
             adaptationReason: adaptationReason(duration.reason, definition: definition),
             environmentAction: environment.environmentAction,
+            appliedRuleIDs: appliedRuleIDs,
+            appliedRuleTitle: appliedRuleTitle,
             programPhase: definition.phase.id,
             curriculumIntent: definition.intent.kind,
             curriculumReason: definition.intent.editorialReason,
@@ -898,7 +1344,7 @@ enum PrescriptionEngine {
         let phaseTitle = definition.phase.title.trimmingCharacters(in: CharacterSet(charactersIn: "."))
         let primaryGoal = profile.primaryGoal.value.flatMap { DiagnosisModels.goalLabel[$0] }
         let reason = primaryGoal.map { "This supports your goal to \($0.lowercased())." }
-            ?? "This fits the current phase without inventing a score."
+            ?? "This fits your current phase without inventing a score."
         switch mode {
         case .stay:
             return PrescriptionCopy(
@@ -926,7 +1372,7 @@ enum PrescriptionEngine {
                 headline: "Add nothing for a moment.",
                 sentence: "A short period without new input is enough for today's test.",
                 goal: "Spend \(minutes) minutes without adding stimulus.",
-                reason: "This phase sometimes tests what happens when there is less to react to."
+                reason: "This phase tests what happens when there is less to react to."
             )
         case .observe:
             return PrescriptionCopy(
@@ -1004,15 +1450,15 @@ enum PrescriptionEngine {
         if history.suffix(2).allSatisfy({
             $0.completed && !$0.endedEarly && ($0.difficulty ?? 3) <= 2
         }), history.count >= 2 {
-            return "Two recent protocol sessions were reported as manageable."
+            return "Your recent sessions have felt steady and manageable."
         }
         if profile.recall.value == .weak {
-            return "Recall remains a supported weak area."
+            return "Recall remains a supported focus area."
         }
         if !(profile.distractors.value ?? []).isEmpty {
             return "Known distractors still inform the setup."
         }
-        return "The curriculum is holding the load until more comparable evidence exists."
+        return "We're keeping the duration steady while your baseline settles."
     }
 
     private static func topDistractor(_ distractors: [String], profile: AttentionProfile) -> String? {
@@ -1044,7 +1490,12 @@ enum PrescriptionEngine {
 // MARK: - Profile Updater (session → profile)
 
 enum ProfileUpdater {
-    static func apply(session: SessionRecord, sessionCount: Int, to profile: inout AttentionProfile) {
+    static func apply(
+        session: SessionRecord,
+        sessionCount: Int,
+        allSessions: [SessionRecord] = [],
+        to profile: inout AttentionProfile
+    ) {
         let src: EvidenceSource = sessionCount >= 2 ? .repeated : .session
 
         // Switch counts are useful evidence even when a session ended early.
@@ -1117,6 +1568,15 @@ enum ProfileUpdater {
                 profile.focusWindowMinutes = session.actualMinutes
             }
         }
+
+        // Personal rules & observations update
+        var currentRules = profile.personalRules
+        PersonalRuleEngine.evaluate(
+            session: session,
+            rules: &currentRules,
+            profile: &profile,
+            allSessions: allSessions.isEmpty ? [session] : allSessions
+        )
     }
 
     private static func merge(_ a: StabilityLevel, with b: StabilityLevel) -> StabilityLevel {

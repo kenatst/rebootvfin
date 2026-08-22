@@ -4,6 +4,7 @@ struct ProgramTab: View {
     @ObservedObject var product: ProductStore
 
     private var phase: ProgramPhase { product.currentProgramPhase }
+    private var isComplete: Bool { product.programStatus == .completed }
 
     var body: some View {
         GeometryReader { geo in
@@ -13,31 +14,38 @@ struct ProgramTab: View {
                     VStack(alignment: .leading, spacing: 0) {
                         MetaLabel(text: "Program", color: AppColors.coral)
                         EditorialHeadline(
-                            text: product.programStatus == .completed
+                            text: isComplete
                                 ? "90 days complete."
                                 : "90 days, built around you."
                         )
                         .padding(.top, 14)
 
                         phaseHero
-                            .padding(.top, 26)
+                            .padding(.top, 24)
 
-                        MetaLabel(text: "Current focus")
-                            .padding(.top, 34)
-                        currentFocus
-                            .padding(.top, 12)
+                        if !isComplete {
+                            MetaLabel(text: "Current phase focus")
+                                .padding(.top, 32)
+                            currentFocus
+                                .padding(.top, 12)
+                        } else {
+                            MetaLabel(text: "What you built")
+                                .padding(.top, 32)
+                            completedSynthesisCard
+                                .padding(.top, 12)
+                        }
 
                         MetaLabel(text: "Your path")
-                            .padding(.top, 38)
+                            .padding(.top, 36)
                         phasePath
                             .padding(.top, 18)
 
-                        MetaLabel(text: "Recent learning")
+                        MetaLabel(text: isComplete ? "Strongest patterns" : "Recent learning")
                             .padding(.top, 36)
                         recentLearning
                             .padding(.top, 12)
 
-                        MetaLabel(text: product.programStatus == .completed ? "Coming next" : "Next checkpoint")
+                        MetaLabel(text: isComplete ? "Preserved foundations" : "Next checkpoint")
                             .padding(.top, 34)
                         nextCheckpoint
                             .padding(.top, 12)
@@ -51,7 +59,7 @@ struct ProgramTab: View {
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, max(20, geo.safeAreaInsets.top))
-                    .padding(.bottom, 160)
+                    .padding(.bottom, 180)
                 }
             }
             .ignoresSafeArea()
@@ -59,60 +67,111 @@ struct ProgramTab: View {
     }
 
     private var phaseHero: some View {
-        LiquidCard(radius: 30, padding: 22) {
+        LiquidCard(radius: 28, padding: 22) {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .center, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
                         MetaLabel(
-                            text: product.isCalibrating
-                                ? "Calibrating"
-                                : "Phase \(phase.number)",
+                            text: isComplete
+                                ? "Completed"
+                                : (product.isCalibrating ? "Calibrating" : "Phase \(phase.number)"),
                             color: AppColors.coral
                         )
-                        Text(phase.title, style: .reportTitle)
+                        Text(isComplete ? "Full Protocol Complete" : phase.title, style: .reportTitle)
                             .foregroundStyle(AppColors.ink)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 8)
-                    ProgressRing(progress: product.programProgress, size: 62, lineWidth: 5)
+                    ProgressRing(progress: product.programProgress, size: 56, lineWidth: 5)
                         .accessibilityLabel("\(product.completedProtocolDays) of 90 program days completed")
                 }
 
                 Text(String(format: "DAY %03d / 090", product.day))
                     .type(.calendarMeta)
                     .foregroundStyle(AppColors.ink)
-                    .padding(.top, 20)
+                    .padding(.top, 18)
 
                 Text(
-                    product.programStatus == .completed
-                        ? "The program is complete. Train remains available whenever a specific skill needs practice."
+                    isComplete
+                        ? "The 90-day adaptive protocol is complete. Your Attention Map and Personal Rules are fully formed and preserved."
                         : phase.description,
                     style: .heroReason
                 )
                 .foregroundStyle(AppColors.inkSoft)
                 .padding(.top, 8)
 
-                Text("\(product.completedProtocolDays) protocol days completed")
-                    .type(.footnote)
-                    .foregroundStyle(AppColors.inkFaint)
-                    .padding(.top, 14)
+                HStack {
+                    Text("\(product.completedProtocolDays) protocol days completed")
+                        .type(.footnote)
+                        .foregroundStyle(AppColors.inkFaint)
+                    Spacer()
+                    if isComplete {
+                        GlassPill(text: "100% Complete", tint: AppColors.coral)
+                    }
+                }
+                .padding(.top, 14)
             }
         }
     }
 
     private var currentFocus: some View {
-        PaperCard(radius: 26, padding: 20) {
-            VStack(alignment: .leading, spacing: 14) {
+        PaperCard(radius: 24, padding: 18) {
+            VStack(alignment: .leading, spacing: 12) {
                 ForEach(Array(phase.priorities.prefix(3)), id: \.self) { priority in
                     HStack(spacing: 12) {
                         Image(systemName: symbol(for: priority))
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(AppColors.coral)
                             .frame(width: 22)
                         Text(priority.title, style: .heroGoal)
                             .foregroundStyle(AppColors.ink)
                     }
                 }
+            }
+        }
+    }
+
+    private var completedSynthesisCard: some View {
+        PaperCard(radius: 24, padding: 18) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(AppColors.coral)
+                    Text("Synthesized Architecture", style: .heroGoal)
+                        .foregroundStyle(AppColors.ink)
+                }
+                Text("90 protocol days across all 6 phases have established your personalized rules, measured focus windows, and verified digital friction.", style: .heroReason)
+                    .foregroundStyle(AppColors.inkSoft)
+
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(product.personalRules.count)")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(AppColors.coral)
+                        Text("Personal Rules")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(AppColors.inkFaint)
+                    }
+                    Spacer()
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(product.sessions.count)")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(AppColors.ink)
+                        Text("Total Sessions")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(AppColors.inkFaint)
+                    }
+                    Spacer()
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("6 / 6")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(AppColors.ink)
+                        Text("Phases Completed")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(AppColors.inkFaint)
+                    }
+                }
+                .padding(.top, 8)
             }
         }
     }
@@ -190,10 +249,10 @@ struct ProgramTab: View {
     private var nextCheckpoint: some View {
         LiquidCard(radius: 24, padding: 18) {
             VStack(alignment: .leading, spacing: 7) {
-                if product.programStatus == .completed {
-                    Text("Your Attention Operating Manual", style: .heroGoal)
+                if isComplete {
+                    Text("Attention Operating Manual", style: .heroGoal)
                         .foregroundStyle(AppColors.ink)
-                    Text("Coming next. The history and self-reports needed for it are preserved.", style: .heroReason)
+                    Text("All 90 protocol sessions, weekly reviews, and discovered rules are archived. Free training remains open.", style: .heroReason)
                         .foregroundStyle(AppColors.inkSoft)
                 } else if let remaining = product.sessionsUntilNextCheckpoint,
                           let checkpoint = product.nextCheckpointDay {
@@ -249,7 +308,7 @@ struct ProgramTab: View {
     }
 
     private func visualState(for item: ProgramPhase) -> PhaseVisualState {
-        if product.programStatus == .completed || item.number < phase.number { return .completed }
+        if isComplete || item.number < phase.number { return .completed }
         if item.id == phase.id { return .current }
         return .upcoming
     }

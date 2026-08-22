@@ -37,10 +37,13 @@ final class ProductStore: ObservableObject {
     @Published private(set) var environmentPreparation: EnvironmentPreparation?
     @Published var tab: ProductTab = .today
     @Published var phase: ProductPhase = .today
+    @Published private(set) var personalRules: [PersonalRule] = []
+    @Published private(set) var observations: [EvidenceObservation] = []
 
     var onObservationSaved: ((EnvironmentObservation) -> Void)?
 
-    private static let storageKey = "reboot.product.v4"
+    private static let storageKey = "reboot.product.v5"
+    private static let v4StorageKey = "reboot.product.v4"
     private static let v3StorageKey = "reboot.product.v3"
     private static let v2StorageKey = "reboot.product.v2"
     private static let v1StorageKey = "reboot.product.v1"
@@ -108,11 +111,14 @@ final class ProductStore: ObservableObject {
             sessions = stored.sessions
             programState = stored.programState
             environmentPreparation = stored.preparation
+            personalRules = profile.personalRules
+            observations = profile.observations
             if let active = stored.activeSession {
                 phase = .recovery(active)
             }
             if loaded.migrated {
                 persist()
+                defaults.removeObject(forKey: Self.v4StorageKey)
                 defaults.removeObject(forKey: Self.v3StorageKey)
                 defaults.removeObject(forKey: Self.v2StorageKey)
                 defaults.removeObject(forKey: Self.v1StorageKey)
@@ -122,6 +128,8 @@ final class ProductStore: ObservableObject {
             sessions = []
             programState = .fresh
             environmentPreparation = nil
+            personalRules = []
+            observations = []
             persist()
         }
 
@@ -134,7 +142,7 @@ final class ProductStore: ObservableObject {
         }
 #if DEBUG
         if let tabName = ProcessInfo.processInfo.arguments.valueAfter("-qaTab"),
-           let qaTab = ProductTab(rawValue: tabName) {
+           let qaTab = ProductTab.allCases.first(where: { $0.rawValue.caseInsensitiveCompare(tabName) == .orderedSame }) {
             tab = qaTab
         }
         if let modeName = ProcessInfo.processInfo.arguments.valueAfter("-qaMode"),
@@ -150,7 +158,11 @@ final class ProductStore: ObservableObject {
     // MARK: - QA seeding
 
     func apply(_ seed: QASeed) {
-        if let profile = seed.profile { self.profile = profile }
+        if let profile = seed.profile {
+            self.profile = profile
+            self.personalRules = profile.personalRules
+            self.observations = profile.observations
+        }
         if let sessions = seed.sessions { self.sessions = sessions }
         if let programState = seed.programState {
             self.programState = programState
@@ -169,6 +181,7 @@ final class ProductStore: ObservableObject {
         if case .today = phase {
             routePendingProgramFlow()
         }
+        persist()
     }
 
     private static func loadQASeed() -> QASeed? {
@@ -177,6 +190,50 @@ final class ProductStore: ObservableObject {
             return nil
         }
         return try? JSONDecoder().decode(QASeed.self, from: data)
+    }
+
+    // MARK: - Personal Rules actions
+
+    func keepPersonalRule(id: UUID) {
+        PersonalRuleEngine.keep(id: id, in: &personalRules)
+        profile.personalRules = personalRules
+        persist()
+    }
+
+    func testPersonalRule(id: UUID) {
+        PersonalRuleEngine.test(id: id, in: &personalRules)
+        profile.personalRules = personalRules
+        persist()
+    }
+
+    func retirePersonalRule(id: UUID) {
+        PersonalRuleEngine.retire(id: id, in: &personalRules)
+        profile.personalRules = personalRules
+        persist()
+    }
+
+    func rejectPersonalRule(id: UUID) {
+        PersonalRuleEngine.reject(id: id, in: &personalRules)
+        profile.personalRules = personalRules
+        persist()
+    }
+
+    func addCustomPersonalRule(
+        title: String,
+        detail: String,
+        category: RuleCategory,
+        contexts: [RuleContext]
+    ) {
+        PersonalRuleEngine.addCustom(
+            title: title,
+            detail: detail,
+            category: category,
+            contexts: contexts,
+            day: day,
+            into: &personalRules
+        )
+        profile.personalRules = personalRules
+        persist()
     }
 
     // MARK: - Canonical session requests
@@ -270,6 +327,7 @@ final class ProductStore: ObservableObject {
         var record = SessionRecord(
             origin: request.origin,
             requestID: request.id,
+            prescriptionID: request.prescriptionID,
             day: request.programDay ?? day,
             date: Date(),
             mode: request.mode,
@@ -277,7 +335,10 @@ final class ProductStore: ObservableObject {
             actualMinutes: 0,
             completed: false,
             environmentActionDone: capturedPreparation?.actionWasDone,
+            environmentVerification: capturedArm != nil ? .systemConfirmed : (capturedPreparation?.actionWasDone == true ? .userReported : nil),
             evidence: evidence,
+            appliedRuleIDs: request.appliedRuleIDs,
+            environmentPreparation: capturedPreparation,
             programPhase: request.programPhase,
             curriculumIntent: request.curriculumIntent,
             adaptationReason: request.adaptationReason
@@ -448,7 +509,10 @@ final class ProductStore: ObservableObject {
             onObservationSaved?(observation)
         }
         let comparableCount = sessions.filter { $0.mode == record.mode }.count
-        ProfileUpdater.apply(session: record, sessionCount: comparableCount, to: &profile)
+        ProfileUpdater.apply(session: record, sessionCount: comparableCount, allSessions: sessions, to: &profile)
+
+        personalRules = profile.personalRules
+        observations = profile.observations
 
         environmentPreparation = nil
         tab = record.origin == .freeTraining ? .train : .today
@@ -574,6 +638,8 @@ final class ProductStore: ObservableObject {
         sessions = []
         programState = .fresh
         environmentPreparation = nil
+        personalRules = []
+        observations = []
         tab = .today
         phase = .today
         persist(activeSession: nil)
@@ -596,6 +662,8 @@ final class ProductStore: ObservableObject {
             "day": day,
             "programState": (try? JSONEncoder().encode(programState)) ?? Data(),
             "preparation": (try? JSONEncoder().encode(environmentPreparation)) ?? Data(),
+            "personalRules": (try? JSONEncoder().encode(personalRules)) ?? Data(),
+            "observations": (try? JSONEncoder().encode(observations)) ?? Data(),
             "activeSession": (try? JSONEncoder().encode(active)) ?? Data(),
         ]
         defaults.set(payload, forKey: Self.storageKey)
@@ -611,30 +679,73 @@ final class ProductStore: ObservableObject {
 
     private static func load(defaults: UserDefaults) -> (state: StoredState?, migrated: Bool) {
         if defaults.object(forKey: storageKey) != nil {
-            return (decodeV4(defaults: defaults), false)
+            return (decodeV5(defaults: defaults), false)
         }
-        if let state = decodeLegacy(from: v3StorageKey, defaults: defaults, includesV3Fields: true) {
-            return (state, true)
+        if defaults.object(forKey: v4StorageKey) != nil {
+            return (decodeV4(from: v4StorageKey, defaults: defaults), true)
         }
-        if let state = decodeLegacy(from: v2StorageKey, defaults: defaults, includesV3Fields: false) {
-            return (state, true)
+        if defaults.object(forKey: v3StorageKey) != nil {
+            return (decodeLegacy(from: v3StorageKey, defaults: defaults, includesV3Fields: true), true)
         }
-        if let state = decodeLegacy(from: v1StorageKey, defaults: defaults, includesV3Fields: false) {
-            return (state, true)
+        if defaults.object(forKey: v2StorageKey) != nil {
+            return (decodeLegacy(from: v2StorageKey, defaults: defaults, includesV3Fields: false), true)
+        }
+        if defaults.object(forKey: v1StorageKey) != nil {
+            return (decodeLegacy(from: v1StorageKey, defaults: defaults, includesV3Fields: false), true)
         }
         return (nil, false)
     }
 
-    private static func decodeV4(defaults: UserDefaults) -> StoredState? {
-        guard let raw = defaults.dictionary(forKey: storageKey),
-              let profileData = raw["profile"] as? Data,
-              let sessionsData = raw["sessions"] as? Data,
-              let programData = raw["programState"] as? Data,
-              let profile = try? JSONDecoder().decode(AttentionProfile.self, from: profileData),
-              let sessions = try? JSONDecoder().decode([SessionRecord].self, from: sessionsData),
-              let programState = try? JSONDecoder().decode(ProgramState.self, from: programData) else {
-            return nil
+    private static func decodeV5(defaults: UserDefaults) -> StoredState? {
+        guard let raw = defaults.dictionary(forKey: storageKey) else {
+            return (AttentionProfile(), [], .fresh, nil, nil)
         }
+        let profileData = raw["profile"] as? Data
+        let sessionsData = raw["sessions"] as? Data
+        let programData = raw["programState"] as? Data
+
+        var profile = profileData.flatMap { try? JSONDecoder().decode(AttentionProfile.self, from: $0) }
+            ?? AttentionProfile()
+        let sessions = sessionsData.flatMap { try? JSONDecoder().decode([SessionRecord].self, from: $0) }
+            ?? []
+        let programState = programData.flatMap { try? JSONDecoder().decode(ProgramState.self, from: $0) }
+            ?? .migrated(day: (raw["day"] as? Int) ?? 1, sessions: sessions)
+
+        if let rulesData = raw["personalRules"] as? Data,
+           let rules = try? JSONDecoder().decode([PersonalRule].self, from: rulesData),
+           profile.personalRules.isEmpty {
+            profile.personalRules = rules
+        }
+
+        if let obsData = raw["observations"] as? Data,
+           let obs = try? JSONDecoder().decode([EvidenceObservation].self, from: obsData),
+           profile.observations.isEmpty {
+            profile.observations = obs
+        }
+
+        let preparation = (raw["preparation"] as? Data).flatMap {
+            try? JSONDecoder().decode(EnvironmentPreparation?.self, from: $0)
+        } ?? nil
+        let active = (raw["activeSession"] as? Data).flatMap {
+            try? JSONDecoder().decode(SessionRecord?.self, from: $0)
+        } ?? nil
+        return (profile, sessions, programState, preparation, active)
+    }
+
+    private static func decodeV4(from key: String, defaults: UserDefaults) -> StoredState? {
+        guard let raw = defaults.dictionary(forKey: key) else {
+            return (AttentionProfile(), [], .fresh, nil, nil)
+        }
+        let profileData = raw["profile"] as? Data
+        let sessionsData = raw["sessions"] as? Data
+        let programData = raw["programState"] as? Data
+
+        let profile = profileData.flatMap { try? JSONDecoder().decode(AttentionProfile.self, from: $0) }
+            ?? AttentionProfile()
+        let sessions = sessionsData.flatMap { try? JSONDecoder().decode([SessionRecord].self, from: $0) }
+            ?? []
+        let programState = programData.flatMap { try? JSONDecoder().decode(ProgramState.self, from: $0) }
+            ?? .migrated(day: (raw["day"] as? Int) ?? 1, sessions: sessions)
         let preparation = (raw["preparation"] as? Data).flatMap {
             try? JSONDecoder().decode(EnvironmentPreparation?.self, from: $0)
         } ?? nil

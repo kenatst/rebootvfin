@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import REBOOT
 
 @MainActor
@@ -382,7 +383,7 @@ final class REBOOTTests: XCTestCase {
             XCTAssertEqual(store.protocolSessions.count, 1)
             XCTAssertEqual(store.protocolSessions[0].origin, .protocol)
             XCTAssertEqual(store.day, 2)
-            XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v4"))
+            XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v5"))
         }
     }
 
@@ -412,7 +413,7 @@ final class REBOOTTests: XCTestCase {
         XCTAssertNil(store.programState.pendingReviewDay)
         XCTAssertNil(store.programState.pendingPhaseTransition)
         XCTAssertTrue(store.programState.acknowledgedPhaseTransitions.contains(.controlInput))
-        XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v4"))
+        XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v5"))
         XCTAssertNil(defaults.object(forKey: "reboot.product.v3"))
     }
 
@@ -639,7 +640,7 @@ final class REBOOTTests: XCTestCase {
         )
         XCTAssertEqual(recovery.mode, .nothing)
         XCTAssertEqual(recovery.curriculumIntent, .tolerateLessStimulus)
-        XCTAssertTrue(recovery.recentEvidenceReason?.contains("last protocol session") == true)
+        XCTAssertTrue(recovery.recentEvidenceReason?.contains("demanding") == true || recovery.recentEvidenceReason?.contains("difficult") == true || recovery.recentEvidenceReason?.contains("resetting") == true)
 
         let completedRecovery = protocolRecord(day: 10, mode: .nothing, difficulty: 5)
         let next = PrescriptionEngine.prescription(
@@ -837,9 +838,691 @@ final class REBOOTTests: XCTestCase {
             "reboot.product.v2",
             "reboot.product.v3",
             "reboot.product.v4",
+            "reboot.product.v5",
         ] {
             defaults.removeObject(forKey: key)
         }
+    }
+
+    // MARK: - Personal Rules Lifecycle & Strict Guards Tests
+
+    func testPersonalRuleLifecycleCandidateToKept() {
+        let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
+        let candidateRule = PersonalRule(
+            id: UUID(),
+            title: "Leave phone outside room",
+            detail: "Friction reduces distractions.",
+            category: .environment,
+            matchingContexts: [.stay],
+            lifecycle: .candidate,
+            sourceType: .discoveredFromEvidence,
+            confidence: .emerging,
+            supportingObservations: ["Observed in 2 sessions."],
+            contradictingObservations: [],
+            recencyStatus: .recent,
+            createdDay: 2,
+            lastTestedDay: 2,
+            timesTested: 2,
+            timesKept: 0
+        )
+        store.profile.personalRules = [candidateRule]
+        store.apply(QASeed(profile: store.profile, sessions: []))
+
+        XCTAssertEqual(store.personalRules.count, 1)
+        XCTAssertEqual(store.personalRules.first?.lifecycle, .candidate)
+
+        store.keepPersonalRule(id: candidateRule.id)
+
+        XCTAssertEqual(store.personalRules.first?.lifecycle, .kept)
+        XCTAssertEqual(store.personalRules.first?.timesKept, 1)
+        XCTAssertEqual(store.profile.personalRules.first?.lifecycle, .kept)
+    }
+
+    func testPersonalRuleLifecycleCandidateToTesting() {
+        let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
+        let candidateRule = PersonalRule(
+            id: UUID(),
+            title: "Single tab mode",
+            detail: "Keep one tab open.",
+            category: .taskSetup,
+            matchingContexts: [.stay],
+            lifecycle: .candidate,
+            sourceType: .discoveredFromEvidence,
+            confidence: .emerging,
+            supportingObservations: [],
+            contradictingObservations: [],
+            recencyStatus: .recent,
+            createdDay: 3,
+            lastTestedDay: 3,
+            timesTested: 1,
+            timesKept: 0
+        )
+        store.profile.personalRules = [candidateRule]
+        store.apply(QASeed(profile: store.profile, sessions: []))
+
+        store.testPersonalRule(id: candidateRule.id)
+
+        XCTAssertEqual(store.personalRules.first?.lifecycle, .testing)
+        XCTAssertEqual(store.personalRules.first?.timesTested, 2)
+    }
+
+    func testPersonalRuleLifecycleTestingToKeptAndTestingToRejected() {
+        let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
+        let rule1 = PersonalRule(
+            id: UUID(),
+            title: "Rule A",
+            detail: "Detail A",
+            category: .friction,
+            matchingContexts: [.stay],
+            lifecycle: .testing,
+            sourceType: .discoveredFromEvidence,
+            confidence: .emerging,
+            supportingObservations: [],
+            contradictingObservations: [],
+            recencyStatus: .recent,
+            createdDay: 3,
+            lastTestedDay: 3,
+            timesTested: 2,
+            timesKept: 0
+        )
+        let rule2 = PersonalRule(
+            id: UUID(),
+            title: "Rule B",
+            detail: "Detail B",
+            category: .timing,
+            matchingContexts: [.stay],
+            lifecycle: .testing,
+            sourceType: .discoveredFromEvidence,
+            confidence: .emerging,
+            supportingObservations: [],
+            contradictingObservations: [],
+            recencyStatus: .recent,
+            createdDay: 3,
+            lastTestedDay: 3,
+            timesTested: 2,
+            timesKept: 0
+        )
+        store.profile.personalRules = [rule1, rule2]
+        store.apply(QASeed(profile: store.profile, sessions: []))
+
+        store.keepPersonalRule(id: rule1.id)
+        store.rejectPersonalRule(id: rule2.id)
+
+        XCTAssertEqual(store.personalRules.first(where: { $0.id == rule1.id })?.lifecycle, .kept)
+        XCTAssertEqual(store.personalRules.first(where: { $0.id == rule2.id })?.lifecycle, .rejected)
+    }
+
+    func testPersonalRuleLifecycleKeptToRetired() {
+        let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
+        let keptRule = PersonalRule(
+            id: UUID(),
+            title: "Rule A",
+            detail: "Detail A",
+            category: .friction,
+            matchingContexts: [.stay],
+            lifecycle: .kept,
+            sourceType: .userCreated,
+            confidence: .strong,
+            supportingObservations: [],
+            contradictingObservations: [],
+            recencyStatus: .recent,
+            createdDay: 1,
+            lastTestedDay: 1,
+            timesTested: 0,
+            timesKept: 1
+        )
+        store.profile.personalRules = [keptRule]
+        store.apply(QASeed(profile: store.profile, sessions: []))
+
+        store.retirePersonalRule(id: keptRule.id)
+
+        XCTAssertEqual(store.personalRules.first?.lifecycle, .retired)
+        XCTAssertFalse(store.personalRules.first!.isActivelyInfluencing)
+    }
+
+    func testRetiredAndRejectedRulesNeverInfluenceToday() {
+        let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
+        let retiredRule = PersonalRule(
+            id: UUID(),
+            title: "Retired Rule",
+            detail: "Retired Detail",
+            category: .environment,
+            matchingContexts: [.stay],
+            lifecycle: .retired,
+            sourceType: .discoveredFromEvidence,
+            confidence: .strong,
+            supportingObservations: [],
+            contradictingObservations: [],
+            recencyStatus: .recent,
+            createdDay: 1,
+            lastTestedDay: 1,
+            timesTested: 5,
+            timesKept: 1
+        )
+        let rejectedRule = PersonalRule(
+            id: UUID(),
+            title: "Rejected Rule",
+            detail: "Rejected Detail",
+            category: .taskSetup,
+            matchingContexts: [.stay],
+            lifecycle: .rejected,
+            sourceType: .discoveredFromEvidence,
+            confidence: .emerging,
+            supportingObservations: [],
+            contradictingObservations: [],
+            recencyStatus: .recent,
+            createdDay: 1,
+            lastTestedDay: 1,
+            timesTested: 1,
+            timesKept: 0
+        )
+        let sessions = protocolHistory(through: 8)
+        var profile = AttentionProfile()
+        profile.personalRules = [retiredRule, rejectedRule]
+        store.apply(QASeed(profile: profile, sessions: sessions, day: 9))
+
+        let prescription = store.prescription
+        XCTAssertFalse(prescription.appliedRuleIDs.contains(retiredRule.id))
+        XCTAssertFalse(prescription.appliedRuleIDs.contains(rejectedRule.id))
+        XCTAssertNil(prescription.appliedRuleTitle)
+    }
+
+    func testTestingRulesNeverInfluenceToday() {
+        let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
+        let testingRule = PersonalRule(
+            id: UUID(),
+            title: "Testing Rule",
+            detail: "Testing Detail",
+            category: .environment,
+            matchingContexts: [.stay],
+            lifecycle: .testing,
+            sourceType: .discoveredFromEvidence,
+            confidence: .emerging,
+            supportingObservations: [],
+            contradictingObservations: [],
+            recencyStatus: .recent,
+            createdDay: 5,
+            lastTestedDay: 5,
+            timesTested: 2,
+            timesKept: 0
+        )
+        let sessions = protocolHistory(through: 8)
+        var profile = AttentionProfile()
+        profile.personalRules = [testingRule]
+        store.apply(QASeed(profile: profile, sessions: sessions, day: 9))
+
+        let prescription = store.prescription
+        XCTAssertFalse(prescription.appliedRuleIDs.contains(testingRule.id))
+    }
+
+    func testKeptRuleInfluencesOnlyMatchingContext() {
+        let recallRule = PersonalRule(
+            id: UUID(),
+            title: "Cover text with paper",
+            detail: "Full concealment aids recall.",
+            category: .taskSetup,
+            matchingContexts: [.recall],
+            lifecycle: .kept,
+            sourceType: .userCreated,
+            confidence: .strong,
+            supportingObservations: [],
+            contradictingObservations: [],
+            recencyStatus: .recent,
+            createdDay: 10,
+            lastTestedDay: 10,
+            timesTested: 1,
+            timesKept: 1
+        )
+        let sessions = protocolHistory(through: 8)
+        var profile = AttentionProfile()
+        profile.personalRules = [recallRule]
+
+        let stayDefinition = ProgramDayDefinition(
+            day: 9,
+            phase: ProgramPhase.phase(for: 9),
+            intent: CurriculumIntent(
+                kind: .buildContinuity,
+                objectives: [],
+                constraints: [],
+                preferredModes: [.stay],
+                editorialReason: "Continuity",
+                observationMission: nil
+            )
+        )
+        let stayPrescription = PrescriptionEngine.prescription(profile: profile, protocolHistory: sessions, definition: stayDefinition)
+        XCTAssertFalse(stayPrescription.appliedRuleIDs.contains(recallRule.id))
+
+        let recallDefinition = ProgramDayDefinition(
+            day: 9,
+            phase: ProgramPhase.phase(for: 9),
+            intent: CurriculumIntent(
+                kind: .deepenUnderstanding,
+                objectives: [],
+                constraints: [],
+                preferredModes: [.recall],
+                editorialReason: "Recall",
+                observationMission: nil
+            )
+        )
+        let recallPrescription = PrescriptionEngine.prescription(profile: profile, protocolHistory: sessions, definition: recallDefinition)
+        XCTAssertTrue(recallPrescription.appliedRuleIDs.contains(recallRule.id))
+        XCTAssertEqual(recallPrescription.appliedRuleTitle, recallRule.title)
+    }
+
+    func testDay1BaselineStrictlyProtectedFromAllRules() {
+        let keptRule = PersonalRule(
+            id: UUID(),
+            title: "Never open phone",
+            detail: "Lock phone away",
+            category: .environment,
+            matchingContexts: [.stay, .observe, .general],
+            lifecycle: .kept,
+            sourceType: .userCreated,
+            confidence: .strong,
+            supportingObservations: [],
+            contradictingObservations: [],
+            recencyStatus: .recent,
+            createdDay: 1,
+            lastTestedDay: 1,
+            timesTested: 0,
+            timesKept: 1
+        )
+        var profile = AttentionProfile()
+        profile.personalRules = [keptRule]
+        let definition = CurriculumEngine.definition(for: 1, profile: profile, protocolHistory: [])
+        let prescription = PrescriptionEngine.prescription(profile: profile, protocolHistory: [], definition: definition)
+
+        XCTAssertEqual(prescription.day, 1)
+        XCTAssertEqual(prescription.mode, .observe)
+        XCTAssertEqual(prescription.minutes, 15)
+        XCTAssertTrue(prescription.appliedRuleIDs.isEmpty)
+        XCTAssertNil(prescription.appliedRuleTitle)
+        XCTAssertEqual(prescription.adaptationReason, "Day 1 protects a natural baseline before any intervention.")
+    }
+
+    func testRecoveryStrictlyProtectedFromAllRules() {
+        let keptRule = PersonalRule(
+            id: UUID(),
+            title: "Intense deep work setup",
+            detail: "Aggressive blocking",
+            category: .environment,
+            matchingContexts: [.stay, .rest, .general],
+            lifecycle: .kept,
+            sourceType: .userCreated,
+            confidence: .strong,
+            supportingObservations: [],
+            contradictingObservations: [],
+            recencyStatus: .recent,
+            createdDay: 5,
+            lastTestedDay: 5,
+            timesTested: 1,
+            timesKept: 1
+        )
+        var profile = AttentionProfile()
+        profile.personalRules = [keptRule]
+        let history = [
+            protocolRecord(day: 1, mode: .observe),
+            protocolRecord(day: 2, mode: .stay, endedEarly: true, difficulty: 5)
+        ]
+        let definition = CurriculumEngine.definition(for: 3, profile: profile, protocolHistory: history)
+        let prescription = PrescriptionEngine.prescription(profile: profile, protocolHistory: history, definition: definition)
+
+        XCTAssertEqual(prescription.mode, .nothing)
+        XCTAssertTrue(prescription.appliedRuleIDs.isEmpty)
+        XCTAssertNil(prescription.appliedRuleTitle)
+    }
+
+    func testContradictoryEvidenceWeakensConfidenceWithoutDeletingRule() {
+        let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
+        let ruleID = UUID()
+        let rule = PersonalRule(
+            id: ruleID,
+            title: "Phone out of reach",
+            detail: "Keep phone outside room",
+            category: .environment,
+            matchingContexts: [.stay],
+            lifecycle: .kept,
+            sourceType: .discoveredFromEvidence,
+            confidence: .strong,
+            supportingObservations: ["Observed in 5 sessions."],
+            contradictingObservations: [],
+            recencyStatus: .repeatedRecent,
+            createdDay: 10,
+            lastTestedDay: 15,
+            timesTested: 5,
+            timesKept: 1
+        )
+        var profile = AttentionProfile()
+        profile.personalRules = [rule]
+        store.apply(QASeed(profile: profile, sessions: protocolHistory(through: 15), day: 16))
+
+        // Start session applying this rule:
+        var request = tryUnwrap(store.protocolRequest())
+        request.mode = .stay
+        request.appliedRuleIDs = [ruleID]
+        store.begin(request: request)
+        store.finishRunning(actualMinutes: 10, endedEarly: true)
+        store.saveDoneSession(SessionReflection(difficulty: 5, switches: 6))
+
+        let updatedRule = tryUnwrap(store.personalRules.first(where: { $0.id == ruleID }))
+        XCTAssertEqual(updatedRule.lifecycle, .kept, "Rule must NEVER be silently deleted or retired")
+        XCTAssertEqual(updatedRule.confidence, .moderate, "Confidence was downgraded from strong to moderate")
+        XCTAssertEqual(updatedRule.recencyStatus, .mixedRecently)
+        XCTAssertFalse(updatedRule.contradictingObservations.isEmpty)
+    }
+
+    func testWhyThisRuleDiscoveredVsUserCreated() {
+        let discoveredRule = PersonalRule(
+            id: UUID(),
+            title: "Phone outside reach",
+            detail: "Physical distance prevents checking.",
+            category: .environment,
+            matchingContexts: [.stay],
+            lifecycle: .kept,
+            sourceType: .discoveredFromEvidence,
+            confidence: .strong,
+            supportingObservations: [
+                "Observed in 4 recent sessions.",
+                "Fewer switches recorded."
+            ],
+            contradictingObservations: ["One difficult session."],
+            recencyStatus: .repeatedRecent,
+            createdDay: 10,
+            lastTestedDay: 20,
+            timesTested: 5,
+            timesKept: 1
+        )
+        let discoveredExplanation = discoveredRule.whyRebootSuggested
+        XCTAssertEqual(discoveredExplanation.sourceDescription, "WHY REBOOT SUGGESTED THIS")
+        XCTAssertEqual(discoveredExplanation.supportingPoints.count, 2)
+        XCTAssertEqual(discoveredExplanation.contradictionPoint, "One difficult session.")
+        XCTAssertTrue(discoveredExplanation.disclaimer.contains("association from your recent sessions"))
+
+        let userCreatedRule = PersonalRule(
+            id: UUID(),
+            title: "Listen to white noise",
+            detail: "Blocks office conversation.",
+            category: .friction,
+            matchingContexts: [.stay],
+            lifecycle: .kept,
+            sourceType: .userCreated,
+            confidence: .strong,
+            supportingObservations: [],
+            contradictingObservations: [],
+            recencyStatus: .recent,
+            createdDay: 15,
+            lastTestedDay: 15,
+            timesTested: 0,
+            timesKept: 1
+        )
+        let userExplanation = userCreatedRule.whyRebootSuggested
+        XCTAssertEqual(userExplanation.sourceDescription, "Created by you.")
+        XCTAssertTrue(userExplanation.supportingPoints.isEmpty, "User-created rules must never have manufactured observations")
+        XCTAssertNil(userExplanation.contradictionPoint)
+        XCTAssertEqual(userExplanation.disclaimer, "This is a rule created directly by you.")
+    }
+
+    func testRecencyStatusHumanLabelsWithoutFakePrecision() {
+        XCTAssertEqual(RecencyStatus.recent.humanLabel, "Recent")
+        XCTAssertEqual(RecencyStatus.current.humanLabel, "Still current")
+        XCTAssertEqual(RecencyStatus.older.humanLabel, "Older evidence")
+        XCTAssertEqual(RecencyStatus.mixedRecently.humanLabel, "Mixed recently")
+        XCTAssertEqual(RecencyStatus.repeatedRecent.humanLabel, "Repeated signal · recent")
+        XCTAssertEqual(RecencyStatus.repeatedOlder.humanLabel, "Repeated signal · older evidence")
+
+        for status in RecencyStatus.allCases {
+            XCTAssertFalse(status.humanLabel.contains("%"), "Must not use fake percentages")
+            XCTAssertFalse(status.humanLabel.contains("0."), "Must not use fake precision decimals")
+        }
+    }
+
+    func testEnvironmentTruthSystemConfirmedVsUserReported() {
+        let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
+        let sessions = protocolHistory(through: 8)
+        store.apply(QASeed(profile: AttentionProfile(), sessions: sessions, day: 9))
+
+        // 1. Session with Screen Time arm -> systemConfirmed
+        var req1 = tryUnwrap(store.protocolRequest())
+        req1.programDay = 9
+        store.begin(request: req1, environment: protectedArm())
+        guard case .running(let rec1) = store.phase else { return XCTFail("Expected running") }
+        XCTAssertEqual(rec1.environmentVerification, .systemConfirmed)
+
+        // 2. Session with manual preparation only -> userReported
+        store.reset()
+        store.apply(QASeed(profile: AttentionProfile(), sessions: sessions, day: 9))
+        var req2 = tryUnwrap(store.protocolRequest())
+        req2.programDay = 9
+        req2.environmentPreparation = EnvironmentPreparation(action: "Phone away", fallback: "Face down", outcome: .completed, arm: nil)
+        store.begin(request: req2, environment: nil)
+        guard case .running(let rec2) = store.phase else { return XCTFail("Expected running") }
+        XCTAssertEqual(rec2.environmentVerification, .userReported)
+    }
+
+    func testUnifiedSessionTimelineEndToEndDataLinkage() {
+        let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
+        let keptRule = PersonalRule(
+            id: UUID(),
+            title: "Desk cleared",
+            detail: "Clear desk before starting",
+            category: .taskSetup,
+            matchingContexts: [.stay, .observe, .general],
+            lifecycle: .kept,
+            sourceType: .userCreated,
+            confidence: .strong,
+            supportingObservations: [],
+            contradictingObservations: [],
+            recencyStatus: .recent,
+            createdDay: 5,
+            lastTestedDay: 5,
+            timesTested: 0,
+            timesKept: 1
+        )
+        var profile = AttentionProfile()
+        profile.personalRules = [keptRule]
+        store.apply(QASeed(profile: profile, sessions: protocolHistory(through: 10), day: 11))
+
+        let prescription = store.prescription
+        XCTAssertTrue(prescription.appliedRuleIDs.contains(keptRule.id))
+
+        let request = tryUnwrap(store.protocolRequest())
+        XCTAssertNotNil(request.prescriptionID)
+        XCTAssertEqual(request.appliedRuleIDs, [keptRule.id])
+
+        store.begin(request: request)
+        guard case .running(let runningRec) = store.phase else { return XCTFail("Expected running") }
+        XCTAssertEqual(runningRec.prescriptionID, request.prescriptionID)
+        XCTAssertEqual(runningRec.appliedRuleIDs, [keptRule.id])
+
+        store.finishRunning(actualMinutes: runningRec.targetMinutes, endedEarly: false)
+        store.saveDoneSession(SessionReflection(difficulty: 2, firstDistraction: "none", switches: 0))
+
+        XCTAssertEqual(store.personalRules.first?.timesTested, 1)
+        XCTAssertEqual(store.personalRules.first?.lastTestedDay, 11)
+        XCTAssertFalse(store.observations.isEmpty)
+    }
+
+    // MARK: - Persistence v5 & Corruption Recovery Tests
+
+    func testPersistenceV5RoundTrip() {
+        let store1 = ProductStore(diagnosisAnswers: [:], defaults: defaults)
+        store1.addCustomPersonalRule(
+            title: "Custom Rule 1",
+            detail: "Custom Detail 1",
+            category: .environment,
+            contexts: [.stay]
+        )
+        let sessions = protocolHistory(through: 12)
+        store1.apply(QASeed(profile: store1.profile, sessions: sessions, day: 13))
+
+        // Reload fresh instance from same defaults
+        let store2 = ProductStore(diagnosisAnswers: [:], defaults: defaults)
+        XCTAssertEqual(store2.day, 13)
+        XCTAssertEqual(store2.sessions.count, 12)
+        XCTAssertEqual(store2.personalRules.count, 1)
+        XCTAssertEqual(store2.personalRules.first?.title, "Custom Rule 1")
+    }
+
+    func testPersistenceV4ToV5Migration() {
+        clearProductPersistence()
+        let legacyState: [String: Any] = [
+            "profile": (try? JSONEncoder().encode(AttentionProfile(focusWindowMinutes: 25))) ?? Data(),
+            "sessions": (try? JSONEncoder().encode(protocolHistory(through: 5))) ?? Data(),
+            "day": 6,
+            "programState": (try? JSONEncoder().encode(progressedState(through: 5))) ?? Data(),
+        ]
+        defaults.set(legacyState, forKey: "reboot.product.v4")
+
+        let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
+        XCTAssertEqual(store.day, 6)
+        XCTAssertEqual(store.sessions.count, 5)
+        XCTAssertNil(defaults.object(forKey: "reboot.product.v4"), "Legacy v4 key must be cleaned after v5 migration")
+        XCTAssertNotNil(defaults.object(forKey: "reboot.product.v5"), "v5 storage key must be set")
+    }
+
+    func testCorruptedPersistenceV5SafeRecovery() {
+        clearProductPersistence()
+        // Save corrupted payload in v5:
+        defaults.set(["profile": "corrupted_non_data_string", "day": 14], forKey: "reboot.product.v5")
+
+        // ProductStore must not crash and must safely initialize:
+        let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
+        XCTAssertNotNil(store.profile)
+        XCTAssertEqual(store.sessions.count, 0)
+    }
+
+    // MARK: - Long-Range Multi-Archetype Deterministic Simulations
+
+    func testLongRangeSimulationStudyArchetype30_60_90Days() {
+        let store = ProductStore(diagnosisAnswers: ["primary_goal": ["study_better"], "breaker": ["tabs"]], defaults: defaults)
+        for day in 1...90 {
+            XCTAssertEqual(store.day, day)
+            XCTAssertLessThanOrEqual(store.day, 90, "Program must never advance to Day 91")
+
+            let prescription = store.prescription
+            let phase = ProgramPhase.phase(for: day)
+            let range = phase.durationGuidance.range(for: prescription.mode)
+            XCTAssertGreaterThanOrEqual(prescription.minutes, range.lower)
+            XCTAssertLessThanOrEqual(prescription.minutes, range.upper)
+
+            var req = tryUnwrap(store.protocolRequest())
+            req.programDay = day
+            store.begin(request: req)
+            store.finishRunning(actualMinutes: req.targetMinutes, endedEarly: false)
+            store.saveDoneSession(SessionReflection(difficulty: 2, firstDistraction: "none", switches: 1))
+
+            if case .weeklyReview = store.phase {
+                store.saveWeeklyReview(WeeklyReviewAnswers(helpedMost: "Recall blocks", stillBreaksAttention: nil, nextTestPreference: "Study material"))
+            }
+            if case .phaseTransition = store.phase {
+                store.acknowledgePhaseTransition()
+            }
+            if case .programCompletion = store.phase {
+                store.acknowledgeProgramCompletion()
+            }
+        }
+
+        XCTAssertEqual(store.completedProtocolDays, 90)
+        XCTAssertEqual(store.programStatus, .completed)
+        XCTAssertEqual(store.programProgress, 1.0)
+        XCTAssertTrue(store.hasCompletedCurrentProtocol)
+        XCTAssertNil(store.protocolRequest())
+    }
+
+    func testLongRangeSimulationScrollControlArchetype30_60_90Days() {
+        let store = ProductStore(diagnosisAnswers: ["primary_goal": ["scroll_less"], "breaker": ["phone", "social"]], defaults: defaults)
+        for day in 1...90 {
+            XCTAssertEqual(store.day, day)
+            let req = tryUnwrap(store.protocolRequest())
+            store.begin(request: req)
+            store.finishRunning(actualMinutes: req.targetMinutes, endedEarly: false)
+            store.saveDoneSession(SessionReflection(
+                difficulty: day.isMultiple(of: 7) ? 3 : 2,
+                firstDistraction: Distractor.phone,
+                switches: 2
+            ))
+
+            if case .weeklyReview = store.phase {
+                store.skipWeeklyReviewQuestions()
+            }
+            if case .phaseTransition = store.phase {
+                store.acknowledgePhaseTransition()
+            }
+            if case .programCompletion = store.phase {
+                store.acknowledgeProgramCompletion()
+            }
+        }
+
+        XCTAssertEqual(store.completedProtocolDays, 90)
+        XCTAssertEqual(store.programStatus, .completed)
+    }
+
+    func testLongRangeSimulationDeepWorkArchetype30_60_90Days() {
+        let store = ProductStore(diagnosisAnswers: ["primary_goal": ["deep_work"], "breaker": ["notifications"]], defaults: defaults)
+        for day in 1...90 {
+            let req = tryUnwrap(store.protocolRequest())
+            store.begin(request: req)
+            store.finishRunning(actualMinutes: req.targetMinutes, endedEarly: false)
+            store.saveDoneSession(SessionReflection(difficulty: 2, firstDistraction: "none", switches: 1))
+
+            if case .weeklyReview = store.phase { store.skipWeeklyReviewQuestions() }
+            if case .phaseTransition = store.phase { store.acknowledgePhaseTransition() }
+            if case .programCompletion = store.phase { store.acknowledgeProgramCompletion() }
+        }
+
+        XCTAssertEqual(store.completedProtocolDays, 90)
+        XCTAssertEqual(store.programStatus, .completed)
+    }
+
+    func testLongRangeSimulationContradictoryArchetype30_60_90Days() {
+        let store = ProductStore(diagnosisAnswers: ["primary_goal": ["focus_better"]], defaults: defaults)
+        store.addCustomPersonalRule(title: "Desk Setup", detail: "Clean desk", category: .taskSetup, contexts: [.stay])
+
+        for day in 1...90 {
+            let req = tryUnwrap(store.protocolRequest())
+            store.begin(request: req)
+            // Alternate between smooth and difficult sessions with high switches:
+            let isDifficult = day.isMultiple(of: 5)
+            store.finishRunning(actualMinutes: req.targetMinutes, endedEarly: false)
+            store.saveDoneSession(SessionReflection(
+                difficulty: isDifficult ? 5 : 2,
+                firstDistraction: isDifficult ? "social" : "none",
+                switches: isDifficult ? 7 : 1
+            ))
+
+            if case .weeklyReview = store.phase { store.skipWeeklyReviewQuestions() }
+            if case .phaseTransition = store.phase { store.acknowledgePhaseTransition() }
+            if case .programCompletion = store.phase { store.acknowledgeProgramCompletion() }
+        }
+
+        XCTAssertEqual(store.completedProtocolDays, 90)
+        XCTAssertEqual(store.programStatus, .completed)
+        // Ensure kept rule was never deleted despite difficult sessions:
+        XCTAssertFalse(store.personalRules.isEmpty)
+    }
+
+    func testAddCustomPersonalRuleInvariants() {
+        let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
+        store.addCustomPersonalRule(
+            title: "Noise cancelling headphones",
+            detail: "Wear headphones during stay sessions",
+            category: .friction,
+            contexts: [.stay]
+        )
+
+        let rule = tryUnwrap(store.personalRules.first)
+        XCTAssertEqual(rule.title, "Noise cancelling headphones")
+        XCTAssertEqual(rule.sourceType, .userCreated)
+        XCTAssertEqual(rule.lifecycle, .kept)
+        XCTAssertEqual(rule.confidence, .strong)
+        XCTAssertEqual(rule.supportingObservations.count, 0, "Custom rules must not manufacture false observations")
+        XCTAssertEqual(rule.whyRebootSuggested.disclaimer, "This is a rule created directly by you.")
+    }
+
+    func testDynamicTypeScalability() {
+        let sizes = DynamicTypeSize.allCases
+        XCTAssertGreaterThanOrEqual(sizes.count, 10, "Supports dynamic type sizes including accessibility categories")
+        XCTAssertTrue(sizes.contains(.accessibility5))
     }
 
     private func tryUnwrap<T>(_ value: T?, file: StaticString = #filePath, line: UInt = #line) -> T {

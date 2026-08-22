@@ -71,7 +71,9 @@ final class AppState: ObservableObject {
 
     private static func load() -> (phase: Phase, screen: Int, step: Int, answers: Answers) {
 #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-qaToday") {
+        if ProcessInfo.processInfo.arguments.contains("-qaToday")
+            || ProcessInfo.processInfo.arguments.contains("-qaSeed")
+            || ProcessInfo.processInfo.arguments.contains("-qaTab") {
             return (.today, 0, 0, [:])
         }
 #endif
