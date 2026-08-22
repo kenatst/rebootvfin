@@ -1,0 +1,135 @@
+{
+  "identifier" : "E2B7A890",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21456789",
+      "localizations" : [
+        {
+          "description" : "Full access to REBOOT 90-day attention system",
+          "displayName" : "REBOOT Membership",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "REBOOT Membership",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "14.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "6447890123",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Monthly access to the complete 90-day protocol and daily guidance.",
+              "displayName" : "Monthly Membership",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "reboot.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "REBOOT Monthly",
+          "subscriptionGroupID" : "21456789",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "79.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6447890124",
+          "introductoryOffer" : {
+            "internalID" : "7891234567",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1W"
+          },
+          "localizations" : [
+            {
+              "description" : "Annual access with 7-day free trial. Complete attention system and operating manual.",
+              "displayName" : "Annual Membership",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "reboot.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "REBOOT Annual",
+          "subscriptionGroupID" : "21456789",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

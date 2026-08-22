@@ -3,7 +3,10 @@ import SwiftUI
 /// Root of the product world. Today and Train both enter the same session lifecycle.
 struct ProductRootView: View {
     @ObservedObject var product: ProductStore
+    var state: AppState? = nil
     @ObservedObject var environmentStore: EnvironmentStore
+    var subscriptionStore: SubscriptionStore? = nil
+    var notificationService: NotificationService? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -95,13 +98,23 @@ struct ProductRootView: View {
         ZStack(alignment: .bottom) {
             switch product.tab {
             case .today:
-                TodayView(product: product, environmentStore: environmentStore)
+                TodayView(
+                    product: product,
+                    environmentStore: environmentStore,
+                    subscriptionStore: subscriptionStore
+                )
             case .train:
                 TrainTab(product: product)
             case .program:
                 ProgramTab(product: product)
             case .profile:
-                ProfileTab(product: product)
+                ProfileTab(
+                    product: product,
+                    state: state,
+                    environmentStore: environmentStore,
+                    subscriptionStore: subscriptionStore,
+                    notificationService: notificationService
+                )
             }
             FloatingGlassTabBar(selection: $product.tab)
         }

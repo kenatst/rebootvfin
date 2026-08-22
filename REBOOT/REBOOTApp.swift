@@ -5,6 +5,9 @@ struct REBOOTApp: App {
     @StateObject private var state = AppState()
     @StateObject private var product: ProductStore
     @StateObject private var environmentStore = EnvironmentStore()
+    @StateObject private var subscriptionStore = SubscriptionStore()
+    @StateObject private var notificationService = NotificationService()
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let state = AppState()
@@ -13,6 +16,11 @@ struct REBOOTApp: App {
         _product = StateObject(wrappedValue: product)
         let environmentStore = EnvironmentStore()
         _environmentStore = StateObject(wrappedValue: environmentStore)
+        let subscriptionStore = SubscriptionStore()
+        _subscriptionStore = StateObject(wrappedValue: subscriptionStore)
+        let notificationService = NotificationService()
+        _notificationService = StateObject(wrappedValue: notificationService)
+
         product.onObservationSaved = { [weak environmentStore] observation in
             Task { @MainActor in
                 environmentStore?.appendObservation(observation)
@@ -22,9 +30,24 @@ struct REBOOTApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(state: state, product: product, environmentStore: environmentStore)
-                .preferredColorScheme(.light)
-                .tint(AppColors.ink)
+            ContentView(
+                state: state,
+                product: product,
+                environmentStore: environmentStore,
+                subscriptionStore: subscriptionStore,
+                notificationService: notificationService
+            )
+            .preferredColorScheme(.light)
+            .tint(AppColors.ink)
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active {
+                    environmentStore.refreshCapability()
+                    Task {
+                        await subscriptionStore.updateSubscriptionStatus()
+                        await notificationService.refreshAuthorizationStatus()
+                    }
+                }
+            }
         }
     }
 }

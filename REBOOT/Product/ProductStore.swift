@@ -2147,6 +2147,16 @@ final class ProductStore: ObservableObject {
         labState = .empty
         fuelState = .empty
         flowState = .empty
+        guidanceDecisions = []
+        ownModeState = OwnModeState()
+        tab = .today
+        phase = .today
+        persist(activeSession: nil)
+    }
+
+    func restartProgram() {
+        programState = .fresh
+        environmentPreparation = nil
         tab = .today
         phase = .today
         persist(activeSession: nil)

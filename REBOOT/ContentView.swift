@@ -1,36 +1,54 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject var state: AppState
+    @ObservedObject var state: AppState
     @ObservedObject var product: ProductStore
     @ObservedObject var environmentStore: EnvironmentStore
+    @ObservedObject var subscriptionStore: SubscriptionStore
+    @ObservedObject var notificationService: NotificationService
     @State private var showDebug = false
 
     var body: some View {
         ZStack {
             switch state.phase {
             case .cinematic:
-                CinematicOnboardingView(state: state) { showDebug = true }
-                    .transition(.opacity)
+                CinematicOnboardingView(state: state) {
+                    #if DEBUG
+                    showDebug = true
+                    #endif
+                }
+                .transition(.opacity)
             case .dissolve:
                 DissolveView { state.patch(phase: .diagnosis) }
                     .transition(.opacity)
             case .diagnosis:
-                DiagnosisFlowView(state: state) { showDebug = true }
-                    .transition(.opacity)
+                DiagnosisFlowView(state: state) {
+                    #if DEBUG
+                    showDebug = true
+                    #endif
+                }
+                .transition(.opacity)
             case .report:
                 StartingPointView(state: state)
                     .transition(.opacity)
             case .today:
-                ProductRootView(product: product, environmentStore: environmentStore)
-                    .transition(.opacity)
+                ProductRootView(
+                    product: product,
+                    state: state,
+                    environmentStore: environmentStore,
+                    subscriptionStore: subscriptionStore,
+                    notificationService: notificationService
+                )
+                .transition(.opacity)
             }
         }
         .animation(.easeInOut(duration: 0.35), value: state.phase)
         .background(StatusBarStyleBridge(light: state.phase == .cinematic || state.phase == .dissolve))
+        #if DEBUG
         .sheet(isPresented: $showDebug) {
             DebugNavView(state: state, product: product)
         }
+        #endif
     }
 }
 

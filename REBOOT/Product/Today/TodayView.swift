@@ -4,11 +4,13 @@ import SwiftUI
 struct TodayView: View {
     @ObservedObject var product: ProductStore
     @ObservedObject var environmentStore: EnvironmentStore
+    var subscriptionStore: SubscriptionStore? = nil
     @State private var showWhy = false
     @State private var showReset = false
     @State private var showConnect = false
     @State private var showActivityPicker = false
     @State private var showManual = false
+    @State private var showPaywall = false
 
     private var guidance: DailyGuidance { product.dailyGuidance }
     private var isCompleted: Bool { product.programStatus == .completed }
@@ -72,6 +74,18 @@ struct TodayView: View {
         }
         .sheet(isPresented: $showManual) {
             AttentionOperatingManualView(manual: product.operatingManual)
+        }
+        .sheet(isPresented: $showPaywall) {
+            if let subscriptionStore {
+                PaywallView(subscriptionStore: subscriptionStore)
+            } else {
+                PaywallView(subscriptionStore: SubscriptionStore())
+            }
+        }
+        .onAppear {
+            if ProcessInfo.processInfo.arguments.contains("-qaPaywall") {
+                showPaywall = true
+            }
         }
     }
 
@@ -227,6 +241,11 @@ struct TodayView: View {
     }
 
     private func startPrimaryAction() {
+        if !SubscriptionGating.isProgramDayAccessible(day: product.day, status: subscriptionStore?.status ?? .free) {
+            showPaywall = true
+            return
+        }
+
         if guidance.primaryAction.kind == .projectFlowBlock, let flow = guidance.flowOpportunity {
             _ = product.beginFlowSetup(projectID: flow.projectID, origin: .protocol)
         } else {

@@ -240,11 +240,17 @@ private struct ModeIntroductionSheet: View {
 /// Real profile data only — unknowns stay unknown, every fact keeps its source.
 struct ProfileTab: View {
     @ObservedObject var product: ProductStore
+    var state: AppState? = nil
+    var environmentStore: EnvironmentStore? = nil
+    var subscriptionStore: SubscriptionStore? = nil
+    var notificationService: NotificationService? = nil
+
     @State private var selectedRule: PersonalRule?
     @State private var showAddRule = false
     @State private var selectedLabExperiment: PersonalExperiment?
     @State private var showEnvironmentLab = false
     @State private var showOperatingManual = false
+    @State private var showSettings = false
 
     private var profile: AttentionProfile { product.profile }
     private var isSparse: Bool { product.sessions.count < 3 }
@@ -255,7 +261,21 @@ struct ProfileTab: View {
                 AmbientBackground()
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
-                        MetaLabel(text: "Attention Profile", color: AppColors.coral)
+                        HStack {
+                            MetaLabel(text: "Attention Profile", color: AppColors.coral)
+                            Spacer()
+                            Button {
+                                showSettings = true
+                            } label: {
+                                Image(systemName: "gearshape")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(AppColors.ink)
+                                    .frame(width: 38, height: 38)
+                                    .background(AppColors.paperRaised)
+                                    .clipShape(Circle())
+                                    .appShadow(.soft)
+                            }
+                        }
                         EditorialHeadline(text: "Your Attention Architecture")
                             .padding(.top, 14)
                         Text(
@@ -342,10 +362,22 @@ struct ProfileTab: View {
         .sheet(isPresented: $showOperatingManual) {
             AttentionOperatingManualView(manual: product.operatingManual)
         }
+        .sheet(isPresented: $showSettings) {
+            SettingsView(
+                product: product,
+                state: state ?? AppState(),
+                environmentStore: environmentStore ?? EnvironmentStore(),
+                subscriptionStore: subscriptionStore ?? SubscriptionStore(),
+                notificationService: notificationService ?? NotificationService()
+            )
+        }
         .onAppear {
             if ProcessInfo.processInfo.arguments.valueAfter("-qaSeed") == "rulesWhyThisRule",
                selectedRule == nil {
                 selectedRule = product.personalRules.first
+            }
+            if ProcessInfo.processInfo.arguments.contains("-qaSettings") {
+                showSettings = true
             }
         }
     }

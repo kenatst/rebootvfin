@@ -95,6 +95,18 @@
 		9D0000000000000000000087 /* AttentionOperatingManualEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D0000000000000000000088 /* AttentionOperatingManualEngine.swift */; };
 		9D0000000000000000000089 /* AttentionOperatingManualView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D0000000000000000000090 /* AttentionOperatingManualView.swift */; };
 		9D0000000000000000000091 /* DailyGuidanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D0000000000000000000092 /* DailyGuidanceTests.swift */; };
+		8A0000000000000000000002 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000000000000000000001 /* AppConfig.swift */; };
+		8A0000000000000000000004 /* SubscriptionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000000000000000000003 /* SubscriptionModels.swift */; };
+		8A0000000000000000000006 /* SubscriptionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000000000000000000005 /* SubscriptionStore.swift */; };
+		8A0000000000000000000008 /* SubscriptionGating.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000000000000000000007 /* SubscriptionGating.swift */; };
+		8A0000000000000000000010 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000000000000000000009 /* PaywallView.swift */; };
+		8A0000000000000000000012 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000000000000000000011 /* NotificationService.swift */; };
+		8A0000000000000000000014 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000000000000000000013 /* SettingsView.swift */; };
+		8A0000000000000000000016 /* DataPrivacyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000000000000000000015 /* DataPrivacyView.swift */; };
+		8A0000000000000000000018 /* LegalViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000000000000000000017 /* LegalViews.swift */; };
+		8A0000000000000000000020 /* PermissionSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000000000000000000019 /* PermissionSheets.swift */; };
+		8A0000000000000000000022 /* ShippingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000000000000000000021 /* ShippingTests.swift */; };
+		8A0000000000000000000024 /* REBOOT.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 8A0000000000000000000023 /* REBOOT.storekit */; };
 	/* End PBXBuildFile section */
 
 	/* Begin PBXContainerItemProxy section */
@@ -237,6 +249,18 @@
 		9D0000000000000000000088 /* AttentionOperatingManualEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionOperatingManualEngine.swift; sourceTree = "<group>"; };
 		9D0000000000000000000090 /* AttentionOperatingManualView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionOperatingManualView.swift; sourceTree = "<group>"; };
 		9D0000000000000000000092 /* DailyGuidanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyGuidanceTests.swift; sourceTree = "<group>"; };
+		8A0000000000000000000001 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		8A0000000000000000000003 /* SubscriptionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionModels.swift; sourceTree = "<group>"; };
+		8A0000000000000000000005 /* SubscriptionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionStore.swift; sourceTree = "<group>"; };
+		8A0000000000000000000007 /* SubscriptionGating.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionGating.swift; sourceTree = "<group>"; };
+		8A0000000000000000000009 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		8A0000000000000000000011 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		8A0000000000000000000013 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		8A0000000000000000000015 /* DataPrivacyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataPrivacyView.swift; sourceTree = "<group>"; };
+		8A0000000000000000000017 /* LegalViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalViews.swift; sourceTree = "<group>"; };
+		8A0000000000000000000019 /* PermissionSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionSheets.swift; sourceTree = "<group>"; };
+		8A0000000000000000000021 /* ShippingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShippingTests.swift; sourceTree = "<group>"; };
+		8A0000000000000000000023 /* REBOOT.storekit */ = {isa = PBXFileReference; lastKnownFileType = file; path = REBOOT.storekit; sourceTree = "<group>"; };
 	/* End PBXFileReference section */
 
 	/* Begin PBXGroup section */
@@ -510,9 +534,59 @@
 			children = (
 				68A1CCD6497BC89D8B350489,
 				EDF7D1DE90CD6FE79FD08A65,
+				8A0000000000000000000023 /* REBOOT.storekit */,
 			);
 			name = Resources;
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		8A0000000000000000000051 /* Subscription */ = {
+			isa = PBXGroup;
+			children = (
+				8A0000000000000000000003 /* SubscriptionModels.swift */,
+				8A0000000000000000000005 /* SubscriptionStore.swift */,
+				8A0000000000000000000007 /* SubscriptionGating.swift */,
+				8A0000000000000000000009 /* PaywallView.swift */,
+			);
+			path = Subscription;
+			sourceTree = "<group>";
+		};
+		8A0000000000000000000052 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				8A0000000000000000000013 /* SettingsView.swift */,
+				8A0000000000000000000015 /* DataPrivacyView.swift */,
+				8A0000000000000000000017 /* LegalViews.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		8A0000000000000000000053 /* Notifications */ = {
+			isa = PBXGroup;
+			children = (
+				8A0000000000000000000011 /* NotificationService.swift */,
+			);
+			path = Notifications;
+			sourceTree = "<group>";
+		};
+		8A0000000000000000000054 /* Permissions */ = {
+			isa = PBXGroup;
+			children = (
+				8A0000000000000000000019 /* PermissionSheets.swift */,
+			);
+			path = Permissions;
+			sourceTree = "<group>";
+		};
+		8A0000000000000000000050 /* Shipping */ = {
+			isa = PBXGroup;
+			children = (
+				8A0000000000000000000001 /* AppConfig.swift */,
+				8A0000000000000000000051 /* Subscription */,
+				8A0000000000000000000052 /* Settings */,
+				8A0000000000000000000053 /* Notifications */,
+				8A0000000000000000000054 /* Permissions */,
+			);
+			path = Shipping;
 			sourceTree = "<group>";
 		};
 		1B64AD7E8A8DAAB00C6B661B /* REBOOT */ = {
@@ -525,6 +599,7 @@
 				82CF3496F1A9FE790BD48616,
 				533023D77B9A9AA522398231,
 				196EF52925D46297EF0DD9C9,
+				8A0000000000000000000050 /* Shipping */,
 				A5A8C9C844432C945943D37F,
 				4223D12B15314A7FA9A742CF,
 				7FCE23048C8BCF847BCE6964,
@@ -564,6 +639,7 @@
 				9F0000000000000000000008 /* FlowTests.swift */,
 				9E0000000000000000000022 /* DigitalEnvironmentTests.swift */,
 				9D0000000000000000000092 /* DailyGuidanceTests.swift */,
+				8A0000000000000000000021 /* ShippingTests.swift */,
 			);
 			path = REBOOTTests;
 			sourceTree = "<group>";
@@ -604,6 +680,7 @@
 				E0055988518D652442F18AF7 /* PlusJakartaSans-Medium.ttf in Resources */,
 				5448876C1C142BE6D500B049 /* PlusJakartaSans-Regular.ttf in Resources */,
 				1CD1304E9E163A87F3E367FA /* PlusJakartaSans-SemiBold.ttf in Resources */,
+				8A0000000000000000000024 /* REBOOT.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -676,6 +753,16 @@
 				9D0000000000000000000085 /* AttentionOperatingManualModels.swift in Sources */,
 				9D0000000000000000000087 /* AttentionOperatingManualEngine.swift in Sources */,
 				9D0000000000000000000089 /* AttentionOperatingManualView.swift in Sources */,
+				8A0000000000000000000002 /* AppConfig.swift in Sources */,
+				8A0000000000000000000004 /* SubscriptionModels.swift in Sources */,
+				8A0000000000000000000006 /* SubscriptionStore.swift in Sources */,
+				8A0000000000000000000008 /* SubscriptionGating.swift in Sources */,
+				8A0000000000000000000010 /* PaywallView.swift in Sources */,
+				8A0000000000000000000012 /* NotificationService.swift in Sources */,
+				8A0000000000000000000014 /* SettingsView.swift in Sources */,
+				8A0000000000000000000016 /* DataPrivacyView.swift in Sources */,
+				8A0000000000000000000018 /* LegalViews.swift in Sources */,
+				8A0000000000000000000020 /* PermissionSheets.swift in Sources */,
 				91EF2CCF54D98AC6AFA0ACA0 /* ProductStore.swift in Sources */,
 				214B397E915C917076B0DEA2 /* QASeed.swift in Sources */,
 				DA352BF5FA05264D878B63BD /* FloatingGlassTabBar.swift in Sources */,
@@ -729,6 +816,7 @@
 				9F0000000000000000000007 /* FlowTests.swift in Sources */,
 				9E0000000000000000000021 /* DigitalEnvironmentTests.swift in Sources */,
 				9D0000000000000000000091 /* DailyGuidanceTests.swift in Sources */,
+				8A0000000000000000000022 /* ShippingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
