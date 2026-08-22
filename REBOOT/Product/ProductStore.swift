@@ -2,6 +2,7 @@ import Foundation
 
 enum ProductPhase: Equatable {
     case today
+    case lab
     case preparing(TrainingSessionRequest)
     case running(SessionRecord)
     case recovery(SessionRecord)
@@ -39,10 +40,12 @@ final class ProductStore: ObservableObject {
     @Published var phase: ProductPhase = .today
     @Published private(set) var personalRules: [PersonalRule] = []
     @Published private(set) var observations: [EvidenceObservation] = []
+    @Published private(set) var labState: PersonalLabState = .empty
 
     var onObservationSaved: ((EnvironmentObservation) -> Void)?
 
-    private static let storageKey = "reboot.product.v5"
+    private static let storageKey = "reboot.product.v6"
+    private static let v5StorageKey = "reboot.product.v5"
     private static let v4StorageKey = "reboot.product.v4"
     private static let v3StorageKey = "reboot.product.v3"
     private static let v2StorageKey = "reboot.product.v2"
@@ -52,6 +55,7 @@ final class ProductStore: ObservableObject {
     var allSessions: [SessionRecord] { sessions }
     var protocolSessions: [SessionRecord] { sessions.filter { $0.origin == .protocol } }
     var freeTrainingSessions: [SessionRecord] { sessions.filter { $0.origin == .freeTraining } }
+    var experimentSessions: [SessionRecord] { sessions.filter { $0.origin == .experiment } }
     var completedProtocolSessions: [SessionRecord] { protocolSessions.filter(\.completed) }
     var completedProtocolDays: Int {
         min(90, Set(completedProtocolSessions.map(\.day).filter { (1...90).contains($0) }).count)
@@ -87,6 +91,10 @@ final class ProductStore: ObservableObject {
 
     var isCalibrating: Bool { completedProtocolDays < 3 }
 
+    var activeExperiment: PersonalExperiment? { labState.activeExperiment }
+    var pausedExperiment: PersonalExperiment? { labState.pausedExperiment }
+    var pastExperiments: [PersonalExperiment] { labState.completedExperiments }
+
     var hasCompletedCurrentProtocol: Bool {
         programStatus == .completed || protocolSessions.contains { $0.day == day && $0.completed }
     }
@@ -113,11 +121,13 @@ final class ProductStore: ObservableObject {
             environmentPreparation = stored.preparation
             personalRules = profile.personalRules
             observations = profile.observations
+            labState = stored.labState
             if let active = stored.activeSession {
                 phase = .recovery(active)
             }
             if loaded.migrated {
                 persist()
+                defaults.removeObject(forKey: Self.v5StorageKey)
                 defaults.removeObject(forKey: Self.v4StorageKey)
                 defaults.removeObject(forKey: Self.v3StorageKey)
                 defaults.removeObject(forKey: Self.v2StorageKey)
@@ -130,6 +140,7 @@ final class ProductStore: ObservableObject {
             environmentPreparation = nil
             personalRules = []
             observations = []
+            labState = .empty
             persist()
         }
 
@@ -149,6 +160,9 @@ final class ProductStore: ObservableObject {
            let qaMode = TrainingMode(rawValue: modeName) {
             prepareFreeTraining(qaMode)
         }
+        if ProcessInfo.processInfo.arguments.contains("-qaLabPrepare") {
+            prepareStandaloneLabSession()
+        }
 #endif
         if case .today = phase {
             routePendingProgramFlow()
@@ -164,6 +178,7 @@ final class ProductStore: ObservableObject {
             self.observations = profile.observations
         }
         if let sessions = seed.sessions { self.sessions = sessions }
+        if let labState = seed.labState { self.labState = labState }
         if let programState = seed.programState {
             self.programState = programState
         } else if let day = seed.day {
@@ -174,6 +189,8 @@ final class ProductStore: ObservableObject {
             if let record = seed.record { phase = .running(record) }
         case "done":
             if let record = seed.record { phase = .done(record) }
+        case "lab":
+            phase = .lab
         default:
             phase = .today
         }
@@ -236,6 +253,214 @@ final class ProductStore: ObservableObject {
         persist()
     }
 
+    // MARK: - Personal Lab
+
+    func openPersonalLab() {
+        phase = .lab
+    }
+
+    func closePersonalLab() {
+        tab = .profile
+        phase = .today
+    }
+
+    func experiment(id: UUID) -> PersonalExperiment? {
+        labState.experiments.first { $0.id == id }
+    }
+
+    func labSuggestions(screenTimeAvailable: Bool) -> [ExperimentSuggestion] {
+        PersonalLabEngine.suggestions(
+            profile: profile,
+            sessions: sessions,
+            rules: personalRules,
+            state: labState,
+            screenTimeAvailable: screenTimeAvailable
+        )
+    }
+
+    func ruleConflicts(
+        template: ExperimentTemplate,
+        linkedRuleID: UUID? = nil
+    ) -> [PersonalRule] {
+        let origin: ExperimentOrigin = linkedRuleID == nil ? .builtIn : .personalRuleRetest
+        let draft = PersonalLabEngine.makeExperiment(
+            template: template,
+            origin: origin,
+            linkedRuleID: linkedRuleID
+        )
+        let ids = Set(PersonalLabEngine.conflictingRuleIDs(for: draft, rules: personalRules))
+        return personalRules.filter { ids.contains($0.id) }
+    }
+
+    @discardableResult
+    func startExperiment(
+        template: ExperimentTemplate,
+        linkedRuleID: UUID? = nil,
+        allowingRuleExceptions: Bool = false
+    ) -> ExperimentStartOutcome {
+        let origin: ExperimentOrigin
+        if linkedRuleID != nil {
+            origin = .personalRuleRetest
+        } else if labSuggestions(screenTimeAvailable: true).contains(where: { $0.template.id == template.id }) {
+            origin = .evidenceSuggestion
+        } else {
+            origin = .builtIn
+        }
+        let experiment = PersonalLabEngine.makeExperiment(
+            template: template,
+            origin: origin,
+            linkedRuleID: linkedRuleID
+        )
+        let outcome = PersonalLabEngine.start(
+            experiment,
+            in: &labState,
+            rules: personalRules,
+            allowingRuleExceptions: allowingRuleExceptions
+        )
+        if case .started = outcome { persist() }
+        return outcome
+    }
+
+    @discardableResult
+    func startCustomExperiment(
+        question: String,
+        normal: String,
+        test: String,
+        mode: TrainingMode,
+        primaryOutcome: ExperimentOutcomeMetric
+    ) -> ExperimentStartOutcome {
+        let trimmedQuestion = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNormal = normal.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedTest = test.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuestion.isEmpty, !trimmedNormal.isEmpty, !trimmedTest.isEmpty else {
+            return .unavailable
+        }
+        let experiment = PersonalLabEngine.makeCustomExperiment(
+            question: trimmedQuestion,
+            normal: trimmedNormal,
+            test: trimmedTest,
+            mode: mode,
+            primaryOutcome: primaryOutcome
+        )
+        let outcome = PersonalLabEngine.start(
+            experiment,
+            in: &labState,
+            rules: personalRules
+        )
+        if case .started = outcome { persist() }
+        return outcome
+    }
+
+    func pauseExperiment(id: UUID) {
+        PersonalLabEngine.pause(id: id, in: &labState)
+        persist()
+    }
+
+    @discardableResult
+    func resumeExperiment(id: UUID) -> Bool {
+        let resumed = PersonalLabEngine.resume(id: id, in: &labState)
+        if resumed { persist() }
+        return resumed
+    }
+
+    func abandonExperiment(id: UUID) {
+        PersonalLabEngine.abandon(id: id, in: &labState)
+        persist()
+    }
+
+    @discardableResult
+    func finalizeExperiment(id: UUID, allowEarly: Bool = true) -> ExperimentResult? {
+        let result = PersonalLabEngine.finalize(id: id, in: &labState, allowEarly: allowEarly)
+        if result != nil { persist() }
+        return result
+    }
+
+    @discardableResult
+    func repeatExperiment(
+        id: UUID,
+        allowingRuleExceptions: Bool = false
+    ) -> ExperimentStartOutcome {
+        if let activeExperiment { return .activeExperimentExists(activeExperiment.id) }
+        guard let previous = experiment(id: id) else { return .unavailable }
+        var repeated = previous
+        repeated.id = UUID()
+        repeated.version += 1
+        repeated.status = .draft
+        repeated.observations = []
+        repeated.pairs = []
+        repeated.result = nil
+        repeated.approvedRuleExceptionIDs = []
+        repeated.createdAt = Date()
+        repeated.updatedAt = Date()
+        repeated.completedAt = nil
+        repeated.normalArm.id = UUID()
+        repeated.testArm.id = UUID()
+        let outcome = PersonalLabEngine.start(
+            repeated,
+            in: &labState,
+            rules: personalRules,
+            allowingRuleExceptions: allowingRuleExceptions
+        )
+        if case .started = outcome { persist() }
+        return outcome
+    }
+
+    @discardableResult
+    func keepExperimentResultAsRule(experimentID: UUID) -> PersonalRule? {
+        guard let experimentIndex = labState.experiments.firstIndex(where: { $0.id == experimentID }),
+              labState.experiments[experimentIndex].result?.state == .keep,
+              let result = labState.experiments[experimentIndex].result else { return nil }
+
+        if let existing = personalRules.first(where: { $0.experimentID == experimentID }) {
+            return existing
+        }
+
+        if let linkedID = labState.experiments[experimentIndex].linkedPersonalRuleID,
+           let ruleIndex = personalRules.firstIndex(where: { $0.id == linkedID }) {
+            PersonalRuleEngine.keep(id: linkedID, in: &personalRules)
+            personalRules[ruleIndex].experimentID = experimentID
+            personalRules[ruleIndex].supportingEvidenceIDs = result.sourceEvidenceIDs
+            personalRules[ruleIndex].supportingObservations.append(result.summary)
+            profile.personalRules = personalRules
+            labState.experiments[experimentIndex].result?.personalRuleID = linkedID
+            persist()
+            return personalRules[ruleIndex]
+        }
+
+        guard let draft = labState.experiments[experimentIndex].ruleDraft else { return nil }
+        let newRule = PersonalRule(
+            title: draft.title,
+            detail: draft.detail,
+            category: draft.category,
+            matchingContexts: draft.contexts,
+            lifecycle: .kept,
+            sourceType: .experiment,
+            confidence: .moderate,
+            supportingObservations: [result.summary],
+            contradictingObservations: [],
+            recencyStatus: .repeatedRecent,
+            createdDay: day,
+            lastTestedDay: day,
+            timesTested: result.completedPairs * 2,
+            timesKept: 1,
+            experimentID: experimentID,
+            supportingEvidenceIDs: result.sourceEvidenceIDs
+        )
+        personalRules.append(newRule)
+        profile.personalRules = personalRules
+        labState.experiments[experimentIndex].linkedPersonalRuleID = newRule.id
+        labState.experiments[experimentIndex].result?.personalRuleID = newRule.id
+        persist()
+        return newRule
+    }
+
+    func retireRuleChallengedByExperiment(experimentID: UUID) {
+        guard let experiment = experiment(id: experimentID),
+              experiment.result?.state == .drop,
+              let linkedID = experiment.linkedPersonalRuleID else { return }
+        retirePersonalRule(id: linkedID)
+    }
+
     // MARK: - Canonical session requests
 
     func protocolRequest() -> TrainingSessionRequest? {
@@ -249,13 +474,149 @@ final class ProductStore: ObservableObject {
         )
     }
 
-    func prepareProtocolSession() {
-        guard let request = protocolRequest() else { return }
+    func prepareProtocolSession(
+        participatingInLab: Bool = false,
+        activeRecurringProtection: Bool = false
+    ) {
+        guard var request = protocolRequest() else { return }
+        if participatingInLab {
+            request = attachingActiveExperiment(
+                to: request,
+                activeRecurringProtection: activeRecurringProtection
+            )
+        }
         phase = .preparing(request)
     }
 
-    func prepareFreeTraining(_ mode: TrainingMode) {
-        phase = .preparing(.freeTraining(mode: mode))
+    func prepareFreeTraining(_ mode: TrainingMode, participatingInLab: Bool = false) {
+        var request = TrainingSessionRequest.freeTraining(mode: mode)
+        if participatingInLab {
+            request = attachingActiveExperiment(to: request)
+        }
+        phase = .preparing(request)
+    }
+
+    func prepareStandaloneLabSession() {
+        guard !labParticipationProtectedToday,
+              let experiment = activeExperiment,
+              let assignment = PersonalLabEngine.nextAssignment(for: experiment),
+              let mode = experiment.eligibleModes.first else { return }
+        var request = TrainingSessionRequest(
+            origin: .experiment,
+            mode: mode,
+            programDay: nil,
+            targetMinutes: experiment.preferredDuration,
+            goal: experiment.question,
+            observationMission: mode == .observe ? experiment.question : nil
+        )
+        let eligibility = PersonalLabEligibilityEngine.evaluate(
+            request: request,
+            experiment: experiment,
+            isRecovery: false
+        )
+        guard let participation = PersonalLabEngine.participation(
+            for: experiment,
+            request: request,
+            eligibility: eligibility
+        ), participation.armKind == assignment.armKind else { return }
+        request.experimentParticipation = participation
+        labState.pendingParticipation = participation
+        phase = .preparing(request)
+        persist()
+    }
+
+    var canPrepareStandaloneLabSession: Bool {
+        !labParticipationProtectedToday
+            && activeExperiment.flatMap(PersonalLabEngine.nextAssignment(for:)) != nil
+    }
+
+    func canAttachActiveExperiment(
+        to mode: TrainingMode,
+        origin: SessionOrigin = .freeTraining
+    ) -> Bool {
+        guard !labParticipationProtectedToday,
+              let experiment = activeExperiment else { return false }
+        let request = TrainingSessionRequest(
+            origin: origin,
+            mode: mode,
+            programDay: origin == .protocol ? day : nil,
+            targetMinutes: origin == .protocol ? prescription.minutes : (mode.freeDurations.first ?? 10),
+            goal: mode.libraryDescription,
+            adaptationReason: origin == .protocol ? prescription.adaptationReason : nil
+        )
+        return PersonalLabEligibilityEngine.evaluate(
+            request: request,
+            experiment: experiment,
+            isRecovery: isProtectedRecovery(request)
+        ).eligible
+    }
+
+    func todayExperimentParticipation(
+        activeRecurringProtection: Bool = false
+    ) -> ExperimentParticipation? {
+        guard let experiment = activeExperiment,
+              let request = protocolRequest() else { return nil }
+        let eligibility = PersonalLabEligibilityEngine.evaluate(
+            request: request,
+            experiment: experiment,
+            isRecovery: isProtectedRecovery(request),
+            activeRecurringProtection: activeRecurringProtection
+        )
+        return PersonalLabEngine.participation(
+            for: experiment,
+            request: request,
+            eligibility: eligibility
+        )
+    }
+
+    func todayExperimentWaitReason(activeRecurringProtection: Bool = false) -> String? {
+        guard let experiment = activeExperiment,
+              let request = protocolRequest() else { return nil }
+        let eligibility = PersonalLabEligibilityEngine.evaluate(
+            request: request,
+            experiment: experiment,
+            isRecovery: isProtectedRecovery(request),
+            activeRecurringProtection: activeRecurringProtection
+        )
+        guard !eligibility.eligible else { return nil }
+        if eligibility.recoveryProtected {
+            return "We'll continue this test when the sessions are comparable again."
+        }
+        if request.origin == .protocol, request.programDay == 1 {
+            return "Day 1 stays a natural baseline. The test will wait."
+        }
+        return eligibility.reasons.first
+    }
+
+    func nextExperimentCondition(for mode: TrainingMode) -> String? {
+        guard let experiment = activeExperiment,
+              experiment.eligibleModes.contains(mode),
+              let assignment = PersonalLabEngine.nextAssignment(for: experiment) else { return nil }
+        let arm = experiment.arm(for: assignment.armKind)
+        return "\(arm.kind.displayLabel): \(arm.condition.title)"
+    }
+
+    func experimentTemplate(for rule: PersonalRule) -> ExperimentTemplate? {
+        let copy = "\(rule.title) \(rule.detail)".lowercased()
+        if copy.contains("phone") { return ExperimentTemplateLibrary.phoneDistance }
+        if copy.contains("tab") || copy.contains("browser") { return ExperimentTemplateLibrary.oneBrowserTask }
+        if copy.contains("done") || copy.contains("finish") { return ExperimentTemplateLibrary.clearFinishLine }
+        if copy.contains("protect") || copy.contains("screen time") { return ExperimentTemplateLibrary.sessionProtection }
+        return nil
+    }
+
+    @discardableResult
+    func startExperimentForRule(
+        id: UUID,
+        allowingRuleExceptions: Bool = false
+    ) -> ExperimentStartOutcome {
+        guard let rule = personalRules.first(where: { $0.id == id }),
+              let template = experimentTemplate(for: rule) else { return .unavailable }
+        return startExperiment(
+            template: template,
+            linkedRuleID: id,
+            allowingRuleExceptions: allowingRuleExceptions
+        )
     }
 
     func updatePreparedRequest(_ request: TrainingSessionRequest) {
@@ -264,7 +625,9 @@ final class ProductStore: ObservableObject {
     }
 
     func cancelPreparation() {
+        labState.pendingParticipation = nil
         phase = .today
+        persist()
     }
 
     func setEnvironmentPreparation(_ preparation: EnvironmentPreparation?) {
@@ -297,6 +660,21 @@ final class ProductStore: ObservableObject {
             }
         }
 
+        if isProtectedRecovery(request) {
+            request.experimentParticipation = nil
+            labState.pendingParticipation = nil
+        } else if let participation = request.experimentParticipation {
+            let valid = activeExperiment.map { experiment in
+                experiment.id == participation.experimentID
+                    && experiment.eligibleModes.contains(request.mode)
+                    && experiment.arm(for: participation.armKind).id == participation.armID
+            } ?? false
+            if !valid {
+                request.experimentParticipation = nil
+                labState.pendingParticipation = nil
+            }
+        }
+
         let isNaturalBaseline = request.origin == .protocol && request.programDay == 1
         let capturedPreparation = isNaturalBaseline
             ? nil
@@ -324,6 +702,14 @@ final class ProductStore: ObservableObject {
             )
         }
 
+        let verification: EnvironmentVerificationState?
+        switch request.experimentParticipation?.conditionSnapshot.truthSource {
+        case .userReported: verification = .userReported
+        case .systemConfirmed: verification = .systemConfirmed
+        case .notConfirmed: verification = nil
+        case nil: verification = capturedArm != nil ? .systemConfirmed : (capturedPreparation?.actionWasDone == true ? .userReported : nil)
+        }
+
         var record = SessionRecord(
             origin: request.origin,
             requestID: request.id,
@@ -335,13 +721,14 @@ final class ProductStore: ObservableObject {
             actualMinutes: 0,
             completed: false,
             environmentActionDone: capturedPreparation?.actionWasDone,
-            environmentVerification: capturedArm != nil ? .systemConfirmed : (capturedPreparation?.actionWasDone == true ? .userReported : nil),
+            environmentVerification: verification,
             evidence: evidence,
             appliedRuleIDs: request.appliedRuleIDs,
             environmentPreparation: capturedPreparation,
             programPhase: request.programPhase,
             curriculumIntent: request.curriculumIntent,
-            adaptationReason: request.adaptationReason
+            adaptationReason: request.adaptationReason,
+            experimentParticipation: request.experimentParticipation
         )
         if let capturedArm {
             record.environment = EnvironmentSnapshot(
@@ -359,6 +746,42 @@ final class ProductStore: ObservableObject {
         }
         phase = .running(record)
         persist()
+    }
+
+    private func attachingActiveExperiment(
+        to request: TrainingSessionRequest,
+        activeRecurringProtection: Bool = false
+    ) -> TrainingSessionRequest {
+        guard !labParticipationProtectedToday,
+              let experiment = activeExperiment else { return request }
+        let eligibility = PersonalLabEligibilityEngine.evaluate(
+            request: request,
+            experiment: experiment,
+            isRecovery: isProtectedRecovery(request),
+            activeRecurringProtection: activeRecurringProtection
+        )
+        guard let participation = PersonalLabEngine.participation(
+            for: experiment,
+            request: request,
+            eligibility: eligibility
+        ) else { return request }
+        var updated = request
+        updated.experimentParticipation = participation
+        labState.pendingParticipation = participation
+        persist()
+        return updated
+    }
+
+    private func isProtectedRecovery(_ request: TrainingSessionRequest) -> Bool {
+        request.origin == .protocol
+            && request.mode == .nothing
+            && (request.adaptationReason?.localizedCaseInsensitiveContains("recovery") == true)
+    }
+
+    private var labParticipationProtectedToday: Bool {
+        if day == 1, completedProtocolDays == 0 { return true }
+        return prescription.mode == .nothing
+            && prescription.adaptationReason.localizedCaseInsensitiveContains("recovery")
     }
 
     /// Compatibility entry point used by the existing deterministic QA harness.
@@ -462,6 +885,7 @@ final class ProductStore: ObservableObject {
         record.firstDistraction = reflection.firstDistraction
         record.switches = reflection.switches ?? record.switches
         record.firstSwitchTiming = reflection.firstSwitchTiming ?? record.firstSwitchTiming
+        record.startedEasierSelfReport = reflection.startedEasier
         if record.environment != nil {
             record.environment?.startedEasierSelfReport = reflection.startedEasier
             record.environment?.protectionEndedEarly = record.endedEarly
@@ -514,10 +938,25 @@ final class ProductStore: ObservableObject {
         personalRules = profile.personalRules
         observations = profile.observations
 
+        if record.experimentParticipation != nil {
+            let sourceEvidenceIDs = profile.observations
+                .filter { $0.sessionID == record.id }
+                .map(\.id)
+            PersonalLabEngine.record(
+                session: record,
+                sourceEvidenceIDs: sourceEvidenceIDs,
+                in: &labState
+            )
+        }
+
         environmentPreparation = nil
         tab = record.origin == .freeTraining ? .train : .today
         persist(activeSession: nil)
-        if record.origin == .freeTraining || !record.completed {
+        if record.origin == .protocol, record.completed, programState.hasPendingRequiredFlow {
+            routePendingProgramFlow()
+        } else if record.experimentParticipation != nil {
+            phase = .lab
+        } else if record.origin == .freeTraining || record.origin == .experiment || !record.completed {
             phase = .today
         } else {
             routePendingProgramFlow()
@@ -640,6 +1079,7 @@ final class ProductStore: ObservableObject {
         environmentPreparation = nil
         personalRules = []
         observations = []
+        labState = .empty
         tab = .today
         phase = .today
         persist(activeSession: nil)
@@ -664,6 +1104,7 @@ final class ProductStore: ObservableObject {
             "preparation": (try? JSONEncoder().encode(environmentPreparation)) ?? Data(),
             "personalRules": (try? JSONEncoder().encode(personalRules)) ?? Data(),
             "observations": (try? JSONEncoder().encode(observations)) ?? Data(),
+            "personalLab": (try? JSONEncoder().encode(labState)) ?? Data(),
             "activeSession": (try? JSONEncoder().encode(active)) ?? Data(),
         ]
         defaults.set(payload, forKey: Self.storageKey)
@@ -674,12 +1115,16 @@ final class ProductStore: ObservableObject {
         sessions: [SessionRecord],
         programState: ProgramState,
         preparation: EnvironmentPreparation?,
-        activeSession: SessionRecord?
+        activeSession: SessionRecord?,
+        labState: PersonalLabState
     )
 
     private static func load(defaults: UserDefaults) -> (state: StoredState?, migrated: Bool) {
         if defaults.object(forKey: storageKey) != nil {
-            return (decodeV5(defaults: defaults), false)
+            return (decodeV6(defaults: defaults), false)
+        }
+        if defaults.object(forKey: v5StorageKey) != nil {
+            return (decodeV5(defaults: defaults), true)
         }
         if defaults.object(forKey: v4StorageKey) != nil {
             return (decodeV4(from: v4StorageKey, defaults: defaults), true)
@@ -696,9 +1141,9 @@ final class ProductStore: ObservableObject {
         return (nil, false)
     }
 
-    private static func decodeV5(defaults: UserDefaults) -> StoredState? {
+    private static func decodeV6(defaults: UserDefaults) -> StoredState? {
         guard let raw = defaults.dictionary(forKey: storageKey) else {
-            return (AttentionProfile(), [], .fresh, nil, nil)
+            return (AttentionProfile(), [], .fresh, nil, nil, .empty)
         }
         let profileData = raw["profile"] as? Data
         let sessionsData = raw["sessions"] as? Data
@@ -729,30 +1174,24 @@ final class ProductStore: ObservableObject {
         let active = (raw["activeSession"] as? Data).flatMap {
             try? JSONDecoder().decode(SessionRecord?.self, from: $0)
         } ?? nil
-        return (profile, sessions, programState, preparation, active)
+        let labState = (raw["personalLab"] as? Data).flatMap {
+            try? JSONDecoder().decode(PersonalLabState.self, from: $0)
+        } ?? .empty
+        return (profile, sessions, programState, preparation, active, labState)
+    }
+
+    private static func decodeV5(defaults: UserDefaults) -> StoredState? {
+        guard let raw = defaults.dictionary(forKey: v5StorageKey) else {
+            return (AttentionProfile(), [], .fresh, nil, nil, .empty)
+        }
+        return decodePreLab(raw: raw)
     }
 
     private static func decodeV4(from key: String, defaults: UserDefaults) -> StoredState? {
         guard let raw = defaults.dictionary(forKey: key) else {
-            return (AttentionProfile(), [], .fresh, nil, nil)
+            return (AttentionProfile(), [], .fresh, nil, nil, .empty)
         }
-        let profileData = raw["profile"] as? Data
-        let sessionsData = raw["sessions"] as? Data
-        let programData = raw["programState"] as? Data
-
-        let profile = profileData.flatMap { try? JSONDecoder().decode(AttentionProfile.self, from: $0) }
-            ?? AttentionProfile()
-        let sessions = sessionsData.flatMap { try? JSONDecoder().decode([SessionRecord].self, from: $0) }
-            ?? []
-        let programState = programData.flatMap { try? JSONDecoder().decode(ProgramState.self, from: $0) }
-            ?? .migrated(day: (raw["day"] as? Int) ?? 1, sessions: sessions)
-        let preparation = (raw["preparation"] as? Data).flatMap {
-            try? JSONDecoder().decode(EnvironmentPreparation?.self, from: $0)
-        } ?? nil
-        let active = (raw["activeSession"] as? Data).flatMap {
-            try? JSONDecoder().decode(SessionRecord?.self, from: $0)
-        } ?? nil
-        return (profile, sessions, programState, preparation, active)
+        return decodePreLab(raw: raw)
     }
 
     private static func decodeLegacy(
@@ -786,8 +1225,39 @@ final class ProductStore: ObservableObject {
             sessions,
             ProgramState.migrated(day: legacyDay, sessions: sessions),
             preparation,
-            active
+            active,
+            .empty
         )
+    }
+
+    private static func decodePreLab(raw: [String: Any]) -> StoredState {
+        let profileData = raw["profile"] as? Data
+        let sessionsData = raw["sessions"] as? Data
+        let programData = raw["programState"] as? Data
+        var profile = profileData.flatMap { try? JSONDecoder().decode(AttentionProfile.self, from: $0) }
+            ?? AttentionProfile()
+        let sessions = sessionsData.flatMap { try? JSONDecoder().decode([SessionRecord].self, from: $0) }
+            ?? []
+        let programState = programData.flatMap { try? JSONDecoder().decode(ProgramState.self, from: $0) }
+            ?? .migrated(day: (raw["day"] as? Int) ?? 1, sessions: sessions)
+
+        if let rulesData = raw["personalRules"] as? Data,
+           let rules = try? JSONDecoder().decode([PersonalRule].self, from: rulesData),
+           profile.personalRules.isEmpty {
+            profile.personalRules = rules
+        }
+        if let observationsData = raw["observations"] as? Data,
+           let decoded = try? JSONDecoder().decode([EvidenceObservation].self, from: observationsData),
+           profile.observations.isEmpty {
+            profile.observations = decoded
+        }
+        let preparation = (raw["preparation"] as? Data).flatMap {
+            try? JSONDecoder().decode(EnvironmentPreparation?.self, from: $0)
+        } ?? nil
+        let active = (raw["activeSession"] as? Data).flatMap {
+            try? JSONDecoder().decode(SessionRecord?.self, from: $0)
+        } ?? nil
+        return (profile, sessions, programState, preparation, active, .empty)
     }
 
     private func timing(forElapsedSeconds elapsed: Int) -> FirstSwitchTiming {

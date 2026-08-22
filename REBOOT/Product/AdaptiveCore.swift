@@ -106,11 +106,13 @@ enum RuleLifecycle: String, Codable, CaseIterable, Equatable {
 enum RuleSourceType: String, Codable, CaseIterable, Equatable {
     case discoveredFromEvidence = "discovered"
     case userCreated = "userCreated"
+    case experiment = "experiment"
 
     var displayLabel: String {
         switch self {
         case .discoveredFromEvidence: return "Discovered from your sessions"
         case .userCreated: return "Created by you"
+        case .experiment: return "Kept from a Personal Lab test"
         }
     }
 }
@@ -159,6 +161,7 @@ struct EvidenceObservation: Codable, Identifiable, Equatable {
     var sentiment: String // "positive", "neutral", "contradictory"
     var context: RuleContext
     var recency: RecencyStatus = .recent
+    var experimentID: UUID? = nil
 }
 
 struct PersonalRule: Codable, Identifiable, Equatable {
@@ -177,6 +180,8 @@ struct PersonalRule: Codable, Identifiable, Equatable {
     var lastTestedDay: Int?
     var timesTested: Int
     var timesKept: Int
+    var experimentID: UUID? = nil
+    var supportingEvidenceIDs: [UUID]? = nil
 
     var isActivelyInfluencing: Bool {
         lifecycle == .kept && confidence != .needsReview
@@ -197,7 +202,9 @@ struct WhyThisRuleExplanation: Equatable {
 
     init(rule: PersonalRule) {
         self.ruleTitle = rule.title
-        self.sourceDescription = rule.sourceType == .userCreated ? "Created by you." : "WHY REBOOT SUGGESTED THIS"
+        self.sourceDescription = rule.sourceType == .userCreated
+            ? "Created by you."
+            : (rule.sourceType == .experiment ? "KEPT FROM PERSONAL LAB" : "WHY REBOOT SUGGESTED THIS")
         if rule.sourceType == .userCreated {
             self.supportingPoints = []
             self.contradictionPoint = nil
@@ -457,6 +464,7 @@ struct TrainingSessionRequest: Codable, Identifiable, Equatable {
     var programPhase: ProgramPhaseID?
     var curriculumIntent: CurriculumIntentKind?
     var adaptationReason: String?
+    var experimentParticipation: ExperimentParticipation?
     var createdAt = Date()
 
     static func protocolRequest(
@@ -527,6 +535,7 @@ struct SessionRecord: Codable, Identifiable, Equatable {
     var energy: Int?
     var environmentActionDone: Bool?
     var environmentVerification: EnvironmentVerificationState?
+    var startedEasierSelfReport: Bool?
 
     /// Minutes into the session when the first switch was noticed, if remembered.
     var firstSwitchMinute: Int?
@@ -550,6 +559,10 @@ struct SessionRecord: Codable, Identifiable, Equatable {
     /// What actually happened in the digital environment during the session.
     var environment: EnvironmentSnapshot?
 
+    /// Personal Lab participation is orthogonal to SessionOrigin. A protocol
+    /// session remains protocol while contributing one Lab observation.
+    var experimentParticipation: ExperimentParticipation?
+
     init(
         id: UUID = UUID(),
         origin: SessionOrigin = .protocol,
@@ -569,6 +582,7 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         energy: Int? = nil,
         environmentActionDone: Bool? = nil,
         environmentVerification: EnvironmentVerificationState? = nil,
+        startedEasierSelfReport: Bool? = nil,
         firstSwitchMinute: Int? = nil,
         firstSwitchTiming: FirstSwitchTiming? = nil,
         evidence: SessionEvidence? = nil,
@@ -577,7 +591,8 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         programPhase: ProgramPhaseID? = nil,
         curriculumIntent: CurriculumIntentKind? = nil,
         adaptationReason: String? = nil,
-        environment: EnvironmentSnapshot? = nil
+        environment: EnvironmentSnapshot? = nil,
+        experimentParticipation: ExperimentParticipation? = nil
     ) {
         self.id = id
         self.origin = origin
@@ -597,6 +612,7 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         self.energy = energy
         self.environmentActionDone = environmentActionDone
         self.environmentVerification = environmentVerification
+        self.startedEasierSelfReport = startedEasierSelfReport
         self.firstSwitchMinute = firstSwitchMinute
         self.firstSwitchTiming = firstSwitchTiming ?? FirstSwitchTiming.from(legacyMinute: firstSwitchMinute)
         self.evidence = evidence
@@ -606,13 +622,15 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         self.curriculumIntent = curriculumIntent
         self.adaptationReason = adaptationReason
         self.environment = environment
+        self.experimentParticipation = experimentParticipation
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, origin, requestID, prescriptionID, day, date, mode, targetMinutes, actualMinutes
         case elapsedSeconds, completed, endedEarly, firstDistraction, switches, difficulty
-        case energy, environmentActionDone, environmentVerification, firstSwitchMinute, firstSwitchTiming, evidence
+        case energy, environmentActionDone, environmentVerification, startedEasierSelfReport, firstSwitchMinute, firstSwitchTiming, evidence
         case appliedRuleIDs, environmentPreparation, programPhase, curriculumIntent, adaptationReason, environment
+        case experimentParticipation
     }
 
     init(from decoder: Decoder) throws {
@@ -635,6 +653,7 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         energy = try values.decodeIfPresent(Int.self, forKey: .energy)
         environmentActionDone = try values.decodeIfPresent(Bool.self, forKey: .environmentActionDone)
         environmentVerification = try values.decodeIfPresent(EnvironmentVerificationState.self, forKey: .environmentVerification)
+        startedEasierSelfReport = try values.decodeIfPresent(Bool.self, forKey: .startedEasierSelfReport)
         firstSwitchMinute = try values.decodeIfPresent(Int.self, forKey: .firstSwitchMinute)
         firstSwitchTiming = try values.decodeIfPresent(FirstSwitchTiming.self, forKey: .firstSwitchTiming)
             ?? FirstSwitchTiming.from(legacyMinute: firstSwitchMinute)
@@ -645,6 +664,7 @@ struct SessionRecord: Codable, Identifiable, Equatable {
         curriculumIntent = try values.decodeIfPresent(CurriculumIntentKind.self, forKey: .curriculumIntent)
         adaptationReason = try values.decodeIfPresent(String.self, forKey: .adaptationReason)
         environment = try values.decodeIfPresent(EnvironmentSnapshot.self, forKey: .environment)
+        experimentParticipation = try values.decodeIfPresent(ExperimentParticipation.self, forKey: .experimentParticipation)
     }
 
     var targetReached: Bool {
@@ -913,7 +933,8 @@ enum PersonalRuleEngine {
             finding: findingText(for: session),
             sentiment: isDifficult ? "contradictory" : (isSmooth ? "positive" : "neutral"),
             context: context(for: session.mode),
-            recency: .recent
+            recency: .recent,
+            experimentID: session.experimentParticipation?.experimentID
         )
         profile.observations.append(observation)
         profile.personalRules = rules

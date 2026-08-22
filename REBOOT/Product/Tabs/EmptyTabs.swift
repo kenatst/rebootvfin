@@ -39,12 +39,22 @@ struct TrainTab: View {
             .ignoresSafeArea()
         }
         .sheet(item: $selectedMode) { mode in
-            ModeIntroductionSheet(mode: mode) {
-                selectedMode = nil
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    product.prepareFreeTraining(mode)
-                }
-            }
+            ModeIntroductionSheet(
+                mode: mode,
+                experimentCondition: product.nextExperimentCondition(for: mode),
+                start: {
+                    selectedMode = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        product.prepareFreeTraining(mode)
+                    }
+                },
+                startExperiment: product.canAttachActiveExperiment(to: mode) ? {
+                    selectedMode = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        product.prepareFreeTraining(mode, participatingInLab: true)
+                    }
+                } : nil
+            )
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
@@ -136,7 +146,9 @@ struct TrainTab: View {
 
 private struct ModeIntroductionSheet: View {
     let mode: TrainingMode
+    let experimentCondition: String?
     let start: () -> Void
+    let startExperiment: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -172,6 +184,18 @@ private struct ModeIntroductionSheet: View {
                     .padding(.top, 16)
                 Spacer()
                 PrimaryPillButton(title: "Start practice", symbol: "play.fill", action: start)
+                if let experimentCondition, let startExperiment {
+                    VStack(alignment: .leading, spacing: 10) {
+                        MetaLabel(text: "Active Personal Lab test", color: AppColors.coral)
+                        Text(experimentCondition, style: .footnote)
+                            .foregroundStyle(AppColors.inkSoft)
+                        Button(action: startExperiment) {
+                            GlassPill(text: "Use test condition", symbol: "arrow.left.arrow.right", tint: AppColors.ink)
+                        }
+                        .buttonStyle(PressScaleStyle())
+                    }
+                    .padding(.top, 14)
+                }
             }
             .padding(24)
             .padding(.top, 10)
@@ -197,6 +221,7 @@ struct ProfileTab: View {
     @ObservedObject var product: ProductStore
     @State private var selectedRule: PersonalRule?
     @State private var showAddRule = false
+    @State private var selectedLabExperiment: PersonalExperiment?
 
     private var profile: AttentionProfile { product.profile }
     private var isSparse: Bool { product.sessions.count < 3 }
@@ -220,6 +245,9 @@ struct ProfileTab: View {
                         // Hero summary card
                         overviewCard
                             .padding(.top, 24)
+
+                        personalLabSection
+                            .padding(.top, 32)
 
                         // Personal Rules Section
                         personalRulesSection
@@ -257,12 +285,97 @@ struct ProfileTab: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(item: $selectedLabExperiment) { experiment in
+            ExperimentDetailView(product: product, experimentID: experiment.id)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
         .onAppear {
             if ProcessInfo.processInfo.arguments.valueAfter("-qaSeed") == "rulesWhyThisRule",
                selectedRule == nil {
                 selectedRule = product.personalRules.first
             }
         }
+    }
+
+    // MARK: - Personal Lab
+
+    private var personalLabSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                MetaLabel(text: "Still learning · Personal Lab", color: AppColors.coral)
+                Spacer()
+                Button { product.openPersonalLab() } label: {
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppColors.coral)
+                        .frame(width: 36, height: 36)
+                }
+                .accessibilityLabel("Open Personal Lab")
+            }
+
+            if let active = product.activeExperiment {
+                PaperCard(radius: 24, padding: 18) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        GlassPill(
+                            text: "\(active.completePairCount) of \(active.plan.targetPairs) comparisons",
+                            tint: AppColors.coral
+                        )
+                        Text(active.question, style: .heroGoal)
+                            .foregroundStyle(AppColors.ink)
+                        Button { product.openPersonalLab() } label: {
+                            GlassPill(text: "Continue test", symbol: "chevron.right", tint: AppColors.ink)
+                        }
+                        .buttonStyle(PressScaleStyle())
+                    }
+                }
+            } else if let useful = product.pastExperiments.first(where: { $0.result?.state == .keep }) {
+                PaperCard(radius: 24, padding: 18) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        MetaLabel(text: "What seems to help")
+                        Text(useful.testArm.condition.title, style: .heroGoal)
+                            .foregroundStyle(AppColors.ink)
+                        Text("Repeated experiment signal", style: .footnote)
+                            .foregroundStyle(AppColors.inkFaint)
+                        Button { selectedLabExperiment = useful } label: {
+                            GlassPill(text: "View test", symbol: "chevron.right", tint: AppColors.ink)
+                        }
+                        .buttonStyle(PressScaleStyle())
+                    }
+                }
+            } else if let suggestion = profileLabSuggestions.first {
+                PaperCard(radius: 24, padding: 18) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(suggestion.template.question, style: .heroGoal)
+                            .foregroundStyle(AppColors.ink)
+                        Text(suggestion.reason, style: .heroReason)
+                            .foregroundStyle(AppColors.inkSoft)
+                        Button { product.openPersonalLab() } label: {
+                            GlassPill(text: "Test this", symbol: "arrow.right", tint: AppColors.coral)
+                        }
+                        .buttonStyle(PressScaleStyle())
+                    }
+                }
+            } else {
+                PaperCard(radius: 24, padding: 18) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(isSparse ? "A little evidence first." : "Nothing urgent to test.", style: .heroGoal)
+                            .foregroundStyle(AppColors.ink)
+                        Text(isSparse
+                            ? "Useful comparisons appear after a few real sessions."
+                            : "Open Lab whenever you want to browse or create a test.", style: .heroReason)
+                            .foregroundStyle(AppColors.inkSoft)
+                    }
+                }
+            }
+        }
+    }
+
+    private var profileLabSuggestions: [ExperimentSuggestion] {
+        let environment = profile.environmentEvidence
+        return product.labSuggestions(
+            screenTimeAvailable: environment?.screenTimeConnected == true && environment?.hasSelection == true
+        )
     }
 
     // MARK: - Overview card
@@ -585,6 +698,9 @@ struct WhyThisRuleSheet: View {
     let rule: PersonalRule
     @ObservedObject var product: ProductStore
     @Environment(\.dismiss) private var dismiss
+    @State private var showRuleException = false
+    @State private var showActiveWarning = false
+    @State private var showLinkedExperiment = false
 
     private var explanation: WhyThisRuleExplanation { rule.whyRebootSuggested }
 
@@ -667,6 +783,15 @@ struct WhyThisRuleSheet: View {
                             .foregroundStyle(AppColors.inkFaint)
                             .padding(.top, 18)
 
+                        if let experimentID = rule.experimentID,
+                           product.experiment(id: experimentID) != nil {
+                            Button { showLinkedExperiment = true } label: {
+                                GlassPill(text: "View test", symbol: "arrow.up.right", tint: AppColors.ink)
+                            }
+                            .buttonStyle(PressScaleStyle())
+                            .padding(.top, 18)
+                        }
+
                         // Actions
                         VStack(spacing: 12) {
                             if rule.lifecycle == .candidate || rule.lifecycle == .testing {
@@ -676,10 +801,9 @@ struct WhyThisRuleSheet: View {
                                 }
                                 if rule.lifecycle == .candidate {
                                     Button {
-                                        product.testPersonalRule(id: rule.id)
-                                        dismiss()
+                                        startRuleTest(allowingRuleExceptions: false)
                                     } label: {
-                                        GlassPill(text: "Test in sessions", symbol: "play.circle", tint: AppColors.ink)
+                                        GlassPill(text: "Test in Personal Lab", symbol: "play.circle", tint: AppColors.ink)
                                     }
                                 }
                                 Button {
@@ -694,8 +818,7 @@ struct WhyThisRuleSheet: View {
                             } else if rule.lifecycle == .kept {
                                 HStack(spacing: 12) {
                                     Button {
-                                        product.testPersonalRule(id: rule.id)
-                                        dismiss()
+                                        startRuleTest(allowingRuleExceptions: false)
                                     } label: {
                                         GlassPill(text: "Test again", symbol: "arrow.counterclockwise", tint: AppColors.ink)
                                     }
@@ -721,6 +844,47 @@ struct WhyThisRuleSheet: View {
                 }
             }
             .ignoresSafeArea()
+        }
+        .confirmationDialog("Temporary rule exception", isPresented: $showRuleException, titleVisibility: .visible) {
+            Button("Allow temporary test exception") {
+                startRuleTest(allowingRuleExceptions: true)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The Normal condition needs a few sessions without this kept rule. The rule remains kept.")
+        }
+        .alert("One active test at a time", isPresented: $showActiveWarning) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Pause your current test before starting another.")
+        }
+        .sheet(isPresented: $showLinkedExperiment) {
+            if let experimentID = rule.experimentID {
+                ExperimentDetailView(product: product, experimentID: experimentID)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+    }
+
+    private func startRuleTest(allowingRuleExceptions: Bool) {
+        let outcome = product.startExperimentForRule(
+            id: rule.id,
+            allowingRuleExceptions: allowingRuleExceptions
+        )
+        switch outcome {
+        case .started:
+            dismiss()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                product.openPersonalLab()
+            }
+        case .needsRuleException:
+            showRuleException = true
+        case .activeExperimentExists:
+            showActiveWarning = true
+        case .unavailable:
+            product.testPersonalRule(id: rule.id)
+            dismiss()
         }
     }
 }
@@ -817,4 +981,3 @@ struct AddCustomRuleSheet: View {
         }
     }
 }
-

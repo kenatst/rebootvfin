@@ -11,6 +11,9 @@ struct ProductRootView: View {
             case .today:
                 tabContent
                     .transition(.opacity)
+            case .lab:
+                PersonalLabView(product: product, environmentStore: environmentStore)
+                    .transition(.opacity)
             case .preparing(let request):
                 SessionPreparationView(product: product, environmentStore: environmentStore, request: request)
                     .transition(.opacity)

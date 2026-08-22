@@ -14,6 +14,7 @@ struct SessionPreparationView: View {
     @State private var duration: Int
     @State private var mission: String
     @State private var useProtection = false
+    @State private var conditionConfirmed = false
 
     init(product: ProductStore, environmentStore: EnvironmentStore, request: TrainingSessionRequest) {
         self.product = product
@@ -41,6 +42,11 @@ struct SessionPreparationView: View {
                         Text(request.mode.trains, style: .todaySentence)
                             .foregroundStyle(AppColors.inkSoft)
                             .padding(.top, 12)
+
+                        if request.experimentParticipation != nil {
+                            experimentPreparation
+                                .padding(.top, 24)
+                        }
 
                         modePreparation
                             .padding(.top, 30)
@@ -176,7 +182,10 @@ struct SessionPreparationView: View {
 
     @ViewBuilder
     private var optionalProtection: some View {
-        if request.mode != .nothing, environmentStore.isConnected, environmentStore.selection != nil {
+        if request.experimentParticipation == nil,
+           request.mode != .nothing,
+           environmentStore.isConnected,
+           environmentStore.selection != nil {
             PaperCard(radius: 24, padding: 18) {
                 Toggle(isOn: $useProtection) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -192,6 +201,13 @@ struct SessionPreparationView: View {
     }
 
     private var canStart: Bool {
+        if let participation = request.experimentParticipation {
+            guard conditionConfirmed else { return false }
+            if participation.conditionSnapshot.requestedConditionID == "finish_line.clear",
+               completionDefinition.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return false
+            }
+        }
         switch request.mode {
         case .stay: return !task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .recall: return !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -201,7 +217,45 @@ struct SessionPreparationView: View {
     }
 
     private var startTitle: String {
-        request.origin == .protocol ? "Start today's session" : "Start practice"
+        if request.experimentParticipation != nil { return "I'm ready" }
+        return request.origin == .protocol ? "Start today's session" : "Start practice"
+    }
+
+    @ViewBuilder
+    private var experimentPreparation: some View {
+        if let participation = request.experimentParticipation {
+            PaperCard(radius: 26, padding: 20, shadow: .soft) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        MetaLabel(text: "Today's test condition", color: AppColors.coral)
+                        Spacer()
+                        GlassPill(text: participation.armKind.displayLabel, tint: AppColors.ink)
+                    }
+                    Text(participation.conditionSnapshot.requestedTitle, style: .heroGoal)
+                        .foregroundStyle(AppColors.ink)
+                    Text(participation.conditionSnapshot.requestedDetail, style: .heroReason)
+                        .foregroundStyle(AppColors.inkSoft)
+                    Text("Everything else stays as normal as possible.", style: .footnote)
+                        .foregroundStyle(AppColors.inkFaint)
+
+                    Button {
+                        conditionConfirmed.toggle()
+                    } label: {
+                        HStack(spacing: 9) {
+                            Image(systemName: conditionConfirmed ? "checkmark.circle.fill" : "circle")
+                            Text(conditionConfirmed ? "Condition ready" : "Confirm setup")
+                                .type(.buttonLabel)
+                            Spacer()
+                        }
+                        .foregroundStyle(conditionConfirmed ? AppColors.coral : AppColors.ink)
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(PressScaleStyle())
+                    .accessibilityLabel("\(participation.armKind.displayLabel) condition. \(participation.conditionSnapshot.requestedTitle)")
+                    .accessibilityValue(conditionConfirmed ? "Ready" : "Not confirmed")
+                }
+            }
+        }
     }
 
     private func start() {
@@ -214,7 +268,71 @@ struct SessionPreparationView: View {
         updated.observationMission = request.origin == .protocol ? request.observationMission : mission
 
         var arm: SessionEnvironmentArm?
-        if useProtection {
+        if var participation = updated.experimentParticipation {
+            let conditionID = participation.conditionSnapshot.requestedConditionID
+            if conditionID == "screen_time.protected" {
+                let applied = environmentStore.applySessionProtection()
+                participation.conditionSnapshot.actualDescription = applied
+                    ? "Selected distractions were protected."
+                    : "Protection could not be applied."
+                participation.conditionSnapshot.truthSource = applied ? .systemConfirmed : .notConfirmed
+                participation.conditionSnapshot.conditionFollowed = applied
+                arm = SessionEnvironmentArm(
+                    condition: .protected,
+                    manualIntervention: nil,
+                    protectedSelectionID: environmentStore.selection?.id,
+                    protectionOffered: true,
+                    protectionAccepted: true,
+                    protectionActivated: applied,
+                    phoneLocationSelfReport: nil
+                )
+            } else if conditionID == "screen_time.unprotected" {
+                let protectionActive = environmentStore.hasActiveProtectionNow
+                participation.conditionSnapshot.actualDescription = protectionActive
+                    ? "A protected window was already active."
+                    : "No session protection was active."
+                participation.conditionSnapshot.truthSource = .systemConfirmed
+                participation.conditionSnapshot.conditionFollowed = !protectionActive
+                if protectionActive {
+                    arm = SessionEnvironmentArm(
+                        condition: .protectedWindow,
+                        manualIntervention: nil,
+                        protectedSelectionID: environmentStore.selection?.id,
+                        protectionOffered: false,
+                        protectionAccepted: false,
+                        protectionActivated: true,
+                        phoneLocationSelfReport: nil
+                    )
+                }
+            } else {
+                participation.conditionSnapshot.actualDescription = participation.conditionSnapshot.requestedDetail
+                participation.conditionSnapshot.truthSource = .userReported
+                participation.conditionSnapshot.conditionFollowed = conditionConfirmed
+                if conditionID == "phone.outside_reach" || conditionID == "phone.usual" {
+                    arm = SessionEnvironmentArm(
+                        condition: conditionID == "phone.outside_reach" ? .phoneAway : .unrestricted,
+                        manualIntervention: participation.conditionSnapshot.requestedDetail,
+                        protectedSelectionID: nil,
+                        protectionOffered: false,
+                        protectionAccepted: false,
+                        protectionActivated: false,
+                        phoneLocationSelfReport: participation.conditionSnapshot.requestedTitle
+                    )
+                } else if conditionID == "browser.single_task" || conditionID == "browser.usual" {
+                    arm = SessionEnvironmentArm(
+                        condition: conditionID == "browser.single_task" ? .singleTaskBrowser : .unrestricted,
+                        manualIntervention: participation.conditionSnapshot.requestedDetail,
+                        protectedSelectionID: nil,
+                        protectionOffered: false,
+                        protectionAccepted: false,
+                        protectionActivated: false,
+                        phoneLocationSelfReport: nil
+                    )
+                }
+            }
+            participation.conditionSnapshot.capturedAt = Date()
+            updated.experimentParticipation = participation
+        } else if useProtection {
             let applied = environmentStore.applySessionProtection()
             arm = SessionEnvironmentArm(
                 condition: .protected,

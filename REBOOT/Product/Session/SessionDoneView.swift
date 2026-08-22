@@ -211,11 +211,13 @@ struct SessionDoneView: View {
 
     @ViewBuilder
     private func environmentQuestions(for record: SessionRecord) -> some View {
-        if record.environment?.protectionActivated == true {
+        if record.environment?.protectionActivated == true || experimentWatchesStartEase(record) {
             VStack(alignment: .leading, spacing: 24) {
                 choiceGroup(
-                    label: "Did protection make starting easier?",
-                    items: [("Yes", true), ("Not really", false)],
+                    label: record.environment?.protectionActivated == true
+                        ? "Did protection make starting easier?"
+                        : "Did starting feel easier?",
+                    items: [("Yes", true), ("No", false)],
                     selection: $startedEasier
                 )
                 if record.endedEarly {
@@ -236,6 +238,9 @@ struct SessionDoneView: View {
     }
 
     private func canContinue(_ record: SessionRecord) -> Bool {
+        if experimentPrimaryOutcome(record) == .startEase, startedEasier == nil {
+            return false
+        }
         switch record.mode {
         case .stay, .observe:
             return distraction != nil && switches != nil && difficulty != nil
@@ -256,7 +261,9 @@ struct SessionDoneView: View {
             Text(learnedCopy, style: .todaySentence)
                 .foregroundStyle(AppColors.inkSoft)
                 .padding(.top, 16)
-            PrimaryPillButton(title: record?.origin == .freeTraining ? "Back to Train" : "Back to Today") {
+            PrimaryPillButton(title: record?.experimentParticipation == nil
+                ? (record?.origin == .freeTraining ? "Back to Train" : "Back to Today")
+                : "Back to Lab") {
                 save()
             }
             .padding(.top, 32)
@@ -266,6 +273,12 @@ struct SessionDoneView: View {
     private var learnedCopy: String {
         guard let record else { return "Unknown stays unknown." }
         if !record.completed { return "This attempt is saved, but it does not advance the 90-day program." }
+        if record.experimentParticipation != nil, record.origin == .protocol {
+            return "This protocol day advances once, and the session can update your current comparison."
+        }
+        if record.experimentParticipation != nil {
+            return "This session can update your current comparison. Your 90-day program does not move."
+        }
         if record.origin == .freeTraining { return "This practice can inform your profile, but your program day does not move." }
         if record.day == 90 { return "Day 90 completes the program once. No Day 91 will be created." }
         if ProgramCheckpointSchedule.isWeeklyCheckpoint(record.day) {
@@ -312,6 +325,18 @@ struct SessionDoneView: View {
                 observation: observation.nilIfBlank
             )
         )
+    }
+
+    private func experimentPrimaryOutcome(_ record: SessionRecord) -> ExperimentOutcomeMetric? {
+        guard let experimentID = record.experimentParticipation?.experimentID else { return nil }
+        return product.experiment(id: experimentID)?.primaryOutcome
+    }
+
+    private func experimentWatchesStartEase(_ record: SessionRecord) -> Bool {
+        guard let experimentID = record.experimentParticipation?.experimentID,
+              let experiment = product.experiment(id: experimentID) else { return false }
+        return experiment.primaryOutcome == .startEase
+            || experiment.secondaryOutcomes.contains(.startEase)
     }
 
     private func questionLabel(_ text: String) -> some View {

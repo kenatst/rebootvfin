@@ -383,7 +383,7 @@ final class REBOOTTests: XCTestCase {
             XCTAssertEqual(store.protocolSessions.count, 1)
             XCTAssertEqual(store.protocolSessions[0].origin, .protocol)
             XCTAssertEqual(store.day, 2)
-            XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v5"))
+            XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v6"))
         }
     }
 
@@ -413,7 +413,7 @@ final class REBOOTTests: XCTestCase {
         XCTAssertNil(store.programState.pendingReviewDay)
         XCTAssertNil(store.programState.pendingPhaseTransition)
         XCTAssertTrue(store.programState.acknowledgedPhaseTransitions.contains(.controlInput))
-        XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v5"))
+        XCTAssertNotNil(defaults.dictionary(forKey: "reboot.product.v6"))
         XCTAssertNil(defaults.object(forKey: "reboot.product.v3"))
     }
 
@@ -839,6 +839,7 @@ final class REBOOTTests: XCTestCase {
             "reboot.product.v3",
             "reboot.product.v4",
             "reboot.product.v5",
+            "reboot.product.v6",
         ] {
             defaults.removeObject(forKey: key)
         }
@@ -1344,7 +1345,7 @@ final class REBOOTTests: XCTestCase {
 
     // MARK: - Persistence v5 & Corruption Recovery Tests
 
-    func testPersistenceV5RoundTrip() {
+    func testPersistenceV6RoundTrip() {
         let store1 = ProductStore(diagnosisAnswers: [:], defaults: defaults)
         store1.addCustomPersonalRule(
             title: "Custom Rule 1",
@@ -1363,7 +1364,7 @@ final class REBOOTTests: XCTestCase {
         XCTAssertEqual(store2.personalRules.first?.title, "Custom Rule 1")
     }
 
-    func testPersistenceV4ToV5Migration() {
+    func testPersistenceV4ToV6Migration() {
         clearProductPersistence()
         let legacyState: [String: Any] = [
             "profile": (try? JSONEncoder().encode(AttentionProfile(focusWindowMinutes: 25))) ?? Data(),
@@ -1376,14 +1377,13 @@ final class REBOOTTests: XCTestCase {
         let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
         XCTAssertEqual(store.day, 6)
         XCTAssertEqual(store.sessions.count, 5)
-        XCTAssertNil(defaults.object(forKey: "reboot.product.v4"), "Legacy v4 key must be cleaned after v5 migration")
-        XCTAssertNotNil(defaults.object(forKey: "reboot.product.v5"), "v5 storage key must be set")
+        XCTAssertNil(defaults.object(forKey: "reboot.product.v4"), "Legacy v4 key must be cleaned after v6 migration")
+        XCTAssertNotNil(defaults.object(forKey: "reboot.product.v6"), "v6 storage key must be set")
     }
 
-    func testCorruptedPersistenceV5SafeRecovery() {
+    func testCorruptedPersistenceV6SafeRecovery() {
         clearProductPersistence()
-        // Save corrupted payload in v5:
-        defaults.set(["profile": "corrupted_non_data_string", "day": 14], forKey: "reboot.product.v5")
+        defaults.set(["profile": "corrupted_non_data_string", "day": 14], forKey: "reboot.product.v6")
 
         // ProductStore must not crash and must safely initialize:
         let store = ProductStore(diagnosisAnswers: [:], defaults: defaults)
@@ -1459,7 +1459,7 @@ final class REBOOTTests: XCTestCase {
 
     func testLongRangeSimulationDeepWorkArchetype30_60_90Days() {
         let store = ProductStore(diagnosisAnswers: ["primary_goal": ["deep_work"], "breaker": ["notifications"]], defaults: defaults)
-        for day in 1...90 {
+        for _ in 1...90 {
             let req = tryUnwrap(store.protocolRequest())
             store.begin(request: req)
             store.finishRunning(actualMinutes: req.targetMinutes, endedEarly: false)

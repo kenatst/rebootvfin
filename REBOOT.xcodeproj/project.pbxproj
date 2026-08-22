@@ -73,6 +73,9 @@
 		9A0000000000000000000001 /* REBOOTTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0000000000000000000002 /* REBOOTTests.swift */; };
 		9B0000000000000000000001 /* ProgramCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0000000000000000000002 /* ProgramCore.swift */; };
 		9B0000000000000000000003 /* ProgramViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0000000000000000000004 /* ProgramViews.swift */; };
+		9C0000000000000000000001 /* PersonalLabCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C0000000000000000000002 /* PersonalLabCore.swift */; };
+		9C0000000000000000000004 /* PersonalLabViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C0000000000000000000005 /* PersonalLabViews.swift */; };
+		9C0000000000000000000006 /* PersonalLabTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C0000000000000000000007 /* PersonalLabTests.swift */; };
 	/* End PBXBuildFile section */
 
 	/* Begin PBXContainerItemProxy section */
@@ -193,6 +196,9 @@
 		9A0000000000000000000003 /* REBOOTTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = REBOOTTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9B0000000000000000000002 /* ProgramCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramCore.swift; sourceTree = "<group>"; };
 		9B0000000000000000000004 /* ProgramViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramViews.swift; sourceTree = "<group>"; };
+		9C0000000000000000000002 /* PersonalLabCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalLabCore.swift; sourceTree = "<group>"; };
+		9C0000000000000000000005 /* PersonalLabViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalLabViews.swift; sourceTree = "<group>"; };
+		9C0000000000000000000007 /* PersonalLabTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalLabTests.swift; sourceTree = "<group>"; };
 	/* End PBXFileReference section */
 
 	/* Begin PBXGroup section */
@@ -311,6 +317,15 @@
 			path = Program;
 			sourceTree = "<group>";
 		};
+		9C0000000000000000000003 /* PersonalLab */ = {
+			isa = PBXGroup;
+			children = (
+				9C0000000000000000000002 /* PersonalLabCore.swift */,
+				9C0000000000000000000005 /* PersonalLabViews.swift */,
+			);
+			path = PersonalLab;
+			sourceTree = "<group>";
+		};
 		82CF3496F1A9FE790BD48616 /* Product */ = {
 			isa = PBXGroup;
 			children = (
@@ -319,6 +334,7 @@
 				DD155ACEB803E4EC937AEFFB,
 				575972E876006934E9B5B1AC,
 				9B0000000000000000000005 /* Program */,
+				9C0000000000000000000003 /* PersonalLab */,
 				03327B4BB8B671204EF7BD05,
 				81FA6CF8148788D830F5E88A,
 				920284D85A96422B151973C1,
@@ -458,6 +474,7 @@
 			isa = PBXGroup;
 			children = (
 				9A0000000000000000000002 /* REBOOTTests.swift */,
+				9C0000000000000000000007 /* PersonalLabTests.swift */,
 			);
 			path = REBOOTTests;
 			sourceTree = "<group>";
@@ -553,6 +570,8 @@
 				C5CE1792824D71C7837EBF2A /* AdaptiveCore.swift in Sources */,
 				9B0000000000000000000001 /* ProgramCore.swift in Sources */,
 				9B0000000000000000000003 /* ProgramViews.swift in Sources */,
+				9C0000000000000000000001 /* PersonalLabCore.swift in Sources */,
+				9C0000000000000000000004 /* PersonalLabViews.swift in Sources */,
 				91EF2CCF54D98AC6AFA0ACA0 /* ProductStore.swift in Sources */,
 				214B397E915C917076B0DEA2 /* QASeed.swift in Sources */,
 				DA352BF5FA05264D878B63BD /* FloatingGlassTabBar.swift in Sources */,
@@ -601,6 +620,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9A0000000000000000000001 /* REBOOTTests.swift in Sources */,
+				9C0000000000000000000006 /* PersonalLabTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -27,6 +27,12 @@ struct TodayView: View {
                                 RealWorldActionCard(product: product, environmentStore: environmentStore)
                                     .padding(.top, 18)
                             }
+                            if product.todayExperimentParticipation(
+                                activeRecurringProtection: environmentStore.hasActiveProtectionNow
+                            ) != nil {
+                                TodayExperimentCard(product: product, environmentStore: environmentStore)
+                                    .padding(.top, 14)
+                            }
                             if prescription.mode == .nothing {
                                 resetEntry
                                     .padding(.top, 14)

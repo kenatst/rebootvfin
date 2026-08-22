@@ -9,6 +9,7 @@ struct QASeed: Codable {
     var phase: String?
     var record: SessionRecord?
     var programState: ProgramState? = nil
+    var labState: PersonalLabState? = nil
 }
 
 enum QASeeds {
@@ -639,6 +640,167 @@ enum QASeeds {
         )
     }
 
+    static var labSuggested: QASeed {
+        var seed = activeProgramSeed(day: 18, profile: scrollControlProfile, track: .scrollControl)
+        seed.phase = "lab"
+        seed.labState = .empty
+        return seed
+    }
+
+    static var labActivePair1: QASeed {
+        labSeed(experiment: activeLabExperiment())
+    }
+
+    static var labActiveMidway: QASeed {
+        var experiment = activeLabExperiment()
+        appendLabPair(normalSwitches: 5, testSwitches: 2, pairIndex: 1, to: &experiment)
+        experiment.observations.append(labObservation(
+            experiment: experiment,
+            armKind: .test,
+            pairIndex: 2,
+            switches: 2,
+            dateOffset: 4
+        ))
+        ExperimentComparisonEngine.updateComparability(&experiment)
+        stabilizeLabPairIDs(&experiment)
+        return labSeed(experiment: experiment)
+    }
+
+    static var labResultKeep: QASeed {
+        var experiment = activeLabExperiment()
+        appendLabPair(normalSwitches: 6, testSwitches: 2, pairIndex: 1, to: &experiment)
+        appendLabPair(normalSwitches: 5, testSwitches: 2, pairIndex: 2, to: &experiment)
+        appendLabPair(normalSwitches: 4, testSwitches: 2, pairIndex: 3, to: &experiment)
+        finalizeLabFixture(&experiment)
+        return labSeed(experiment: experiment)
+    }
+
+    static var labResultInconclusive: QASeed {
+        var experiment = activeLabExperiment(template: ExperimentTemplateLibrary.oneBrowserTask)
+        appendLabPair(normalSwitches: 5, testSwitches: 2, pairIndex: 1, to: &experiment)
+        appendLabPair(normalSwitches: 2, testSwitches: 5, pairIndex: 2, to: &experiment)
+        appendLabPair(normalSwitches: 3, testSwitches: 3, pairIndex: 3, to: &experiment)
+        finalizeLabFixture(&experiment)
+        return labSeed(experiment: experiment)
+    }
+
+    private static func activeLabExperiment(
+        template: ExperimentTemplate = ExperimentTemplateLibrary.phoneDistance
+    ) -> PersonalExperiment {
+        var experiment = PersonalLabEngine.makeExperiment(
+            template: template,
+            origin: .evidenceSuggestion,
+            now: fixtureReferenceDate
+        )
+        let fixtureValue = labTemplateValue(template.id)
+        experiment.id = stableUUID(prefix: 70, track: .focus, value: fixtureValue)
+        experiment.normalArm.id = stableUUID(prefix: 71, track: .focus, value: fixtureValue * 10 + 1)
+        experiment.testArm.id = stableUUID(prefix: 71, track: .focus, value: fixtureValue * 10 + 2)
+        experiment.status = .active
+        return experiment
+    }
+
+    private static func labSeed(experiment: PersonalExperiment) -> QASeed {
+        var seed = activeProgramSeed(day: 18, profile: scrollControlProfile, track: .scrollControl)
+        seed.phase = "lab"
+        seed.labState = PersonalLabState(experiments: [experiment])
+        return seed
+    }
+
+    private static func appendLabPair(
+        normalSwitches: Int,
+        testSwitches: Int,
+        pairIndex: Int,
+        to experiment: inout PersonalExperiment
+    ) {
+        experiment.observations.append(labObservation(
+            experiment: experiment,
+            armKind: .normal,
+            pairIndex: pairIndex,
+            switches: normalSwitches,
+            dateOffset: pairIndex * 2
+        ))
+        experiment.observations.append(labObservation(
+            experiment: experiment,
+            armKind: .test,
+            pairIndex: pairIndex,
+            switches: testSwitches,
+            dateOffset: pairIndex * 2 + 1
+        ))
+        ExperimentComparisonEngine.updateComparability(&experiment)
+        stabilizeLabPairIDs(&experiment)
+    }
+
+    private static func labObservation(
+        experiment: PersonalExperiment,
+        armKind: ExperimentArmKind,
+        pairIndex: Int,
+        switches: Int,
+        dateOffset: Int
+    ) -> ExperimentObservation {
+        let arm = experiment.arm(for: armKind)
+        var snapshot = ExperimentConditionSnapshot.pending(arm.condition)
+        snapshot.actualDescription = arm.condition.detail
+        snapshot.truthSource = .userReported
+        snapshot.conditionFollowed = true
+        snapshot.capturedAt = fixtureReferenceDate.addingTimeInterval(Double(dateOffset) * 3_600)
+        return ExperimentObservation(
+            id: stableUUID(prefix: 72, track: .focus, value: dateOffset),
+            experimentID: experiment.id,
+            sessionID: stableUUID(prefix: 73, track: .focus, value: dateOffset),
+            armID: arm.id,
+            armKind: armKind,
+            pairIndex: pairIndex,
+            requestedCondition: snapshot,
+            mode: .stay,
+            targetMinutes: 15,
+            actualMinutes: 15,
+            completed: true,
+            endedEarly: false,
+            outcomes: [ExperimentOutcomeMetric.reportedSwitches.key: .integer(switches)],
+            classification: .usableButUnmatched,
+            classificationReason: "Waiting for the matching condition.",
+            confounds: [],
+            sourceEvidenceIDs: [stableUUID(prefix: 74, track: .focus, value: dateOffset)],
+            date: fixtureReferenceDate.addingTimeInterval(Double(dateOffset) * 3_600)
+        )
+    }
+
+    private static func finalizeLabFixture(_ experiment: inout PersonalExperiment) {
+        _ = ExperimentResultEngine.finalize(&experiment)
+        let fixtureValue = labTemplateValue(experiment.templateID)
+        experiment.result?.id = stableUUID(prefix: 75, track: .focus, value: fixtureValue)
+        experiment.result?.finalizedAt = fixtureReferenceDate.addingTimeInterval(86_400)
+        experiment.completedAt = experiment.result?.finalizedAt
+        experiment.updatedAt = experiment.result?.finalizedAt ?? fixtureReferenceDate
+        stabilizeLabPairIDs(&experiment)
+    }
+
+    private static func stabilizeLabPairIDs(_ experiment: inout PersonalExperiment) {
+        let fixtureValue = labTemplateValue(experiment.templateID)
+        for index in experiment.pairs.indices {
+            experiment.pairs[index].id = stableUUID(
+                prefix: 76,
+                track: .focus,
+                value: fixtureValue * 10 + experiment.pairs[index].pairIndex
+            )
+        }
+        if experiment.result != nil {
+            experiment.result?.pairResults = experiment.pairs.filter(\.isComplete)
+        }
+    }
+
+    private static func labTemplateValue(_ templateID: String?) -> Int {
+        switch templateID {
+        case ExperimentTemplateLibrary.phoneDistance.id: return 1
+        case ExperimentTemplateLibrary.sessionProtection.id: return 2
+        case ExperimentTemplateLibrary.oneBrowserTask.id: return 3
+        case ExperimentTemplateLibrary.sound.id: return 4
+        case ExperimentTemplateLibrary.clearFinishLine.id: return 5
+        default: return 9
+        }
+    }
+
     private static func stableUUID(
         prefix: Int,
         track: FixtureTrack,
@@ -679,6 +841,11 @@ enum QASeeds {
         case "programDay82Mature": return programDay82Mature
         case "programDay90BeforeCompletion": return programDay90BeforeCompletion
         case "programCompleted": return programCompleted
+        case "labSuggested": return labSuggested
+        case "labActivePair1": return labActivePair1
+        case "labActiveMidway": return labActiveMidway
+        case "labResultKeep": return labResultKeep
+        case "labResultInconclusive": return labResultInconclusive
 #endif
         default: return nil
         }

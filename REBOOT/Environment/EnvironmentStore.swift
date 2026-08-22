@@ -20,6 +20,34 @@ final class EnvironmentStore: ObservableObject {
 
     var isConnected: Bool { capability.canProtect }
 
+    var hasActiveProtectionNow: Bool {
+        if activeSessionProtection { return true }
+        return Self.hasScheduledProtection(in: windows, at: Date(), calendar: .current)
+    }
+
+    static func hasScheduledProtection(
+        in windows: [ProtectedWindow],
+        at now: Date,
+        calendar: Calendar
+    ) -> Bool {
+        let weekday = calendar.component(.weekday, from: now)
+        let minutes = calendar.component(.hour, from: now) * 60 + calendar.component(.minute, from: now)
+        return windows.contains { window in
+            guard window.enabled else { return false }
+            if window.startMinutes <= window.endMinutes {
+                return window.weekdays.contains(weekday)
+                    && (window.startMinutes..<window.endMinutes).contains(minutes)
+            }
+            if minutes >= window.startMinutes {
+                return window.weekdays.contains(weekday)
+            }
+            guard minutes < window.endMinutes,
+                  let previousDay = calendar.date(byAdding: .day, value: -1, to: now) else { return false }
+            let previousWeekday = calendar.component(.weekday, from: previousDay)
+            return window.weekdays.contains(previousWeekday)
+        }
+    }
+
     init() {
         load()
         if activeSessionProtection {
