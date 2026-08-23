@@ -42,11 +42,11 @@ enum DailyGuidanceEngine {
                 bottleneck: .starting,
                 primaryAction: DailyGuidancePrimaryAction(
                     kind: .standardProtocolSession,
-                    title: "Observe your natural focus",
-                    subtitle: "15 MIN · OBSERVE",
+                    title: L("Observe your natural focus"),
+                    subtitle: L("15 MIN · OBSERVE"),
                     targetMinutes: 15,
                     mode: .observe,
-                    ctaTitle: "Start baseline"
+                    ctaTitle: L("Start baseline")
                 ),
                 supportingAction: nil,
                 sessionPrescription: basePrescription,
@@ -54,7 +54,7 @@ enum DailyGuidanceEngine {
                 fuelPrompt: nil,
                 flowOpportunity: nil,
                 experimentOpportunityID: nil,
-                explanation: "Day 1 measures how you normally work. Nothing about your environment changes yet.",
+                explanation: L("Day 1 measures how you normally work. Nothing about your environment changes yet."),
                 confidence: 1.0,
                 evidenceIDs: [],
                 suppressedOpportunities: ["Fuel Prompt", "Personal Lab", "Flow Block", "Environment Intervention"],
@@ -73,11 +73,11 @@ enum DailyGuidanceEngine {
                 bottleneck: .recovery,
                 primaryAction: DailyGuidancePrimaryAction(
                     kind: .recoverySession,
-                    title: "Give your mind less to react to.",
-                    subtitle: "5 MIN · NOTHING",
+                    title: L("Give your mind less to react to."),
+                    subtitle: L("5 MIN · NOTHING"),
                     targetMinutes: 5,
                     mode: .nothing,
-                    ctaTitle: "Begin reset"
+                    ctaTitle: L("Begin reset")
                 ),
                 supportingAction: nil,
                 sessionPrescription: recoveryPrescription,
@@ -85,7 +85,7 @@ enum DailyGuidanceEngine {
                 fuelPrompt: nil,
                 flowOpportunity: nil,
                 experimentOpportunityID: nil,
-                explanation: "Your last session felt hard. Today is lighter on purpose — that is how load stays survivable.",
+                explanation: L("Your last session felt hard. Today is lighter on purpose — that is how load stays survivable."),
                 confidence: 0.95,
                 evidenceIDs: [],
                 suppressedOpportunities: ["Flow Block", "Personal Lab", "Fuel Prompt"],
@@ -185,13 +185,13 @@ enum DailyGuidanceEngine {
         var supportingAction: DailyGuidanceSecondaryAction? = nil
         if primaryKind != .projectFlowBlock, let proj = activeFlowProject {
             supportingAction = DailyGuidanceSecondaryAction(
-                title: "Use your real project: \(proj.title)",
+                title: L("Use your real project: \(proj.title)"),
                 actionType: "flow",
                 identifier: proj.id.uuidString
             )
         } else if let activeExp = labExperiments.first(where: { $0.status == .active }) {
             supportingAction = DailyGuidanceSecondaryAction(
-                title: "Today counts toward: \(activeExp.testArm.condition.title)",
+                title: L("Today counts toward: \(activeExp.testArm.condition.title)"),
                 actionType: "experiment",
                 identifier: activeExp.id.uuidString
             )
@@ -257,8 +257,8 @@ enum DailyGuidanceEngine {
                 bottleneck: .independence,
                 primaryAction: DailyGuidancePrimaryAction(
                     kind: .ownModeSession,
-                    title: "Nothing needs adjusting today.",
-                    subtitle: "NO INTERVENTION",
+                    title: L("Nothing needs adjusting today."),
+                    subtitle: L("NO INTERVENTION"),
                     targetMinutes: 0,
                     mode: .stay,
                     ctaTitle: ""
@@ -269,7 +269,7 @@ enum DailyGuidanceEngine {
                 fuelPrompt: nil,
                 flowOpportunity: nil,
                 experimentOpportunityID: nil,
-                explanation: "Your system is running itself. Train if you want to — REBOOT has nothing to add today.",
+                explanation: L("Your system is running itself. Train if you want to — REBOOT has nothing to add today."),
                 confidence: 1.0,
                 evidenceIDs: [],
                 suppressedOpportunities: [],
@@ -284,14 +284,14 @@ enum DailyGuidanceEngine {
             bottleneck: .independence,
             primaryAction: DailyGuidancePrimaryAction(
                 kind: .ownModeSession,
-                title: "You know how you start best.",
-                subtitle: "\(duration) MIN · STAY · SELF-DIRECTED",
+                title: L("You know how you start best."),
+                subtitle: L("\(duration) MIN · STAY · SELF-DIRECTED"),
                 targetMinutes: duration,
                 mode: .stay,
-                ctaTitle: "Start focus block"
+                ctaTitle: L("Start focus block")
             ),
             supportingAction: DailyGuidanceSecondaryAction(
-                title: "Open your Operating Manual",
+                title: L("Open your Operating Manual"),
                 actionType: "manual",
                 identifier: nil
             ),
@@ -300,7 +300,7 @@ enum DailyGuidanceEngine {
             fuelPrompt: nil,
             flowOpportunity: nil,
             experimentOpportunityID: nil,
-            explanation: "You own your attention system now. REBOOT suggests; you decide.",
+            explanation: L("You own your attention system now. REBOOT suggests; you decide."),
             confidence: 1.0,
             evidenceIDs: [],
             suppressedOpportunities: [],
@@ -430,7 +430,7 @@ enum DailyGuidanceEngine {
             let pull = digitalEnvironment.profile.primaryDigitalPull.value
             return EnvironmentAction(
                 kind: .manualPhoneAway,
-                title: "Keep your phone outside arm's reach",
+                title: L("Keep your phone outside arm's reach"),
                 detail: "Your sessions point at \(pull.displayName) as the strongest pull. Distance acts before willpower has to.",
                 level: 1,
                 minutes: nil

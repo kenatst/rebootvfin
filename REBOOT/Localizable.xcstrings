@@ -30,6 +30,35 @@
         }
       }
     },
+    "15 MIN · OBSERVE": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "15 MIN · OBSERVER"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "15 MIN · OBSERVAR"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "15 MIN · BEOBACHTEN"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "15 MIN · OSSERVARE"
+          }
+        }
+      }
+    },
     "15 – 30 minutes": {
       "extractionState": "manual",
       "localizations": {
@@ -84,6 +113,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "30 – 60 minuti"
+          }
+        }
+      }
+    },
+    "5 MIN · NOTHING": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 MIN · RIEN"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 MIN · NADA"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 MIN · NICHTS"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 MIN · NIENTE"
           }
         }
       }
@@ -697,6 +755,35 @@
         }
       }
     },
+    "Begin reset": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commencer la pause"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciar el reset"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset beginnen"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avvia il reset"
+          }
+        }
+      }
+    },
     "Best hours": {
       "extractionState": "manual",
       "localizations": {
@@ -1215,6 +1302,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "GIORNO 1 COMPLETATO"
+          }
+        }
+      }
+    },
+    "Day 1 measures how you normally work. Nothing about your environment changes yet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le Jour 1 mesure ta façon normale de travailler. Rien dans ton environnement ne change encore."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El Día 1 mide cómo trabajas normalmente. Nada de tu entorno cambia todavía."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tag 1 misst, wie du normalerweise arbeitest. An deiner Umgebung ändert sich noch nichts."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il Giorno 1 misura come lavori di norma. Nulla del tuo ambiente cambia ancora."
           }
         }
       }
@@ -1857,6 +1973,35 @@
         }
       }
     },
+    "Give your mind less to react to.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Donne à ton esprit moins à quoi réagir."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dale a tu mente menos a lo que reaccionar."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gib deinem Geist weniger, worauf es reagieren kann."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dai alla tua mente meno cose a cui reagire."
+          }
+        }
+      }
+    },
     "Hardest part": {
       "extractionState": "manual",
       "localizations": {
@@ -2143,6 +2288,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "Varia"
+          }
+        }
+      }
+    },
+    "Keep your phone outside arm's reach": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garde ton téléphone hors de portée de bras"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deja el teléfono fuera del alcance del brazo"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Halte dein Handy außer Reichweite"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tieni il telefono fuori portata di braccio"
           }
         }
       }
@@ -2901,6 +3075,35 @@
         }
       }
     },
+    "Observe your natural focus": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observe ton focus naturel"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observa tu foco natural"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beobachte deinen natürlichen Fokus"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Osserva la tua concentrazione naturale"
+          }
+        }
+      }
+    },
     "On-device storage only": {
       "extractionState": "manual",
       "localizations": {
@@ -3042,6 +3245,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apri il manuale dell'attenzione"
+          }
+        }
+      }
+    },
+    "Open your Operating Manual": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir ton Manuel"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir tu Manual"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dein Handbuch öffnen"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri il tuo Manuale"
           }
         }
       }
@@ -4090,6 +4322,35 @@
         }
       }
     },
+    "Start baseline": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrer la référence"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciar la referencia"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Referenz starten"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avvia la base di riferimento"
+          }
+        }
+      }
+    },
     "Start day one": {
       "extractionState": "manual",
       "localizations": {
@@ -4115,6 +4376,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "Inizia il giorno uno"
+          }
+        }
+      }
+    },
+    "Start focus block": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrer un bloc de focus"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciar bloque de foco"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fokusblock starten"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avvia blocco di focus"
           }
         }
       }
@@ -5772,6 +6062,64 @@
         }
       }
     },
+    "You know how you start best.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu sais comment tu démarres le mieux."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ya sabes cómo empiezas mejor."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du weißt, wie du am besten startest."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sai già come inizi al meglio."
+          }
+        }
+      }
+    },
+    "You own your attention system now. REBOOT suggests; you decide.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ton système d'attention t'appartient. REBOOT suggère ; tu décides."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu sistema de atención ya es tuyo. REBOOT sugiere; tú decides."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dein Aufmerksamkeitssystem gehört dir. REBOOT schlägt vor; du entscheidest."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il tuo sistema di attenzione è ormai tuo. REBOOT suggerisce; decidi tu."
+          }
+        }
+      }
+    },
     "You told reboot": {
       "extractionState": "manual",
       "localizations": {
@@ -6000,6 +6348,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "La tua sessione è pronta. Prenditi qualche minuto senza interruzioni per praticare."
+          }
+        }
+      }
+    },
+    "Your last session felt hard. Today is lighter on purpose — that is how load stays survivable.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ta dernière séance a été difficile. Aujourd'hui est plus léger à dessein — c'est ainsi que la charge reste soutenable."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu última sesión se sintió dura. Hoy es más ligero a propósito: así la carga se mantiene sostenible."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deine letzte Sitzung fühlte sich hart an. Heute ist absichtlich leichter – so bleibt die Last tragbar."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La tua ultima sessione è stata pesante. Oggi è più leggera apposta: così il carico resta sostenibile."
           }
         }
       }

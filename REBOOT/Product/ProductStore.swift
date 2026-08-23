@@ -421,11 +421,13 @@ final class ProductStore: ObservableObject {
         persist(activeSession: nil)
     }
 
-    /// Canonical entry from the diagnosis flow: installs the diagnosis priors
-    /// into the live profile AND guarantees Day 1 of an active program.
+    /// Canonical entry from the diagnosis flow: a FULL rebuild from the given
+    /// answers — priors installed, evidence history cleared, Day 1 guaranteed.
+    /// Diagnosis completion (fresh user or retake) is the one moment where
+    /// wiping sessions and derived domains is correct; a stale Day-90 state
+    /// must never survive underneath a fresh program.
     func applyDiagnosis(_ answers: Answers) {
-        profile = ProfileBuilder.build(from: answers)
-        initializeProgramIfNeeded()
+        rebuildFromDiagnosis(answers)
     }
 
     // MARK: - Personal Rules actions

@@ -538,6 +538,71 @@ STRINGS = {
         "de": "Über 60 Minuten",
         "it": "Oltre 60 minuti",
     },
+    # ================= DAILY GUIDANCE =================
+    "Observe your natural focus": {
+        "fr": "Observe ton focus naturel",
+        "es": "Observa tu foco natural",
+        "de": "Beobachte deinen natürlichen Fokus",
+        "it": "Osserva la tua concentrazione naturale",
+    },
+    "15 MIN · OBSERVE": {"fr": "15 MIN · OBSERVER", "es": "15 MIN · OBSERVAR", "de": "15 MIN · BEOBACHTEN", "it": "15 MIN · OSSERVARE"},
+    "Start baseline": {
+        "fr": "Démarrer la référence",
+        "es": "Iniciar la referencia",
+        "de": "Referenz starten",
+        "it": "Avvia la base di riferimento",
+    },
+    "Day 1 measures how you normally work. Nothing about your environment changes yet.": {
+        "fr": "Le Jour 1 mesure ta façon normale de travailler. Rien dans ton environnement ne change encore.",
+        "es": "El Día 1 mide cómo trabajas normalmente. Nada de tu entorno cambia todavía.",
+        "de": "Tag 1 misst, wie du normalerweise arbeitest. An deiner Umgebung ändert sich noch nichts.",
+        "it": "Il Giorno 1 misura come lavori di norma. Nulla del tuo ambiente cambia ancora.",
+    },
+    "Give your mind less to react to.": {
+        "fr": "Donne à ton esprit moins à quoi réagir.",
+        "es": "Dale a tu mente menos a lo que reaccionar.",
+        "de": "Gib deinem Geist weniger, worauf es reagieren kann.",
+        "it": "Dai alla tua mente meno cose a cui reagire.",
+    },
+    "5 MIN · NOTHING": {"fr": "5 MIN · RIEN", "es": "5 MIN · NADA", "de": "5 MIN · NICHTS", "it": "5 MIN · NIENTE"},
+    "Begin reset": {"fr": "Commencer la pause", "es": "Iniciar el reset", "de": "Reset beginnen", "it": "Avvia il reset"},
+    "Your last session felt hard. Today is lighter on purpose — that is how load stays survivable.": {
+        "fr": "Ta dernière séance a été difficile. Aujourd'hui est plus léger à dessein — c'est ainsi que la charge reste soutenable.",
+        "es": "Tu última sesión se sintió dura. Hoy es más ligero a propósito: así la carga se mantiene sostenible.",
+        "de": "Deine letzte Sitzung fühlte sich hart an. Heute ist absichtlich leichter – so bleibt die Last tragbar.",
+        "it": "La tua ultima sessione è stata pesante. Oggi è più leggera apposta: così il carico resta sostenibile.",
+    },
+    "You know how you start best.": {
+        "fr": "Tu sais comment tu démarres le mieux.",
+        "es": "Ya sabes cómo empiezas mejor.",
+        "de": "Du weißt, wie du am besten startest.",
+        "it": "Sai già come inizi al meglio.",
+    },
+    "Start focus block": {
+        "fr": "Démarrer un bloc de focus",
+        "es": "Iniciar bloque de foco",
+        "de": "Fokusblock starten",
+        "it": "Avvia blocco di focus",
+    },
+    "Open your Operating Manual": {
+        "fr": "Ouvrir ton Manuel",
+        "es": "Abrir tu Manual",
+        "de": "Dein Handbuch öffnen",
+        "it": "Apri il tuo Manuale",
+    },
+    "You own your attention system now. REBOOT suggests; you decide.": {
+        "fr": "Ton système d'attention t'appartient. REBOOT suggère ; tu décides.",
+        "es": "Tu sistema de atención ya es tuyo. REBOOT sugiere; tú decides.",
+        "de": "Dein Aufmerksamkeitssystem gehört dir. REBOOT schlägt vor; du entscheidest.",
+        "it": "Il tuo sistema di attenzione è ormai tuo. REBOOT suggerisce; decidi tu.",
+    },
+    "Keep your phone outside arm's reach": {
+        "fr": "Garde ton téléphone hors de portée de bras",
+        "es": "Deja el teléfono fuera del alcance del brazo",
+        "de": "Halte dein Handy außer Reichweite",
+        "it": "Tieni il telefono fuori portata di braccio",
+    },
+
     # ================= STARTING POINT REPORT =================
     "Your starting point.": {
         "fr": "Votre point de départ.",
