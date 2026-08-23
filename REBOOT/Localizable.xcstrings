@@ -1,19 +1,48 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@ after a distraction.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ après une distraction"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ tras una distracción"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ nach einer Ablenkung"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ dopo una distrazione"
+          }
+        }
+      }
+    },
     "%@ are a possible breaker.": {
       "extractionState": "manual",
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ sont une source de rupture possible."
+            "value": "Les %@ sont une source de rupture possible."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ son una posible fuente de ruptura."
+            "value": "Las %@ son una posible fuente de ruptura."
           }
         },
         "de": {
@@ -25,7 +54,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ sono una possibile causa di rottura."
+            "value": "Le %@ sono una possibile causa di rottura."
           }
         }
       }
@@ -635,35 +664,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Adattarsi"
-          }
-        }
-      }
-    },
-    "After a distraction, returning %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Après une distraction, revenir %@"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tras una distracción, volver %@"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nach einer Ablenkung fällt die Rückkehr %@ aus"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dopo una distrazione, tornare risulta %@"
           }
         }
       }

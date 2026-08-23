@@ -15,15 +15,30 @@ struct StartingPointView: View {
 
     /// The one direction everything adapts around. Falls back to the single
     /// chosen goal when the conditional primary question never appeared.
+    /// Never renders a raw internal identifier: unresolvable values are
+    /// dropped in favor of a graceful fallback.
     private var wantLabel: String? {
-        if let labeled = DiagnosisModels.answerLabels("primary", answers).first, !labeled.isEmpty {
-            return labeled
+        let candidates = DiagnosisModels.answerLabels("primary", answers)
+            + [bestGoalFallback].compactMap { $0 }
+        let labeled = candidates.first { !Self.looksLikeInternalID($0) }
+        return labeled
+    }
+
+    /// First resolvable goal label, used when the conditional primary
+    /// question was skipped or its stored value no longer resolves.
+    private var bestGoalFallback: String? {
+        let goals = answers["goals"] ?? []
+        if goals.count == 1 {
+            return DiagnosisModels.goalLabel[goals[0]]
         }
-        if DiagnosisModels.isUnknown("primary", answers),
-           let only = answers["goals"]?.first, answers["goals"]?.count == 1 {
-            return DiagnosisModels.goalLabel[only]
-        }
-        return nil
+        return DiagnosisModels.answerLabels("goals", answers).first
+    }
+
+    /// Internal identifiers are snake_case or known enum tokens; display
+    /// labels never are.
+    static func looksLikeInternalID(_ value: String) -> Bool {
+        value.contains("_")
+            || value == value.lowercased() && value.count > 3 && !value.contains(" ")
     }
 
     private var extraGoalLabels: [String] {
@@ -40,10 +55,10 @@ struct StartingPointView: View {
     /// instead of a mechanical "Unmeasured" row.
     private var hypotheses: [Hypothesis] {
         var rows: [Hypothesis] = []
-        if let hardest = firstLabel("hardest") {
+        if let hardest = firstDisplayLabel("hardest") {
             rows.append(Hypothesis(id: "hardest", text: String(format: L("%@ may be the hardest part right now."), hardest)))
         }
-        if let breaker = firstLabel("breaker") {
+        if let breaker = firstDisplayLabel("breaker") {
             rows.append(Hypothesis(id: "breaker", text: String(format: L("%@ are a possible breaker."), breaker)))
         } else {
             rows.append(Hypothesis(id: "breaker", text: L("What pulls your attention is still unclear — Day 1 watches for it.")))
@@ -51,12 +66,18 @@ struct StartingPointView: View {
         if let window = windowSentence {
             rows.append(Hypothesis(id: "window", text: window))
         }
-        if let returning = firstLabel("return_ability") {
-            rows.append(Hypothesis(id: "return", text: String(format: L("After a distraction, returning %@"), returning)))
+        if let returning = firstDisplayLabel("return_ability") {
+            rows.append(Hypothesis(id: "return", text: String(format: L("%@ after a distraction."), returning)))
         } else {
             rows.append(Hypothesis(id: "return", text: L("How you return after distraction isn't measured yet — Day 1 will test it.")))
         }
         return rows
+    }
+
+    /// Label lookup that refuses to hand back raw identifiers.
+    private func firstDisplayLabel(_ questionID: String) -> String? {
+        guard let label = firstLabel(questionID) else { return nil }
+        return Self.looksLikeInternalID(label) ? nil : label
     }
 
     private func firstLabel(_ questionID: String) -> String? {

@@ -803,10 +803,10 @@ STRINGS = {
         "it": "%@ sembra la parte più difficile in questo momento.",
     },
     "%@ are a possible breaker.": {
-        "fr": "%@ sont une source de rupture possible.",
-        "es": "%@ son una posible fuente de ruptura.",
+        "fr": "Les %@ sont une source de rupture possible.",
+        "es": "Las %@ son una posible fuente de ruptura.",
         "de": "%@ sind ein möglicher Unterbrecher.",
-        "it": "%@ sono una possibile causa di rottura.",
+        "it": "Le %@ sono una possibile causa di rottura.",
     },
     "What pulls your attention is still unclear — Day 1 watches for it.": {
         "fr": "Ce qui attire votre attention reste flou — le Jour 1 y veille.",
@@ -844,11 +844,11 @@ STRINGS = {
         "de": "Meist hältst du über eine Stunde durch, bevor du dich abgelenkt fühlst.",
         "it": "Di solito resisti oltre un'ora prima di sentirti attratto altrove.",
     },
-    "After a distraction, returning %@": {
-        "fr": "Après une distraction, revenir %@",
-        "es": "Tras una distracción, volver %@",
-        "de": "Nach einer Ablenkung fällt die Rückkehr %@ aus",
-        "it": "Dopo una distrazione, tornare risulta %@",
+    "%@ after a distraction.": {
+        "fr": "%@ après une distraction",
+        "es": "%@ tras una distracción",
+        "de": "%@ nach einer Ablenkung",
+        "it": "%@ dopo una distrazione",
     },
     "How you return after distraction isn't measured yet — Day 1 will test it.": {
         "fr": "La façon dont vous revenez après une distraction n'est pas encore mesurée — le Jour 1 la testera.",
