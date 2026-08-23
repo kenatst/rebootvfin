@@ -100,23 +100,28 @@ struct TodayView: View {
 
     // MARK: - Top Metadata
 
-    /// Day + phase as quiet metadata; the ring carries the progress meaning so
-    /// no pill repeats it.
+    /// Day over phase, stacked — long phase names never truncate against the
+    /// progress ring.
     private var topMetadata: some View {
-        HStack(spacing: 12) {
-            Text(isCompleted ? "OWN MODE" : String(format: "DAY %03d / 090", product.day))
-                .font(Font(AppTypography.plusJakarta(size: 12, weight: 700)))
-                .tracking(2)
-                .foregroundStyle(AppColors.coral)
-            Text(isCompleted ? "COMPLETE" : phaseTitle.uppercased())
-                .font(Font(AppTypography.plusJakarta(size: 12, weight: 600)))
-                .tracking(2)
-                .foregroundStyle(AppColors.inkFaint)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            Spacer()
-            ProgressRing(progress: isCompleted ? 1.0 : product.programProgress)
-                .accessibilityLabel(isCompleted ? L("90 protocol days complete") : "\(product.completedProtocolDays) of 90 program days completed")
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 12) {
+                Text(isCompleted ? L("OWN MODE") : String(format: "DAY %03d / 090", product.day))
+                    .font(Font(AppTypography.plusJakarta(size: 12, weight: 700)))
+                    .tracking(2)
+                    .foregroundStyle(AppColors.coral)
+                Spacer()
+                ProgressRing(progress: isCompleted ? 1.0 : product.programProgress)
+                    .accessibilityLabel(isCompleted ? L("90 protocol days complete") : L("%d of %d program days completed", product.completedProtocolDays, 90))
+            }
+            if !isCompleted {
+                Text(phaseTitle.uppercased())
+                    .font(Font(AppTypography.plusJakarta(size: 12, weight: 600)))
+                    .tracking(2)
+                    .foregroundStyle(AppColors.inkFaint)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
+            }
         }
     }
 
@@ -286,16 +291,23 @@ struct TodayView: View {
 
     // MARK: - Evidence Strip
 
-    /// Real numbers sit directly on the paper — flat, quiet, no glass box
-    /// competing with the prescription above.
+    /// One quiet editorial line — "RECENT PATTERN · 22 min average focus ·
+    /// Return: strong" — with a whisper of sparkline. Metrics never compete
+    /// with the prescription above.
     @ViewBuilder
     private var evidenceStrip: some View {
         if product.sessions.count >= 2 {
-            HStack(alignment: .center, spacing: 24) {
-                MicroMetric(label: L("Avg focus"), value: averageMinutes)
-                FocusSparkline(points: product.focusHistory)
-                    .frame(maxWidth: .infinity)
-                MicroMetric(label: L("Return"), value: returnTrend)
+            VStack(alignment: .leading, spacing: 8) {
+                MetaLabel(text: L("RECENT PATTERN"))
+                HStack(alignment: .center, spacing: 14) {
+                    Text("\(averageMinutes) \(L("min")) · \(L("Return")): \(returnTrend)")
+                        .type(.footnote)
+                        .foregroundStyle(AppColors.inkSoft)
+                    FocusSparkline(points: product.focusHistory)
+                        .frame(maxWidth: 90)
+                        .opacity(0.75)
+                    Spacer(minLength: 0)
+                }
             }
             .padding(.horizontal, 4)
         } else {
@@ -337,42 +349,54 @@ struct TodayView: View {
     }
 }
 
-/// Own Mode's Today card. Two honest states: a light self-directed suggestion,
-/// or a deliberate quiet day. Never an endless curriculum.
+/// Own Mode's Today content. The page headline already carries the message,
+/// so this renders ONE actionable surface — no duplicated hero card, no
+/// repeated copy.
 struct OwnModeTodayCard: View {
     let guidance: DailyGuidance
     var onManual: () -> Void
     var onStart: () -> Void
 
     var body: some View {
-        PaperCard(radius: AppRadius.hero, padding: 26, shadow: .lift) {
-            VStack(alignment: .leading, spacing: 16) {
-                MetaLabel(text: guidance.noInterventionNeeded ? L("NOTHING NEEDED") : L("SELF-DIRECTED"), color: AppColors.coral)
+        VStack(alignment: .leading, spacing: 0) {
+            MetaLabel(text: L("TODAY'S SUGGESTION"), color: AppColors.coral)
 
-                Text(guidance.noInterventionNeeded
-                     ? L("Nothing needs adjusting today.")
-                     : guidance.primaryAction.title)
-                    .font(.system(size: 30, weight: .semibold, design: .serif))
+            if guidance.noInterventionNeeded {
+                // Quiet day IS the hero — nothing else competes with it.
+                Text(L("Nothing needs adjusting today."))
+                    .font(.system(size: 28, weight: .semibold, design: .serif))
                     .foregroundStyle(AppColors.ink)
                     .fixedSize(horizontal: false, vertical: true)
-
-                Text(guidance.explanation)
+                    .padding(.top, 10)
+                Text(L("Your recent pattern is stable. Use REBOOT if you want to train, test, or review."))
                     .type(.todaySentence)
                     .foregroundStyle(AppColors.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
-
-                if guidance.noInterventionNeeded {
-                    QuietTextButton(title: L("Open Operating Manual")) { onManual() }
-                        .padding(.top, 10)
-                } else {
-                    PrimaryPillButton(title: guidance.primaryAction.ctaTitle, symbol: "play.fill") {
-                        onStart()
-                    }
                     .padding(.top, 12)
+                QuietTextButton(title: L("Open Operating Manual")) { onManual() }
+                    .padding(.top, 14)
+            } else {
+                Text(guidance.primaryAction.title)
+                    .font(.system(size: 24, weight: .semibold, design: .serif))
+                    .foregroundStyle(AppColors.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 10)
+                Text(guidance.primaryAction.subtitle)
+                    .type(.footnote)
+                    .tracking(1)
+                    .foregroundStyle(AppColors.coral)
+                    .padding(.top, 8)
+                PrimaryPillButton(title: guidance.primaryAction.ctaTitle, symbol: "play.fill") {
+                    onStart()
                 }
+                .padding(.top, 18)
             }
         }
+        .padding(22)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppColors.paperRaised.opacity(0.6))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.hero, style: .continuous))
+        .appShadow(.soft)
     }
 }
 

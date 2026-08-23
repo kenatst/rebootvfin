@@ -35,12 +35,20 @@ struct FlowLabView: View {
                                 .padding(.top, 30)
                         }
 
-                        noticingSection
-                            .padding(.top, 38)
-                        projectsSection
-                            .padding(.top, 38)
-                        recentSection
-                            .padding(.top, 38)
+                        // Empty collections stay hidden — an empty-state screen
+                        // shows one path forward, not three empty boxes.
+                        if !product.flowState.evidence.isEmpty || !product.flowPatterns.isEmpty {
+                            noticingSection
+                                .padding(.top, 38)
+                        }
+                        if !product.activeFlowProjects.isEmpty {
+                            projectsSection
+                                .padding(.top, 38)
+                        }
+                        if !product.recentFlowEvidence.isEmpty {
+                            recentSection
+                                .padding(.top, 38)
+                        }
                         stillLearningSection
                             .padding(.top, 34)
                     }
@@ -137,10 +145,10 @@ struct FlowLabView: View {
             }
         } else {
             VStack(alignment: .leading, spacing: 14) {
-                MetaLabel(text: "Start with real work")
-                FlowText("Create one project to give each block a meaningful context.", style: .heroGoal)
+                MetaLabel(text: L("START WITH REAL WORK"))
+                FlowText(L("Create one project to give each block a meaningful context."), style: .heroGoal)
                     .foregroundStyle(AppColors.ink)
-                PrimaryPillButton(title: "Create a project", symbol: "plus") {
+                PrimaryPillButton(title: L("Create your first project"), symbol: "plus") {
                     showNewProject = true
                 }
             }

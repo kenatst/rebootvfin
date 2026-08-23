@@ -544,6 +544,8 @@ private struct TimedSessionScaffold<Accessory: View>: View {
                 ZStack {
                     AmbientBackground()
                     VStack(spacing: 0) {
+                        // Deliberate spatial rhythm: mode/task up top, timer as
+                        // the visual center, one instruction, controls at rest.
                         Spacer()
                         MetaLabel(text: record.mode.rawValue, color: quiet ? AppColors.inkFaint : AppColors.coral)
                         if let detail {
@@ -562,28 +564,39 @@ private struct TimedSessionScaffold<Accessory: View>: View {
                         Text("of \(record.targetMinutes) minutes", style: .footnote)
                             .foregroundStyle(AppColors.inkFaint)
                             .padding(.top, 8)
+
+                        SessionProgressRhythm(progress: min(1, Double(elapsed) / Double(max(1, record.targetMinutes * 60))))
+                            .padding(.top, 26)
+                            .frame(maxWidth: 180)
+
                         Text(instruction, style: .heroReason)
                             .foregroundStyle(AppColors.inkFaint)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 24)
+                            .padding(.top, 22)
                         accessory()
-                            .padding(.top, 18)
+                            .padding(.top, 16)
                         Spacer()
-                        PrimaryPillButton(
-                            title: reached ? "Finish" : "Keep going",
-                            symbol: reached ? "checkmark" : nil,
-                            isEnabled: reached,
-                            action: onFinish
-                        )
-                        Button(action: onEndEarly) {
-                            Text("End early", style: .smallLink)
-                                .foregroundStyle(AppColors.inkFaint)
-                                .frame(minHeight: 44)
-                                .padding(.horizontal, 24)
+
+                        if reached {
+                            PrimaryPillButton(
+                                title: "Finish",
+                                symbol: "checkmark",
+                                action: onFinish
+                            )
+                            .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                        } else {
+                            // No giant disabled CTA while running — a quiet
+                            // end-early affordance is all a session needs.
+                            Button(action: onEndEarly) {
+                                Text("End early", style: .smallLink)
+                                    .foregroundStyle(AppColors.inkFaint)
+                                    .frame(minHeight: 44)
+                                    .padding(.horizontal, 24)
+                            }
                         }
-                        .padding(.top, 4)
                     }
+                    .animation(.easeOut(duration: 0.25), value: reached)
                     .padding(.horizontal, 24)
                     .padding(.top, max(20, geo.safeAreaInsets.top) + 8)
                     .padding(.bottom, max(24, geo.safeAreaInsets.bottom) + 8)
@@ -591,6 +604,29 @@ private struct TimedSessionScaffold<Accessory: View>: View {
             }
             .ignoresSafeArea()
         }
+    }
+}
+
+/// A faint vertical rhythm of dots that fills as the session progresses —
+/// visible at a glance, ignorable at will. No animation that pulls attention.
+struct SessionProgressRhythm: View {
+    let progress: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            let count = max(8, Int(geo.size.height / 14))
+            VStack(spacing: (geo.size.height - CGFloat(count)) / CGFloat(max(1, count - 1))) {
+                ForEach(0..<count, id: \.self) { i in
+                    Circle()
+                        .fill(Double(i) / Double(count) < progress ? AppColors.coral.opacity(0.55) : AppColors.hairline)
+                        .frame(width: 3, height: 3)
+                }
+            }
+            .frame(width: geo.size.width)
+            .frame(height: geo.size.height, alignment: .top)
+            .animation(.easeInOut(duration: 0.6), value: progress)
+        }
+        .frame(height: 120)
     }
 }
 

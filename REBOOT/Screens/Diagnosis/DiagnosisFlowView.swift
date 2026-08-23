@@ -25,7 +25,7 @@ struct DiagnosisFlowView: View {
                         variant: .diagnosis(
                             backEnabled: index > 0,
                             progress: progress,
-                            counter: "\(index + 1)/\(questions.count)",
+                            counter: counterText,
                             onBack: { state.patch(step: max(0, index - 1)) }
                         ),
                         safeTop: geo.safeAreaInsets.top,
@@ -44,8 +44,8 @@ struct DiagnosisFlowView: View {
                                     ))
                             }
                             .padding(.horizontal, AppSpacing.screenPadding)
-                            .padding(.top, AppSpacing.xl)
-                            .padding(.bottom, AppSpacing.choicesBottom)
+                            .padding(.top, AppSpacing.lg)
+                            .padding(.bottom, question.kind == .multi ? AppSpacing.choicesBottom : AppSpacing.choicesBottom * 0.55)
                             .animation(.reboot(duration: AppMotion.questionDuration), value: question.id)
                         }
                         .onChange(of: question.id, initial: false) { _, _ in
@@ -55,12 +55,20 @@ struct DiagnosisFlowView: View {
                 }
 
                 if question.kind == .multi {
-                    bottomBar(safeBottom: geo.safeAreaInsets.bottom)
+                    bottomBar(safeBottom: geo.safeAreaInsets.bottom, hasSelection: canContinue)
                 }
             }
             .ignoresSafeArea()
         }
         .background(AppColors.paper)
+    }
+
+    /// Canonical counter derived from the SAME visible-question array the flow
+    /// walks. The conditional "primary" question only enters the list after
+    /// goals are chosen, so both bar and number always agree.
+    private var counterText: String {
+        String(format: NSLocalizedString("%d of %d", comment: "Diagnosis step counter"),
+               index + 1, questions.count)
     }
 
     // MARK: - Question block
@@ -76,7 +84,7 @@ struct DiagnosisFlowView: View {
                     .padding(.top, AppSpacing.xs)
             }
 
-            VStack(spacing: AppSpacing.choicesGap) {
+            VStack(spacing: 8) {
                 ForEach(Array(options.enumerated()), id: \.element.id) { i, option in
                     Reveal(
                         offset: 8,
@@ -89,7 +97,7 @@ struct DiagnosisFlowView: View {
                     }
                 }
             }
-            .padding(.top, AppSpacing.lg)
+            .padding(.top, 22)
         }
     }
 
@@ -99,14 +107,23 @@ struct DiagnosisFlowView: View {
 
     // MARK: - Bottom bar (multi questions)
 
-    private func bottomBar(safeBottom: CGFloat) -> some View {
-        VStack(spacing: 0) {
-            PrimaryButton(title: "Continue", isEnabled: canContinue) {
-                advance()
+    private func bottomBar(safeBottom: CGFloat, hasSelection: Bool) -> some View {
+        Group {
+            if hasSelection {
+                PrimaryButton(title: L("Continue")) {
+                    advance()
+                }
+                .frame(maxWidth: AppSpacing.contentMaxWidth)
+            } else {
+                // No giant disabled pill: a quiet hint keeps the screen open
+                // until the user actually selects something.
+                Text(L("Select to continue"))
+                    .type(.smallLink)
+                    .foregroundStyle(AppColors.inkFaint)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 34)
             }
-            .frame(maxWidth: AppSpacing.contentMaxWidth)
         }
-        .padding(.top, AppSpacing.twoXL)
         .padding(.horizontal, AppSpacing.screenPadding)
         .padding(.bottom, max(AppSpacing.safeBottomMin, safeBottom))
         .background(
@@ -121,6 +138,7 @@ struct DiagnosisFlowView: View {
             )
             .ignoresSafeArea(edges: .bottom)
         )
+        .animation(.easeOut(duration: 0.2), value: hasSelection)
     }
 
     // MARK: - Actions
