@@ -48,6 +48,14 @@ struct REBOOTApp: App {
                     }
                 }
             }
+            .onChange(of: subscriptionStore.status) { _, newStatus in
+                // Entitlement truth feeds ProductStore routing decisions
+                // (e.g. whether the first-value paywall may appear).
+                product.isEntitlementPremium = newStatus.isPremium
+            }
+            .onAppear {
+                product.isEntitlementPremium = subscriptionStore.status.isPremium
+            }
         }
     }
 }

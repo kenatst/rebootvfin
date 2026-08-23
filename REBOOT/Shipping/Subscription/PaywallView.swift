@@ -38,7 +38,7 @@ struct PaywallView: View {
                                 .background(AppColors.paperRaised)
                                 .clipShape(Circle())
                         }
-                        .accessibilityLabel("Close")
+                        .accessibilityLabel(L("Close"))
                     }
                     .padding(.top, 16)
 
@@ -71,7 +71,7 @@ struct PaywallView: View {
                             if restored { dismiss() }
                         }
                     } label: {
-                        Text("Restore purchases")
+                        Text(L("Restore purchases"))
                             .type(.smallLink)
                             .foregroundStyle(AppColors.inkSoft)
                             .frame(maxWidth: .infinity, minHeight: 44)
@@ -116,14 +116,14 @@ struct PaywallView: View {
     private var pricingSelectionSection: some View {
         VStack(spacing: 12) {
             planRow(
-                title: "Yearly",
+                title: L("Yearly"),
                 subtitle: yearlyPriceSubtitle,
-                badge: trialConfigured ? "7-day free trial" : "Best value",
+                badge: trialConfigured ? L("7-day free trial") : L("Best value"),
                 isSelected: selectedPeriod == .yearly
             ) { selectedPeriod = .yearly }
 
             planRow(
-                title: "Monthly",
+                title: L("Monthly"),
                 subtitle: monthlyPriceSubtitle,
                 badge: nil,
                 isSelected: selectedPeriod == .monthly
@@ -215,42 +215,50 @@ struct PaywallView: View {
 
     private var pillars: [Pillar] {
         [
-            Pillar(tag: "UNDERSTAND", title: "What breaks your attention",
-                   detail: "Your sessions and honest self-reports surface the pulls that actually cost you focus."),
-            Pillar(tag: "TRAIN", title: "Staying, returning, recalling",
-                   detail: "One prescribed practice a day across five attention modes."),
-            Pillar(tag: "RESHAPE", title: "Your environment",
-                   detail: "Lighter friction first — distance, one-task browser, optional protection."),
-            Pillar(tag: "LEARN", title: "The conditions that help you",
-                   detail: "Tested against your own comparable sessions, not averages."),
-            Pillar(tag: "LEAVE", title: "An Operating Manual that's yours",
-                   detail: "Day 90 ends with your evidence-backed manual; Own Mode keeps it useful."),
+            Pillar(tag: L("UNDERSTAND"), title: L("What breaks your attention"),
+                   detail: L("Your sessions and honest self-reports surface the pulls that actually cost you focus.")),
+            Pillar(tag: L("TRAIN"), title: L("Staying, returning, recalling"),
+                   detail: L("One prescribed practice a day across five attention modes.")),
+            Pillar(tag: L("RESHAPE"), title: L("Your environment"),
+                   detail: L("Lighter friction first — distance, one-task browser, optional protection.")),
+            Pillar(tag: L("LEARN"), title: L("The conditions that help you"),
+                   detail: L("Tested against your own comparable sessions, not averages.")),
+            Pillar(tag: L("LEAVE"), title: L("An Operating Manual that's yours"),
+                   detail: L("Day 90 ends with your evidence-backed manual; Own Mode keeps it useful.")),
         ]
     }
 
     // MARK: - Pricing Copy
 
+    /// StoreKit is the single source of pricing truth. When products cannot be
+    /// loaded, REBOOT says so honestly instead of inventing prices.
     private var yearlyPriceSubtitle: String {
         if let product = subscriptionStore.yearlyProduct {
-            return "\(product.displayPrice)/year"
+            return String(
+                format: NSLocalizedString("paywall.price.year", comment: "Yearly price line"),
+                product.displayPrice
+            )
         }
-        return "$79.99/year · about $6.67 a month"
+        return NSLocalizedString("paywall.unavailable", comment: "Products unavailable")
     }
 
     private var monthlyPriceSubtitle: String {
         if let product = subscriptionStore.monthlyProduct {
-            return "\(product.displayPrice)/month · Cancel anytime"
+            return String(
+                format: NSLocalizedString("paywall.price.month", comment: "Monthly price line"),
+                product.displayPrice
+            )
         }
-        return "$14.99/month · Billed monthly"
+        return NSLocalizedString("paywall.unavailable", comment: "Products unavailable")
     }
 
     /// Trial copy appears only when the StoreKit product actually carries an
     /// introductory offer. No invented discounts, no fake urgency.
     private var ctaTitle: String {
         if selectedPeriod == .yearly, trialConfigured {
-            return "Start 7-Day Free Trial"
+            return L("Start 7-Day Free Trial")
         }
-        return "Continue the full program"
+        return L("Continue the full program")
     }
 
     private var trialConfigured: Bool {
@@ -268,17 +276,13 @@ struct PaywallView: View {
                 ? subscriptionStore.yearlyProduct
                 : subscriptionStore.monthlyProduct
 
-            if let product = productToBuy {
-                let success = await subscriptionStore.purchase(product)
-                if success {
-                    dismiss()
-                }
-            } else {
-                // In simulator testing without StoreKit configuration: simulate success for smooth flow
-                #if DEBUG
-                subscriptionStore.setMockStatus(.subscribed(productId: AppConfig.yearlyProductID, expiresAt: Date().addingTimeInterval(365 * 86400), isTrial: true))
+            // No mock purchases: if StoreKit products are unavailable the CTA
+            // is disabled and an honest retry state is shown instead.
+            guard let product = productToBuy else { return }
+            let success = await subscriptionStore.purchase(product)
+            if success {
+                PaywallRules.recordAutomaticPresentation()
                 dismiss()
-                #endif
             }
         }
     }
@@ -288,12 +292,12 @@ struct PaywallView: View {
     private var footerLegalSection: some View {
         VStack(spacing: 10) {
             HStack(spacing: 16) {
-                Button("Terms of Service") {
+                Button(L("Terms of Service")) {
                     showTermsSheet = true
                 }
                 Text("·")
                     .foregroundStyle(AppColors.inkFaint)
-                Button("Privacy Policy") {
+                Button(L("Privacy Policy")) {
                     showPrivacySheet = true
                 }
             }

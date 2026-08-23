@@ -1,0 +1,9 @@
+{
+  "day": 90,
+  "sessions": [
+    {"day": 1, "date": "2026-06-01T10:00:00Z", "mode": "observe", "targetMinutes": 15, "actualMinutes": 14, "completed": true, "endedEarly": false, "firstDistraction": "phone", "switches": 2, "difficulty": 3, "origin": "protocol"},
+    {"day": 2, "date": "2026-06-02T10:00:00Z", "mode": "stay", "targetMinutes": 15, "actualMinutes": 14, "completed": true, "endedEarly": false, "firstDistraction": "phone", "switches": 2, "difficulty": 3, "origin": "protocol"},
+    {"day": 3, "date": "2026-06-03T10:00:00Z", "mode": "recall", "targetMinutes": 20, "actualMinutes": 19, "completed": true, "endedEarly": false, "firstDistraction": "none", "switches": 1, "difficulty": 3, "origin": "protocol"},
+    {"day": 4, "date": "2026-06-04T10:00:00Z", "mode": "observe", "targetMinutes": 20, "actualMinutes": 19, "completed": true, "endedEarly": false, "firstDistraction": "tabs", "switches": 3, "difficulty": 3, "origin": "protocol"}
+  ]
+}

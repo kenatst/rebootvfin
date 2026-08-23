@@ -18,8 +18,15 @@ final class AppState: ObservableObject {
     @Published var answers: Answers
 
     private static let storageKey = "reboot.state.v1"
+    /// Production domain key scrubbed on QA launches (see init).
+    private static let qaLegacyKey = "reboot.state.v1"
     #if DEBUG
     private var watchTimer: Timer?
+    /// QA runs read/write an ephemeral scratch domain instead of production
+    /// defaults, mirroring ProductStore isolation. Nothing a QA run writes can
+    /// survive into a normal launch.
+    private var isQADiverted = false
+    private var qaDefaults: UserDefaults?
     #endif
 
     init() {
@@ -28,6 +35,15 @@ final class AppState: ObservableObject {
         screen = initial.screen
         step = initial.step
         answers = initial.answers
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("-qa") }) {
+            isQADiverted = true
+            qaDefaults = UserDefaults(suiteName: "reboot.qa.appstate.\(UUID().uuidString)")
+            // Scrub any legacy QA state left in the production domain by older
+            // builds so the next NORMAL launch starts clean at first launch.
+            UserDefaults.standard.removeObject(forKey: Self.qaLegacyKey)
+        }
+        #endif
         startQaWatchIfNeeded()
     }
 
@@ -68,6 +84,12 @@ final class AppState: ObservableObject {
             "step": step,
             "answers": answers,
         ]
+#if DEBUG
+        if isQADiverted, let qaDefaults {
+            qaDefaults.set(payload, forKey: Self.storageKey)
+            return
+        }
+#endif
         UserDefaults.standard.set(payload, forKey: Self.storageKey)
     }
 

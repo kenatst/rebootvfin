@@ -93,8 +93,8 @@ final class NotificationService: ObservableObject {
 
     private func scheduleDailyPracticeNotification() {
         let content = UNMutableNotificationContent()
-        content.title = "Today's Attention Practice"
-        content.body = "Your focus session is ready. Take a few uninterrupted minutes to practice."
+        content.title = L("Today's Attention Practice")
+        content.body = L("Your focus session is ready. Take a few uninterrupted minutes to practice.")
         content.sound = .default
 
         let calendar = Calendar.current
@@ -121,8 +121,8 @@ final class NotificationService: ObservableObject {
 
     private func scheduleWeeklyReviewNotification() {
         let content = UNMutableNotificationContent()
-        content.title = "Weekly Attention Review"
-        content.body = "A new weekly summary is available. See what REBOOT learned about your focus patterns."
+        content.title = L("Weekly Attention Review")
+        content.body = L("A new weekly summary is available. See what REBOOT learned about your focus patterns.")
         content.sound = .default
 
         // Trigger on Sunday at 18:00
@@ -152,8 +152,8 @@ final class NotificationService: ObservableObject {
         guard authorizationStatus == .authorized || authorizationStatus == .provisional else { return }
 
         let content = UNMutableNotificationContent()
-        content.title = "Focus Window Starting Soon"
-        content.body = "\"\(title)\" starts in \(startsInMinutes) minutes. Prepare your physical space."
+        content.title = L("Focus Window Starting Soon")
+        content.body = L("\"\(title)\" starts in \(startsInMinutes) minutes. Prepare your physical space.")
         content.sound = .default
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(max(60, startsInMinutes * 60)), repeats: false)
@@ -169,5 +169,14 @@ final class NotificationService: ObservableObject {
     func cancelAll() {
         center.removeAllPendingNotificationRequests()
         center.removeAllDeliveredNotifications()
+    }
+
+    /// Erase-all support: removes scheduled notifications and the stored
+    /// preferences, returning to the pre-permission-preference state. The OS
+    /// notification authorization itself is an Apple grant and is left alone.
+    func eraseAllData() {
+        cancelAll()
+        preferences = NotificationPreferences()
+        defaults.removeObject(forKey: Self.storageKey)
     }
 }

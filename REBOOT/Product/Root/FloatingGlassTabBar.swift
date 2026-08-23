@@ -32,7 +32,7 @@ struct FloatingGlassTabBar: View {
             VStack(spacing: 2) {
                 Image(systemName: tab.symbol)
                     .font(.system(size: 17, weight: .medium))
-                Text(tab.rawValue)
+                Text(tab.displayLabel)
                     .font(.system(size: 10, weight: .semibold))
             }
             .foregroundStyle(isSelected ? AppColors.ink : AppColors.inkFaint)
@@ -48,5 +48,6 @@ struct FloatingGlassTabBar: View {
             .contentShape(Capsule())
         }
         .buttonStyle(PressScaleStyle())
+        .accessibilityLabel(tab.displayLabel)
     }
 }

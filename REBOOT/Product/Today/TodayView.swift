@@ -116,7 +116,7 @@ struct TodayView: View {
                 .truncationMode(.tail)
             Spacer()
             ProgressRing(progress: isCompleted ? 1.0 : product.programProgress)
-                .accessibilityLabel(isCompleted ? "90 protocol days complete" : "\(product.completedProtocolDays) of 90 program days completed")
+                .accessibilityLabel(isCompleted ? L("90 protocol days complete") : "\(product.completedProtocolDays) of 90 program days completed")
         }
     }
 
@@ -149,7 +149,7 @@ struct TodayView: View {
     /// A flat editorial block on the paper — setup is an instruction, not a card.
     private func beforeYouStart(envAction: EnvironmentAction) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            MetaLabel(text: "BEFORE YOU START", color: AppColors.coral)
+            MetaLabel(text: L("BEFORE YOU START"), color: AppColors.coral)
             Text(envAction.title)
                 .type(.heroGoal)
                 .foregroundStyle(AppColors.ink)
@@ -165,7 +165,7 @@ struct TodayView: View {
                 Button(action: { product.completeRequiredAction(done: true) }) {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark")
-                        Text("Done — I'm set up")
+                        Text(L("Done — I'm set up"))
                     }
                     .type(.smallLink)
                     .foregroundStyle(product.environmentPreparation?.outcome == .completed ? AppColors.paper : AppColors.ink)
@@ -176,9 +176,9 @@ struct TodayView: View {
                 }
 
                 Button(action: {
-                    product.completeRequiredAction(done: false, refusalReason: "Not feasible right now")
+                    product.completeRequiredAction(done: false, refusalReason: L("Not feasible today"))
                 }) {
-                    Text("Can't today")
+                    Text(L("Can't today"))
                         .type(.smallLink)
                         .foregroundStyle(AppColors.inkFaint)
                 }
@@ -205,7 +205,7 @@ struct TodayView: View {
             HStack(spacing: 10) {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(AppColors.coral)
-                Text("Today's session is complete.")
+                Text(L("Today's session is complete."))
                     .type(.heroGoal)
                     .foregroundStyle(AppColors.ink)
                 Spacer()
@@ -281,7 +281,7 @@ struct TodayView: View {
             .padding(.vertical, 6)
         }
         .buttonStyle(PressScaleStyle())
-        .accessibilityHint("Opens the suggested destination")
+        .accessibilityHint(L("Opens the suggested destination"))
     }
 
     // MARK: - Evidence Strip
@@ -292,16 +292,16 @@ struct TodayView: View {
     private var evidenceStrip: some View {
         if product.sessions.count >= 2 {
             HStack(alignment: .center, spacing: 24) {
-                MicroMetric(label: "Avg focus", value: averageMinutes)
+                MicroMetric(label: L("Avg focus"), value: averageMinutes)
                 FocusSparkline(points: product.focusHistory)
                     .frame(maxWidth: .infinity)
-                MicroMetric(label: "Return", value: returnTrend)
+                MicroMetric(label: L("Return"), value: returnTrend)
             }
             .padding(.horizontal, 4)
         } else {
             Text(product.sessions.count == 1
-                 ? "One session recorded. REBOOT is still learning your patterns."
-                 : "Nothing measured yet — Day 1 starts the record.")
+                 ? L("One session recorded. REBOOT is still learning your patterns.")
+                 : L("Nothing measured yet — Day 1 starts the record."))
                 .type(.footnote)
                 .foregroundStyle(AppColors.inkFaint)
         }
@@ -315,9 +315,9 @@ struct TodayView: View {
 
     private var returnTrend: String {
         switch product.profile.returnAfterDistraction.value {
-        case .strong: return "Strong"
-        case .fair: return "Fair"
-        case .weak: return "Weak"
+        case .strong: return L("Strong")
+        case .fair: return L("Fair")
+        case .weak: return L("Weak")
         case nil: return "—"
         }
     }
@@ -327,8 +327,8 @@ struct TodayView: View {
     private var footer: some View {
         Text(
             isCompleted
-                ? "Your Attention Operating Manual remains alive and evolving."
-                : "What happens today changes what comes next."
+                ? L("Your Attention Operating Manual remains alive and evolving.")
+                : L("What happens today changes what comes next.")
         )
         .type(.footnote)
         .foregroundStyle(AppColors.inkFaint)
@@ -347,10 +347,10 @@ struct OwnModeTodayCard: View {
     var body: some View {
         PaperCard(radius: AppRadius.hero, padding: 26, shadow: .lift) {
             VStack(alignment: .leading, spacing: 16) {
-                MetaLabel(text: guidance.noInterventionNeeded ? "NOTHING NEEDED" : "SELF-DIRECTED", color: AppColors.coral)
+                MetaLabel(text: guidance.noInterventionNeeded ? L("NOTHING NEEDED") : L("SELF-DIRECTED"), color: AppColors.coral)
 
                 Text(guidance.noInterventionNeeded
-                     ? "Nothing needs adjusting today."
+                     ? L("Nothing needs adjusting today.")
                      : guidance.primaryAction.title)
                     .font(.system(size: 30, weight: .semibold, design: .serif))
                     .foregroundStyle(AppColors.ink)
@@ -363,7 +363,7 @@ struct OwnModeTodayCard: View {
                     .padding(.top, 2)
 
                 if guidance.noInterventionNeeded {
-                    QuietTextButton(title: "Open Operating Manual") { onManual() }
+                    QuietTextButton(title: L("Open Operating Manual")) { onManual() }
                         .padding(.top, 10)
                 } else {
                     PrimaryPillButton(title: guidance.primaryAction.ctaTitle, symbol: "play.fill") {
@@ -390,6 +390,6 @@ struct QuietTextButton: View {
                 .frame(minHeight: 44, alignment: .leading)
         }
         .buttonStyle(PressScaleStyle())
-        .accessibilityHint("Opens the Attention Operating Manual")
+        .accessibilityHint(L("Opens the Attention Operating Manual"))
     }
 }

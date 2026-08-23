@@ -194,4 +194,13 @@ final class SubscriptionStore: ObservableObject {
     func setMockStatus(_ newStatus: SubscriptionStatus) {
         self.status = newStatus
     }
+
+    // MARK: - Erase-all support
+
+    /// Removes REBOOT's cached entitlement snapshot. Apple's purchase history
+    /// itself is not erasable by the app; after this the store re-derives the
+    /// entitlement from StoreKit on next refresh.
+    func clearCachedEntitlement() {
+        defaults.removeObject(forKey: Self.cacheKey)
+    }
 }

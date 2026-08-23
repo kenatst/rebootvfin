@@ -1,12 +1,18 @@
 import SwiftUI
 
+/// DATA & PRIVACY hub: local-first explanation, whole-app data export,
+/// and a real erase-all that returns the app to a true first-launch state.
 struct DataPrivacyView: View {
     @ObservedObject var product: ProductStore
     @ObservedObject var state: AppState
+    var environmentStore: EnvironmentStore? = nil
+    var notificationService: NotificationService? = nil
+    var subscriptionStore: SubscriptionStore? = nil
     @Environment(\.dismiss) private var dismiss
 
     @State private var showEraseConfirmation = false
     @State private var showFinalEraseConfirmation = false
+    @State private var eraseAcknowledgeChecked = false
 
     var body: some View {
         NavigationStack {
@@ -15,83 +21,11 @@ struct DataPrivacyView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
-                        // Header
-                        VStack(alignment: .leading, spacing: 6) {
-                            MetaLabel(text: "DATA & PRIVACY", color: AppColors.coral)
-                            EditorialHeadline(text: "Your Attention, Fully Local")
-                            Text(
-                                "REBOOT operates on an uncompromising local-first model. Your cognitive data never leaves this device.",
-                                style: .todaySentence
-                            )
-                            .foregroundStyle(AppColors.inkSoft)
-                            .padding(.top, 4)
-                        }
-
-                        // Architecture Card
-                        PaperCard(radius: 20, padding: 18) {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Image(systemName: "internaldrive")
-                                        .foregroundStyle(AppColors.coral)
-                                    Text("On-Device Storage Only")
-                                        .type(.heroReason)
-                                        .foregroundStyle(AppColors.ink)
-                                }
-                                Text("Session recordings, task switch logs, rule discoveries, and fuel context snapshots are encoded into local app sandbox storage. There are no remote sync databases or cloud profiles.")
-                                    .type(.footnote)
-                                    .foregroundStyle(AppColors.inkSoft)
-                                    .lineSpacing(4)
-                            }
-                        }
-
-                        // Export Attention Operating Manual
-                        PaperCard(radius: 20, padding: 18) {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Export Operating Manual")
-                                    .type(.heroReason)
-                                    .foregroundStyle(AppColors.ink)
-                                Text("Download a plain-text markdown export of your complete 11-dimension Attention Operating Manual.")
-                                    .type(.footnote)
-                                    .foregroundStyle(AppColors.inkSoft)
-
-                                ShareLink(
-                                    item: product.operatingManual.exportAsText(),
-                                    subject: Text("REBOOT — Attention Operating Manual"),
-                                    message: Text("Exported Attention Operating Manual from REBOOT.")
-                                ) {
-                                    GlassPill(text: "Export as Text", symbol: "square.and.arrow.up", tint: AppColors.ink)
-                                }
-                            }
-                        }
-
-                        // Erase Data Section
-                        PaperCard(radius: 20, padding: 18) {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Image(systemName: "trash")
-                                        .foregroundStyle(Color.red)
-                                    Text("Erase All Data")
-                                        .type(.heroReason)
-                                        .foregroundStyle(Color.red)
-                                }
-                                Text("Permanently deletes all historical sessions, diagnosed profile models, discovered rules, and settings from this iPhone.")
-                                    .type(.footnote)
-                                    .foregroundStyle(AppColors.inkSoft)
-
-                                Button(role: .destructive) {
-                                    showEraseConfirmation = true
-                                } label: {
-                                    Text("Erase All REBOOT Data")
-                                        .type(.heroReason)
-                                        .foregroundStyle(Color.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 14)
-                                        .background(Color.red.opacity(0.88))
-                                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                }
-                                .padding(.top, 4)
-                            }
-                        }
+                        header
+                        architectureCard
+                        exportCard
+                        legalLinksCard
+                        eraseCard
                     }
                     .padding(24)
                 }
@@ -99,39 +33,197 @@ struct DataPrivacyView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button(L("Done")) { dismiss() }
                         .foregroundStyle(AppColors.ink)
                 }
             }
             .confirmationDialog(
-                "Are you sure you want to erase all data?",
+                L("Erase all REBOOT data?"),
                 isPresented: $showEraseConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("Erase All Data", role: .destructive) {
+                Button(L("Continue"), role: .destructive) {
                     showFinalEraseConfirmation = true
                 }
-                Button("Cancel", role: .cancel) {}
+                Button(L("Cancel"), role: .cancel) {}
             } message: {
-                Text("This action cannot be undone. All your session history, rules, and operating manual will be permanently lost.")
+                Text(L("This permanently deletes your sessions, profile, rules, experiments, environment setup, and Operating Manual from this iPhone. It cannot be undone."))
             }
             .alert(
-                "Confirm Permanent Deletion",
+                L("Confirm permanent deletion"),
                 isPresented: $showFinalEraseConfirmation
             ) {
-                Button("Permanently Delete", role: .destructive) {
+                Button(L("Permanently Delete"), role: .destructive) {
                     eraseAllData()
                 }
-                Button("Cancel", role: .cancel) {}
+                Button(L("Cancel"), role: .cancel) {}
             } message: {
-                Text("All local records will be completely deleted and the app will reset to the introduction.")
+                Text(L("Everything will be deleted and REBOOT will return to its first launch. Your Apple subscription is managed separately in your Apple ID settings and is not deleted by this."))
             }
         }
     }
 
+    // MARK: - Sections
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            MetaLabel(text: L("DATA & PRIVACY"), color: AppColors.coral)
+            EditorialHeadline(text: L("Your attention, fully local"))
+            Text(
+                L("REBOOT keeps everything on this device. There is no account, no cloud profile, and no analytics."),
+                style: .todaySentence
+            )
+            .foregroundStyle(AppColors.inkSoft)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 4)
+        }
+    }
+
+    private var architectureCard: some View {
+        PaperCard(radius: 20, padding: 18) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "internaldrive")
+                        .foregroundStyle(AppColors.coral)
+                    Text(L("On-device storage only"))
+                        .type(.heroReason)
+                        .foregroundStyle(AppColors.ink)
+                }
+                Text(L("Diagnosis answers, session records, switch and return evidence, personal rules, experiment results, Fuel context, Flow projects, environment settings, and your Operating Manual are stored in the app's local sandbox on this iPhone. Nothing is transmitted to REBOOT or to anyone else."))
+                    .type(.footnote)
+                    .foregroundStyle(AppColors.inkSoft)
+                    .lineSpacing(4)
+            }
+        }
+    }
+
+    /// GDPR-style portability: one JSON document containing every meaningful
+    /// piece of personal state REBOOT holds, shared through the native sheet.
+    private var exportCard: some View {
+        PaperCard(radius: 20, padding: 18) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "square.and.arrow.up.on.square")
+                        .foregroundStyle(AppColors.coral)
+                    Text(L("Export my REBOOT data"))
+                        .type(.heroReason)
+                        .foregroundStyle(AppColors.ink)
+                }
+                Text(L("A single JSON file containing everything REBOOT knows: diagnosis answers, profile, sessions, rules, experiments, Flow projects and evidence, Fuel history, environment observations, reviews, and your Operating Manual. Nothing leaves your device except through the share sheet you control."))
+                    .type(.footnote)
+                    .foregroundStyle(AppColors.inkSoft)
+                    .lineSpacing(4)
+
+                ShareLink(
+                    item: exportItem,
+                    subject: Text("REBOOT data export"),
+                ) {
+                    GlassPill(text: L("Export as JSON"), symbol: "square.and.arrow.up", tint: AppColors.ink)
+                }
+            }
+        }
+    }
+
+    /// A real .json file when the export can be written, otherwise the raw
+    /// JSON payload — the share sheet always carries the full document.
+    private var exportItem: String {
+        RebootDataExport.writeFile(product: product, answers: state.answers)?.absoluteString
+            ?? RebootDataExport.jsonString(product: product, answers: state.answers)
+    }
+
+    private var legalLinksCard: some View {
+        PaperCard(radius: 20, padding: 18) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Image(systemName: "doc.text")
+                        .foregroundStyle(AppColors.coral)
+                    Text(L("Legal"))
+                        .type(.heroReason)
+                        .foregroundStyle(AppColors.ink)
+                }
+                NavigationLink {
+                    PrivacyPolicyView()
+                } label: {
+                    LegalRowLabel(title: L("Privacy Policy"))
+                }
+                Divider().overlay(AppColors.hairline)
+                NavigationLink {
+                    TermsOfServiceView()
+                } label: {
+                    LegalRowLabel(title: L("Terms of Service"))
+                }
+            }
+        }
+    }
+
+    private var eraseCard: some View {
+        PaperCard(radius: 20, padding: 18) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "trash")
+                        .foregroundStyle(Color.red)
+                    Text(L("Erase all data"))
+                        .type(.heroReason)
+                        .foregroundStyle(Color.red)
+                }
+                Text(L("Permanently deletes everything REBOOT has learned — sessions, profile, rules, experiments, Flow projects, environment setup, notifications, and your Operating Manual — and returns the app to its first launch. Screen Time authorization and notification permission are Apple settings and remain; scheduled protections are removed."))
+                    .type(.footnote)
+                    .foregroundStyle(AppColors.inkSoft)
+                    .lineSpacing(4)
+
+                Toggle(isOn: $eraseAcknowledgeChecked) {
+                    Text(L("I understand this cannot be undone"))
+                        .type(.footnote)
+                        .foregroundStyle(AppColors.ink)
+                        .tint(AppColors.coral)
+                }
+                .padding(.top, 2)
+
+                Button(role: .destructive) {
+                    showEraseConfirmation = true
+                } label: {
+                    Text(L("Erase All REBOOT Data"))
+                        .type(.heroReason)
+                        .foregroundStyle(Color.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.red.opacity(eraseAcknowledgeChecked ? 0.88 : 0.35))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .disabled(!eraseAcknowledgeChecked)
+                .padding(.top, 4)
+            }
+        }
+    }
+
+    // MARK: - Erase chain
+
     private func eraseAllData() {
-        product.reset()
+        notificationService?.eraseAllData()
+        environmentStore?.eraseAllData()
+        subscriptionStore?.clearCachedEntitlement()
+        product.erasePersistedData()
         state.reset()
         dismiss()
+        // ContentView observes state.phase; resetting to .cinematic routes the
+        // user back to the true first-launch experience.
+    }
+}
+
+private struct LegalRowLabel: View {
+    let title: String
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .type(.heroReason)
+                .foregroundStyle(AppColors.ink)
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AppColors.inkFaint)
+        }
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
     }
 }

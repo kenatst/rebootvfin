@@ -65,7 +65,13 @@ struct SettingsView: View {
                 TermsOfServiceView()
             }
             .sheet(isPresented: $showDataPrivacySheet) {
-                DataPrivacyView(product: product, state: state)
+                DataPrivacyView(
+                    product: product,
+                    state: state,
+                    environmentStore: environmentStore,
+                    notificationService: notificationService,
+                    subscriptionStore: subscriptionStore
+                )
             }
             .sheet(isPresented: $showScreenTimePermissionSheet) {
                 ScreenTimePermissionSheet {
