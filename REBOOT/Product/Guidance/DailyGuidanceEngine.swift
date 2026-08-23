@@ -161,6 +161,7 @@ enum DailyGuidanceEngine {
         let title: String
         let subtitle: String
         let ctaTitle: String
+        let primaryActionMode: TrainingMode = basePrescription.mode
         var flowOpportunity: FlowOpportunity? = nil
 
         if canDoFlow, let proj = activeFlowProject {
@@ -199,7 +200,7 @@ enum DailyGuidanceEngine {
 
         let explanation = generateExplanation(
             bottleneck: bottleneck,
-            primaryKind: primaryKind,
+            mode: primaryActionMode,
             targetMinutes: targetMinutes,
             envAction: envAction
         )
@@ -444,35 +445,73 @@ enum DailyGuidanceEngine {
 
     private static func generateExplanation(
         bottleneck: AttentionBottleneck,
-        primaryKind: GuidancePrimaryActionKind,
+        mode: TrainingMode,
         targetMinutes: Int,
         envAction: EnvironmentAction?
     ) -> String {
+        // Cross-cutting facts come first: low energy changes the session
+        // regardless of which mode runs today.
+        if bottleneck == .energyContext {
+            return L("Reported energy is low today. The session gets shorter so quality doesn't have to.")
+        }
+
+        // Explanations are mode-aware next: RECALL explains recall, OBSERVE
+        // explains observation, STAY explains staying. Bottleneck context
+        // refines the sentence rather than replacing it.
+        switch mode {
+        case .recall:
+            return modeAwareRecallExplanation(bottleneck)
+        case .observe:
+            return modeAwareObserveExplanation(bottleneck)
+        case .stay:
+            return modeAwareStayExplanation(bottleneck)
+        case .explain:
+            return L("Today you explain the main idea out loud or in writing — fluency reveals what actually stuck.")
+        case .nothing:
+            return L("A deliberate pause with no input. Notice what makes adding nothing difficult.")
+        }
+    }
+
+    private static func modeAwareRecallExplanation(_ bottleneck: AttentionBottleneck) -> String {
+        switch bottleneck {
+        case .recall:
+            return L("Recent recall attempts lost most of the material. Today closes the source sooner and asks for more.")
+        case .depth:
+            return L("Remembering is depth's proof. Today tests how much of the harder material comes back without the source.")
+        default:
+            return L("Today trains recall: close the source, then bring back what stayed with you.")
+        }
+    }
+
+    private static func modeAwareObserveExplanation(_ bottleneck: AttentionBottleneck) -> String {
         switch bottleneck {
         case .starting:
-            return "Recent sessions ended shortly after starting. Today protects the first ten minutes above all else."
-        case .stability:
-            return "Focus holds once you're in. Today extends the stretch instead of changing the setup."
+            return L("Observation first. Today watches when attention moves, especially near the start of a task.")
         case .digitalPull:
-            return "Your sessions keep breaking toward the same digital pull. The setup handles it before willpower has to."
-        case .returnStrategy:
-            return "Switching happened recently — that's normal. What matters is coming back to the same task quickly."
-        case .recall:
-            return "Recent recall attempts lost most of the material. Today closes the source sooner and asks for more."
-        case .depth:
-            return "You are ready to stay with something harder. Depth comes from difficulty held longer."
-        case .energyContext:
-            return "Reported energy is low today. The session gets shorter so quality doesn't have to."
-        case .environment:
-            return "Physical setup shapes how long attention holds before the first pull."
+            return L("Watch what pulls today — noticing the pull precisely is what lets tomorrow's setup work.")
         case .flowConditions:
-            return "This phase looks for the conditions around your deeper work. A real project is the cleanest probe."
+            return L("This phase looks for the conditions around your deeper work. A real project is the cleanest probe.")
+        default:
+            return L("Nothing gets optimized today. You observe what your attention actually does.")
+        }
+    }
+
+    private static func modeAwareStayExplanation(_ bottleneck: AttentionBottleneck) -> String {
+        switch bottleneck {
+        case .stability:
+            return L("Focus holds once you're in. Today extends the stretch instead of changing the setup.")
+        case .returnStrategy:
+            return L("Switching happened recently — that's normal. What matters is coming back to the same task quickly.")
+        case .depth:
+            return L("You are ready to stay with something harder. Depth comes from difficulty held longer.")
+        case .energyContext:
+            return L("Reported energy is low today. The session gets shorter so quality doesn't have to.")
+        case .environment:
+            return L("Physical setup shapes how long attention holds before the first pull.")
         case .uncertaintyExperiment:
-            return "Today compares one specific condition against your normal, so the question resolves with real sessions."
-        case .recovery:
-            return "A short reset after a demanding session keeps tomorrow comparable to today."
-        case .independence:
-            return "Self-directed focus in Own Mode. You set the conditions; REBOOT records what happens."
+            return L("Today compares one specific condition against your normal, so the question resolves with real sessions.")
+        default:
+            return L("One task, held longer than feels automatic. Today extends the stretch instead of changing the setup.")
         }
     }
 }

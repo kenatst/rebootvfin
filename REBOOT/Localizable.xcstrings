@@ -1,6 +1,180 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@ after a distraction.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ après une distraction"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ tras una distracción"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ nach einer Ablenkung"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ dopo una distrazione"
+          }
+        }
+      }
+    },
+    "%@ are a possible breaker.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les %@ sont une source de rupture possible."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las %@ son una posible fuente de ruptura."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ sind ein möglicher Unterbrecher."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le %@ sono una possibile causa di rottura."
+          }
+        }
+      }
+    },
+    "%@ may be the hardest part right now.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ semble être la partie la plus difficile en ce moment."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ parece ser la parte más difícil ahora mismo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ fühlt sich gerade am schwersten an."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ sembra la parte più difficile in questo momento."
+          }
+        }
+      }
+    },
+    "%d minutes of reading, then the source closed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d minutes de lecture, puis la source s'est fermée."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d minutos de lectura y luego se cerró la fuente."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d Minuten Lesen, dann schloss sich die Quelle."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d minuti di lettura, poi la fonte si è chiusa."
+          }
+        }
+      }
+    },
+    "%d minutes without adding anything new.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d minutes sans rien ajouter de nouveau."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d minutos sin añadir nada nuevo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d Minuten ohne etwas Neues hinzuzufügen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d minuti senza aggiungere nulla di nuovo."
+          }
+        }
+      }
+    },
+    "%d of %d": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d sur %d"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d de %d"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d von %d"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d di %d"
+          }
+        }
+      }
+    },
     "%d of %d program days completed": {
       "extractionState": "manual",
       "localizations": {
@@ -345,6 +519,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "Un rapporto più sereno col telefono"
+          }
+        }
+      }
+    },
+    "A deliberate pause with no input. Notice what makes adding nothing difficult.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une pause délibérée sans aucun input. Remarque ce qui rend le « ne rien ajouter » difficile."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Una pausa deliberada sin nada de entrada. Observa qué hace difícil no añadir nada."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eine bewusste Pause ohne jeden Input. Merke, worin das Nichts-hinzufügen schwerfällt."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Una pausa deliberata senza alcun input. Nota cosa rende difficile non aggiungere nulla."
           }
         }
       }
@@ -1190,6 +1393,35 @@
         }
       }
     },
+    "Create your first project": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Créer ton premier projet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crea tu primer proyecto"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erstes Projekt anlegen"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crea il tuo primo progetto"
+          }
+        }
+      }
+    },
     "Creative work": {
       "extractionState": "manual",
       "localizations": {
@@ -1505,6 +1737,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fatto — sono pronto"
+          }
+        }
+      }
+    },
+    "Done.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fait."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hecho."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geschafft."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fatto."
           }
         }
       }
@@ -1915,6 +2176,122 @@
         }
       }
     },
+    "Focus holds once you're in. Today extends the stretch instead of changing the setup.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le focus tient une fois installé. Aujourd'hui prolonge la séquence au lieu de changer le cadre."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El foco se mantiene una vez dentro. Hoy extiende el tramo en lugar de cambiar el entorno."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Fokus hält, wenn du drin bist. Heute wird die Strecke verlängert statt dem Setup geändert."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il focus regge una volta dentro. Oggi si allunga il tratto invece di cambiare allestimento."
+          }
+        }
+      }
+    },
+    "Focus usually holds 30–60 minutes before something pulls.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le focus tient généralement 30 à 60 minutes avant qu'une distraction survienne."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El foco suele aguantar entre 30 y 60 minutos antes de que algo te arrastre."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Fokus hält meist 30–60 Minuten, bevor etwas zieht."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La concentrazione di solito regge 30–60 minuti prima che qualcosa attragga."
+          }
+        }
+      }
+    },
+    "Focus usually holds 5–15 minutes before something pulls.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le focus tient généralement 5 à 15 minutes avant qu'une distraction survienne."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El foco suele aguantar entre 5 y 15 minutos antes de que algo te arrastre."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Fokus hält meist 5–15 Minuten, bevor etwas zieht."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La concentrazione di solito regge 5–15 minuti prima che qualcosa attragga."
+          }
+        }
+      }
+    },
+    "Focus usually holds under 5 minutes before something pulls.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le focus tient généralement moins de 5 minutes avant qu'une distraction survienne."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El foco suele aguantar menos de 5 minutos antes de que algo te arrastre."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Fokus hält meist unter 5 Minuten, bevor etwas zieht."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La concentrazione di solito regge meno di 5 minuti prima che qualcosa attragga."
+          }
+        }
+      }
+    },
     "Focus window": {
       "extractionState": "manual",
       "localizations": {
@@ -2056,6 +2433,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "Quanto rapidamente torni, e cosa rende il ritorno più facile."
+          }
+        }
+      }
+    },
+    "How you return after distraction isn't measured yet — Day 1 will test it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La façon dont vous revenez après une distraction n'est pas encore mesurée — le Jour 1 la testera."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cómo vuelves tras una distracción aún no se ha medido — el Día 1 lo pondrá a prueba."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wie du nach einer Ablenkung zurückkehrst, ist noch nicht gemessen – Tag 1 testet es."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Come torni dopo una distrazione non è ancora misurato — il Giorno 1 lo verificherà."
+          }
+        }
+      }
+    },
+    "How you return.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comment vous revenez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cómo vuelves."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wie du zurückkommst."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Come torni."
           }
         }
       }
@@ -2930,6 +3365,35 @@
         }
       }
     },
+    "Nothing gets optimized today. You observe what your attention actually does.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien n'est optimisé aujourd'hui. Tu observes ce que fait réellement ton attention."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoy no se optimiza nada. Observas lo que tu atención hace realmente."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heute wird nichts optimiert. Du beobachtest, was deine Aufmerksamkeit wirklich tut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oggi non si ottimizza nulla. Osservi ciò che la tua attenzione fa davvero."
+          }
+        }
+      }
+    },
     "Nothing measured yet — Day 1 starts the record.": {
       "extractionState": "manual",
       "localizations": {
@@ -3046,6 +3510,35 @@
         }
       }
     },
+    "Observation first. Today watches when attention moves, especially near the start of a task.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'observation d'abord. Aujourd'hui observe quand l'attention bouge, surtout au début d'une tâche."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Primero observar. Hoy se observa cuándo se mueve la atención, sobre todo al inicio de una tarea."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zuerst Beobachten. Heute wird beobachtet, wann die Aufmerksamkeit wandert, besonders am Anfang einer Aufgabe."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prima osservare. Oggi si osserva quando l'attenzione si muove, soprattutto all'inizio di un compito."
+          }
+        }
+      }
+    },
     "Observe": {
       "extractionState": "manual",
       "localizations": {
@@ -3100,6 +3593,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "Osserva la tua concentrazione naturale"
+          }
+        }
+      }
+    },
+    "Observed evidence outweighs every answer above.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les observations priment sur chaque réponse ci-dessus."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La evidencia observada pesa más que cada respuesta anterior."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beobachtete Evidenz wiegt schwerer als jede Antwort oben."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'evidenza osservata pesa più di ogni risposta sopra."
           }
         }
       }
@@ -3216,6 +3738,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "Una sessione registrata. REBOOT sta ancora imparando i tuoi schemi."
+          }
+        }
+      }
+    },
+    "One task, held longer than feels automatic. Today extends the stretch instead of changing the setup.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une tâche, tenue plus longtemps que l'automatisme. Aujourd'hui prolonge la séquence sans changer le cadre."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Una tarea sostenida más allá de lo automático. Hoy extiende el tramo sin cambiar el entorno."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eine Aufgabe, länger gehalten als es automatisch fällt. Heute wird die Strecke verlängert, nicht das Setup geändert."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un'attività sostenuta oltre l'automatico. Oggi si allunga il tratto invece di cambiare allestimento."
           }
         }
       }
@@ -3477,6 +4028,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cancella definitivamente tutto ciò che REBOOT ha imparato — sessioni, profilo, regole, esperimenti, progetti Flow, ambiente, notifiche e il tuo Manuale — e riporta l'app al primo avvio. L'autorizzazione Tempo di utilizzo e le notifiche restano impostazioni Apple; le protezioni pianificate vengono rimosse."
+          }
+        }
+      }
+    },
+    "Physical setup shapes how long attention holds before the first pull.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'aménagement physique façonne la durée pendant laquelle l'attention tient avant la première traction."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El entorno físico define cuánto se mantiene la atención antes del primer tirón."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das physische Umfeld bestimmt, wie lange die Aufmerksamkeit vor dem ersten Zug hält."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'allestimento fisico determina quanto a lungo l'attenzione regge prima del primo tiro."
           }
         }
       }
@@ -3800,6 +4380,35 @@
         }
       }
     },
+    "RECENT PATTERN": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MOTIF RÉCENT"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PATRÓN RECIENTE"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AKTUELLES MUSTER"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SCHEMA RECENTE"
+          }
+        }
+      }
+    },
     "RESHAPE": {
       "extractionState": "manual",
       "localizations": {
@@ -3916,6 +4525,35 @@
         }
       }
     },
+    "Recent recall attempts lost most of the material. Today closes the source sooner and asks for more.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les derniers essais de rappel ont perdu l'essentiel du contenu. Aujourd'hui, on ferme la source plus tôt et on en demande plus."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los últimos intentos de recuerdo perdieron la mayor parte del material. Hoy se cierra la fuente antes y se pide más."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die letzten Abruf-Versuche haben das meiste Material verloren. Heute wird die Quelle früher geschlossen und mehr verlangt."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I recenti tentativi di richiamo hanno perso gran parte del materiale. Oggi si chiude la fonte prima e si chiede di più."
+          }
+        }
+      }
+    },
     "Remember what I consume": {
       "extractionState": "manual",
       "localizations": {
@@ -3945,6 +4583,35 @@
         }
       }
     },
+    "Remembering is depth's proof. Today tests how much of the harder material comes back without the source.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se souvenir est la preuve de la profondeur. Aujourd'hui teste combien du contenu difficile revient sans la source."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recordar es la prueba de la profundidad. Hoy pone a prueba cuánto del material difícil vuelve sin la fuente."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erinnern ist der Beweis von Tiefe. Heute testet sich, wie viel des schwierigeren Materials ohne die Quelle zurückkommt."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ricordare è la prova della profondità. Oggi si verifica quanto del materiale più difficile torna senza la fonte."
+          }
+        }
+      }
+    },
     "Remembering what I just read or watched": {
       "extractionState": "manual",
       "localizations": {
@@ -3970,6 +4637,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ricordare cosa ho appena letto o visto"
+          }
+        }
+      }
+    },
+    "Reported energy is low today. The session gets shorter so quality doesn't have to.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'énergie annoncée est basse aujourd'hui. La séance raccourcit pour que la qualité n'ait pas à le faire."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La energía reportada hoy está baja. La sesión se acorta para que la calidad no tenga que hacerlo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die gemeldete Energie ist heute niedrig. Die Sitzung wird kürzer, damit die Qualität es nicht muss."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'energia dichiarata oggi è bassa. La sessione si accorcia così la qualità non deve farlo."
           }
         }
       }
@@ -4206,6 +4902,64 @@
         }
       }
     },
+    "STARTING HYPOTHESES": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HYPOTHÈSES DE DÉPART"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HIPÓTESIS INICIALES"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "STARTHYPOTHESEN"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "IPOTESI INIZIALI"
+          }
+        }
+      }
+    },
+    "See what REBOOT noticed": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voir ce que REBOOT a remarqué"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver lo que REBOOT notó"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sehen, was REBOOT bemerkt hat"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scopri cosa ha notato REBOOT"
+          }
+        }
+      }
+    },
     "See what's happening": {
       "extractionState": "manual",
       "localizations": {
@@ -4231,6 +4985,93 @@
           "stringUnit": {
             "state": "translated",
             "value": "Capire cosa succede"
+          }
+        }
+      }
+    },
+    "Select to continue": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionnez pour continuer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elige para continuar"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auswählen zum Fortfahren"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seleziona per continuare"
+          }
+        }
+      }
+    },
+    "Session complete": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Séance terminée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesión completada"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sitzung abgeschlossen"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessione completata"
+          }
+        }
+      }
+    },
+    "Session ended": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Séance interrompue"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesión finalizada"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sitzung beendet"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessione terminata"
           }
         }
       }
@@ -4554,6 +5395,35 @@
         }
       }
     },
+    "Still choosing": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choix en cours"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todavía eligiendo"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noch am Wählen"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora in scelta"
+          }
+        }
+      }
+    },
     "Still unclear — Day 1 watches for it": {
       "extractionState": "manual",
       "localizations": {
@@ -4728,6 +5598,64 @@
         }
       }
     },
+    "Switching happened recently — that's normal. What matters is coming back to the same task quickly.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Des changements sont survenus récemment — c'est normal. L'important est de revenir vite à la même tâche."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hubo cambios recientemente — es normal. Lo que importa es volver rápido a la misma tarea."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kürzlich gab es Wechsel – das ist normal. Entscheidend ist, schnell zur selben Aufgabe zurückzukehren."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Di recente ci sono stati cambiamenti — è normale. Conta tornare presto alla stessa attività."
+          }
+        }
+      }
+    },
+    "TODAY'S SUGGESTION": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SUGGESTION DU JOUR"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SUGERENCIA DE HOY"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HEUTIGER VORSCHLAG"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SUGGERIMENTO DI OGGI"
+          }
+        }
+      }
+    },
     "TRAIN": {
       "extractionState": "manual",
       "localizations": {
@@ -4811,6 +5739,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "Verificate sulle tue sessioni comparabili, non su medie."
+          }
+        }
+      }
+    },
+    "That still tells us something.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cela nous dit quand même quelque chose."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eso todavía nos dice algo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das verrät uns trotzdem etwas."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo ci dice comunque qualcosa."
           }
         }
       }
@@ -5105,6 +6062,35 @@
         }
       }
     },
+    "This phase looks for the conditions around your deeper work. A real project is the cleanest probe.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette phase cherche les conditions de ton travail en profondeur. Un vrai projet est la sonde la plus nette."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta fase busca las condiciones de tu trabajo profundo. Un proyecto real es la prueba más limpia."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Phase sucht die Bedingungen deiner Tiefenarbeit. Ein echtes Projekt ist der klarste Test."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa fase cerca le condizioni del tuo lavoro profondo. Un progetto reale è la prova più pulita."
+          }
+        }
+      }
+    },
     "Tiredness": {
       "extractionState": "manual",
       "localizations": {
@@ -5159,6 +6145,93 @@
           "stringUnit": {
             "state": "translated",
             "value": "Oggi"
+          }
+        }
+      }
+    },
+    "Today compares one specific condition against your normal, so the question resolves with real sessions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aujourd'hui compare une condition précise à ta normale : la question se résout avec de vraies séances."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoy compara una condición concreta con tu normal: la pregunta se resuelve con sesiones reales."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heute wird eine bestimmte Bedingung mit deinem Normalzustand verglichen – echte Sitzungen klären die Frage."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oggi si confronta una condizione precisa col tuo normale: la domanda si risolve con sessioni vere."
+          }
+        }
+      }
+    },
+    "Today trains recall: close the source, then bring back what stayed with you.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aujourd'hui entraîne le rappel : ferme la source, puis ramène ce qui est resté avec toi."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoy entrena el recuerdo: cierra la fuente y trae de vuelta lo que se quedó contigo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heute trainierst du Abruf: schließe die Quelle und hol zurück, was geblieben ist."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oggi si allena il richiamo: chiudi la fonte e riporta ciò che è rimasto con te."
+          }
+        }
+      }
+    },
+    "Today you explain the main idea out loud or in writing — fluency reveals what actually stuck.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aujourd'hui, tu expliques l'idée principale à voix haute ou par écrit — la fluidité révèle ce qui est vraiment resté."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoy explicas la idea principal en voz alta o por escrito: la fluidez revela lo que de verdad quedó."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heute erklärst du die Hauptidee laut oder schriftlich – die Flüsigkeit zeigt, was wirklich hängen geblieben ist."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oggi spieghi l'idea principale a voce alta o per iscritto: la fluidità rivela ciò che è davvero rimasto."
           }
         }
       }
@@ -5453,6 +6526,93 @@
         }
       }
     },
+    "WHAT REBOOT WILL MEASURE": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CE QUE REBOOT MESURERA"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LO QUE REBOOT MEDIRÁ"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WAS REBOOT MISST"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "COSA MISURERÀ REBOOT"
+          }
+        }
+      }
+    },
+    "WHAT YOU WANT": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CE QUE VOUS VOULEZ"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LO QUE QUIERES"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WAS DU WILLST"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CIO CHE VUOI"
+          }
+        }
+      }
+    },
+    "Watch what pulls today — noticing the pull precisely is what lets tomorrow's setup work.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observe ce qui tire aujourd'hui — remarquer précisément la traction permet au réglage de demain de fonctionner."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observa hoy qué tira de ti — notar con precisión el impulso es lo que hará funcionar el ajuste de mañana."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beobachte heute, was zieht – den Zug genau zu bemerken macht das Setup von morgen wirksam."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Osserva oggi cosa tira — notare con precisione lo slittamento rende efficace il regolamento di domani."
+          }
+        }
+      }
+    },
     "We'll change the conditions around you, train sustained attention, improve recall and help you design real deep-work sessions.": {
       "extractionState": "manual",
       "localizations": {
@@ -5623,6 +6783,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "Che tipo di lavoro conta di più adesso?"
+          }
+        }
+      }
+    },
+    "What pulls your attention is still unclear — Day 1 watches for it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce qui attire votre attention reste flou — le Jour 1 y veille."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lo que atrae tu atención aún no está claro — el Día 1 lo observará."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Was deine Aufmerksamkeit zieht, ist noch unklar – Tag 1 achtet darauf."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ciò che attira la tua attenzione è ancora poco chiaro — il Giorno 1 osserverà."
+          }
+        }
+      }
+    },
+    "What really pulls you away.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce qui vous détache vraiment."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lo que realmente te arrastra."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Was dich wirklich abzieht."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cosa ti attrae davvero altrove."
           }
         }
       }
@@ -5917,6 +7135,35 @@
         }
       }
     },
+    "Which conditions consistently help.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quelles conditions aident durablement."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qué condiciones ayudan de forma constante."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Welche Bedingungen dauerhaft helfen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quali condizioni aiutano costantemente."
+          }
+        }
+      }
+    },
     "Which conditions hold your deeper work.": {
       "extractionState": "manual",
       "localizations": {
@@ -6062,6 +7309,35 @@
         }
       }
     },
+    "You are ready to stay with something harder. Depth comes from difficulty held longer.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu peux rester sur quelque chose de plus difficile. La profondeur vient de la difficulté tenue plus longtemps."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estás listo para quedarte con algo más difícil. La profundidad viene de sostener la dificultad más tiempo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du bist bereit für etwas Schwereres. Tiefe entsteht, wenn Schwierigkeit länger gehalten wird."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sei pronto a restare su qualcosa di più difficile. La profondità nasce dalla difficoltà prolungata."
+          }
+        }
+      }
+    },
     "You know how you start best.": {
       "extractionState": "manual",
       "localizations": {
@@ -6087,6 +7363,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sai già come inizi al meglio."
+          }
+        }
+      }
+    },
+    "You observed for %d minutes.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu as observé pendant %d minutes."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observaste durante %d minutos."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du hast %d Minuten beobachtet."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hai osservato per %d minuti."
           }
         }
       }
@@ -6120,6 +7425,93 @@
         }
       }
     },
+    "You spent %d minutes and explained where it got hard.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu as passé %d minutes et expliqué où cela devenait difficile."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dedicaste %d minutos y explicaste dónde se complicó."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du hast %d Minuten investiert und erklärt, wo es schwer wurde."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hai speso %d minuti e spiegato dove è diventato difficile."
+          }
+        }
+      }
+    },
+    "You stayed for %d minutes. Nothing was optimized first.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu as tenu %d minutes. Rien n'a été optimisé avant tout."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aguantaste %d minutos. Nada se optimizó primero."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du hast %d Minuten durchgehalten. Zuerst wurde nichts optimiert."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hai resistito %d minuti. Nulla è stato ottimizzato prima."
+          }
+        }
+      }
+    },
+    "You stayed with one task for %d minutes.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu es resté sur une tâche pendant %d minutes."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Te quedaste con una tarea durante %d minutos."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du bist %d Minuten bei einer Aufgabe geblieben."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sei restato su un'attività per %d minuti."
+          }
+        }
+      }
+    },
     "You told reboot": {
       "extractionState": "manual",
       "localizations": {
@@ -6145,6 +7537,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hai detto a reboot"
+          }
+        }
+      }
+    },
+    "You usually expect 15–30 minutes before feeling pulled away.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vous tiendez généralement 15 à 30 minutes avant de vous sentir détourné."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Normalmente aguantas entre 15 y 30 minutos antes de sentirte arrastrado."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meist hältst du 15–30 Minuten durch, bevor du dich abgelenkt fühlst."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Di solito resisti 15–30 minuti prima di sentirti attratto altrove."
+          }
+        }
+      }
+    },
+    "You usually stay past an hour before feeling pulled away.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vous tenez généralement plus d'une heure avant de vous sentir détourné."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Normalmente aguantas más de una hora antes de sentirte arrastrado."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meist hältst du über eine Stunde durch, bevor du dich abgelenkt fühlst."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Di solito resisti oltre un'ora prima di sentirti attratto altrove."
           }
         }
       }
@@ -6207,6 +7657,35 @@
         }
       }
     },
+    "Your actual focus window.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre vraie fenêtre d'attention."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu ventana real de concentración."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dein echtes Fokusfenster."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La tua vera finestra di concentrazione."
+          }
+        }
+      }
+    },
     "Your attention is being pulled apart.": {
       "extractionState": "manual",
       "localizations": {
@@ -6261,6 +7740,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "La tua attenzione, interamente locale"
+          }
+        }
+      }
+    },
+    "Your baseline exists now.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ta référence existe désormais."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu referencia ya existe."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deine Referenz existiert jetzt."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ora la tua base di riferimento esiste."
           }
         }
       }
@@ -6406,6 +7914,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "La tua vera finestra di attenzione, misurata sulle sessioni."
+          }
+        }
+      }
+    },
+    "Your recent pattern is stable. Use REBOOT if you want to train, test, or review.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ton schéma récent est stable. Utilise REBOOT si tu veux t'entraîner, tester ou revoir."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu patrón reciente es estable. Usa REBOOT si quieres entrenar, probar o repasar."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dein aktuelles Muster ist stabil. Nutze REBOOT, wenn du trainieren, testen oder nachsehen willst."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il tuo schema recente è stabile. Usa REBOOT se vuoi allenarti, provare o rivedere."
           }
         }
       }

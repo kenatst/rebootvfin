@@ -115,6 +115,8 @@
 		0A6000000000000000000006A /* LegalConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A6000000000000000000006B /* LegalConfiguration.swift */; };
 		0A5000000000000000000005R /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 0A5000000000000000000005 /* Localizable.xcstrings */; };
 		0A7000000000000000000007A /* ReleaseFoundationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A7000000000000000000007B /* ReleaseFoundationTests.swift */;};
+		0A8000000000000000000008A /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A8000000000000000000008B /* FlowLayout.swift */;};
+		0A9000000000000000000009A /* PresentationRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A9000000000000000000009B /* PresentationRegressionTests.swift */;};
 /* End PBXBuildFile section */
 
 	/* Begin PBXContainerItemProxy section */
@@ -277,6 +279,8 @@
 		0A6000000000000000000006B /* LegalConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalConfiguration.swift; sourceTree = "<group>"; };
 		0A7000000000000000000007B /* ReleaseFoundationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseFoundationTests.swift; sourceTree = "<group>";};
 		0A5000000000000000000005 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>";};
+		0A8000000000000000000008B /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>";};
+		0A9000000000000000000009B /* PresentationRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationRegressionTests.swift; sourceTree = "<group>";};
 /* End PBXFileReference section */
 
 	/* Begin PBXGroup section */
@@ -305,6 +309,7 @@
 		2B710A6A20E3EB42CBB04886 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				0A8000000000000000000008B /* FlowLayout.swift */,
 				72CEBE5A886E5B8A19AFACD4,
 				2ADFFFFF173A1525663AADBD,
 				65016BE9B4746E7B22BFCD3D,
@@ -658,6 +663,7 @@
 		9A0000000000000000000006 /* REBOOTTests */ = {
 			isa = PBXGroup;
 			children = (
+				0A9000000000000000000009B /* PresentationRegressionTests.swift */,
 				0A7000000000000000000007B /* ReleaseFoundationTests.swift */,
 				9A0000000000000000000002 /* REBOOTTests.swift */,
 				9C0000000000000000000007 /* PersonalLabTests.swift */,
@@ -756,6 +762,7 @@
 				346DA7763EB5A302A693B96D /* Controls.swift in Sources */,
 				C6DD1F9AD87CFD6422A8102B /* Editorial.swift in Sources */,
 				0A1000000000000000000001A /* L10n.swift in Sources */,
+				0A8000000000000000000008A /* FlowLayout.swift in Sources */,
 				0A2000000000000000000002A /* PaywallRules.swift in Sources */,
 				0A3000000000000000000003A /* Day1ContinuationView.swift in Sources */,
 				0A4000000000000000000004A /* RebootDataExport.swift in Sources */,
@@ -855,6 +862,7 @@
 				E924F5AB3BF86F6D68AA7FCF /* PersonaSimulationTests.swift */,
 				FD0B8959766478DB8D2DB80C /* OwnModeTests.swift */,
 				0A7000000000000000000007A /* ReleaseFoundationTests.swift in Sources */,
+				0A9000000000000000000009A /* PresentationRegressionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

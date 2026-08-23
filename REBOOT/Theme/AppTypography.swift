@@ -88,9 +88,9 @@ extension AppTypography.Style {
     // MARK: - Product styles
 
     static let questionTitle = AppTypography.Style(
-        font: AppTypography.instrument(size: 33.6),
-        lineHeight: 36.288,
-        kerning: -0.336
+        font: AppTypography.instrument(size: 30),
+        lineHeight: 33.6,
+        kerning: -0.3
     )
     static let hint = AppTypography.Style(
         font: AppTypography.plusJakarta(size: 15, weight: 400),

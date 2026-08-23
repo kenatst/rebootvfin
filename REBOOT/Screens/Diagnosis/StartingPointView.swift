@@ -1,89 +1,130 @@
 import SwiftUI
 
-/// "Your starting point" — the report that closes the diagnosis.
+/// "Your starting point" — the editorial close of the diagnosis.
 ///
-/// It shows what the user told REBOOT as honest priors, and names what REBOOT
-/// will replace them with through observation. Nothing here is a verdict.
+/// Structure: WHAT YOU WANT → STARTING HYPOTHESES → WHAT REBOOT WILL MEASURE
+/// → Start day one. No stat grids, no duplicate "what you told us" table,
+/// no raw internal identifiers. Every value renders through localized labels.
 struct StartingPointView: View {
     @ObservedObject var state: AppState
     var product: ProductStore? = nil
 
     private var answers: Answers { state.answers }
-    private var primary: String {
-        if DiagnosisModels.isUnknown("primary", answers),
-           let only = answers["goals"]?.first, answers["goals"]?.count == 1 {
-            return DiagnosisModels.goalLabel[only] ?? "Not chosen yet"
-        }
-        return DiagnosisModels.answerLabels("primary", answers).first ?? "Not chosen yet"
-    }
-    private var hardest: String {
-        DiagnosisModels.isUnknown("hardest", answers)
-            ? "Still unclear — Day 1 watches for it"
-            : (DiagnosisModels.answerLabels("hardest", answers).first ?? "")
-    }
-    private var breaker: String {
-        DiagnosisModels.isUnknown("breaker", answers)
-            ? "Not identified yet"
-            : (DiagnosisModels.answerLabels("breaker", answers).first ?? "")
-    }
-    private var window: String {
-        if DiagnosisModels.isUnknown("focus_window", answers) { return "Unmeasured" }
-        let value = answers["focus_window"]?.first ?? ""
-        return Self.focusCopy[value] ?? "Unmeasured"
-    }
-    private var returning: String {
-        DiagnosisModels.isUnknown("return_ability", answers)
-            ? "Unmeasured"
-            : (DiagnosisModels.answerLabels("return_ability", answers).first ?? "")
+
+    // MARK: - Prior extraction (always display-labeled, never raw values)
+
+    /// The one direction everything adapts around. Falls back to the single
+    /// chosen goal when the conditional primary question never appeared.
+    /// Never renders a raw internal identifier: unresolvable values are
+    /// dropped in favor of a graceful fallback.
+    private var wantLabel: String? {
+        let candidates = DiagnosisModels.answerLabels("primary", answers)
+            + [bestGoalFallback].compactMap { $0 }
+        let labeled = candidates.first { !Self.looksLikeInternalID($0) }
+        return labeled
     }
 
-    private static let focusCopy: [String: String] = [
-        // localized values:
-        "lt5": L("Under 5 min"),
-        "5_15": L("5 – 15 minutes"),
-        "15_30": L("15 – 30 minutes"),
-        "30_60": L("30 – 60 minutes"),
-        "usually_60_plus": L("60+ minutes"),
-        "gt60": L("60+ minutes"),
-    ]
-
-    /// Priors the report renders as rows. Goals and primary live in their own
-    /// card; everything else maps to one honest line.
-    private var knownRows: [(label: String, value: String)] {
-        var rows: [(String, String)] = []
-        if !DiagnosisModels.isUnknown("hardest", answers) {
-            rows.append(("Hardest part", hardest))
+    /// First resolvable goal label, used when the conditional primary
+    /// question was skipped or its stored value no longer resolves.
+    private var bestGoalFallback: String? {
+        let goals = answers["goals"] ?? []
+        if goals.count == 1 {
+            return DiagnosisModels.goalLabel[goals[0]]
         }
-        rows.append(("Main breaker", breaker))
-        rows.append(("Focus window", window))
-        rows.append(("Returning after distraction", returning))
-        if !DiagnosisModels.isUnknown("switch_response", answers) {
-            rows.append(("When it gets hard", DiagnosisModels.answerLabels("switch_response", answers).first ?? ""))
-        }
-        if !DiagnosisModels.isUnknown("use_case", answers) {
-            rows.append(("Work that matters now", DiagnosisModels.answerLabels("use_case", answers).first ?? ""))
-        }
-        if !DiagnosisModels.isUnknown("best_time", answers) {
-            rows.append(("Best hours", DiagnosisModelss.bestTimeLabel(answers["best_time"]?.first)))
-        }
-        return rows.filter { !$0.1.isEmpty }
+        return DiagnosisModels.answerLabels("goals", answers).first
     }
+
+    /// Internal identifiers are snake_case or known enum tokens; display
+    /// labels never are.
+    static func looksLikeInternalID(_ value: String) -> Bool {
+        value.contains("_")
+            || value == value.lowercased() && value.count > 3 && !value.contains(" ")
+    }
+
+    private var extraGoalLabels: [String] {
+        guard let goals = answers["goals"], goals.count > 1 else { return [] }
+        return DiagnosisModels.answerLabels("goals", answers).filter { $0 != wantLabel }
+    }
+
+    private struct Hypothesis: Identifiable {
+        let id: String
+        let text: String
+    }
+
+    /// Honest priors as sentences. Unknowns become "Day 1 will test this."
+    /// instead of a mechanical "Unmeasured" row.
+    private var hypotheses: [Hypothesis] {
+        var rows: [Hypothesis] = []
+        if let hardest = firstDisplayLabel("hardest") {
+            rows.append(Hypothesis(id: "hardest", text: String(format: L("%@ may be the hardest part right now."), hardest)))
+        }
+        if let breaker = firstDisplayLabel("breaker") {
+            rows.append(Hypothesis(id: "breaker", text: String(format: L("%@ are a possible breaker."), breaker)))
+        } else {
+            rows.append(Hypothesis(id: "breaker", text: L("What pulls your attention is still unclear — Day 1 watches for it.")))
+        }
+        if let window = windowSentence {
+            rows.append(Hypothesis(id: "window", text: window))
+        }
+        if let returning = firstDisplayLabel("return_ability") {
+            rows.append(Hypothesis(id: "return", text: String(format: L("%@ after a distraction."), returning)))
+        } else {
+            rows.append(Hypothesis(id: "return", text: L("How you return after distraction isn't measured yet — Day 1 will test it.")))
+        }
+        return rows
+    }
+
+    /// Label lookup that refuses to hand back raw identifiers.
+    private func firstDisplayLabel(_ questionID: String) -> String? {
+        guard let label = firstLabel(questionID) else { return nil }
+        return Self.looksLikeInternalID(label) ? nil : label
+    }
+
+    private func firstLabel(_ questionID: String) -> String? {
+        let label = DiagnosisModels.answerLabels(questionID, answers).first ?? ""
+        return label.isEmpty ? nil : label
+    }
+
+    private var windowSentence: String? {
+        guard !DiagnosisModels.isUnknown("focus_window", answers) else { return nil }
+        switch answers["focus_window"]?.first ?? "" {
+        case "lt5": return L("Focus usually holds under 5 minutes before something pulls.")
+        case "5_15": return L("Focus usually holds 5–15 minutes before something pulls.")
+        case "15_30": return L("You usually expect 15–30 minutes before feeling pulled away.")
+        case "30_60": return L("Focus usually holds 30–60 minutes before something pulls.")
+        default: return L("You usually stay past an hour before feeling pulled away.")
+        }
+    }
+
+    private var willMeasure: [String] {
+        [
+            L("Your actual focus window."),
+            L("What really pulls you away."),
+            L("How you return."),
+            L("Which conditions consistently help."),
+        ]
+    }
+
+    // MARK: - Body
 
     var body: some View {
         GeometryReader { geo in
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: AppSpacing.cardStack) {
+                VStack(alignment: .leading, spacing: 0) {
                     header
-                    primaryGoalCard
-                    statGrid
-                    knownCard
-                    learnCard
-                    statusCard
+                    whatYouWant
+                        .padding(.top, 34)
+                    hypothesesSection
+                        .padding(.top, 36)
+                    willMeasureSection
+                        .padding(.top, 36)
                     actions
+                        .padding(.top, 40)
                 }
                 .padding(.horizontal, AppSpacing.screenPadding)
-                .padding(.top, max(AppSpacing.safeTopMin, geo.safeAreaInsets.top))
-                .padding(.bottom, max(AppSpacing.safeBottomMin, geo.safeAreaInsets.bottom))
+                .padding(.top, max(AppSpacing.safeTopMin, geo.safeAreaInsets.top) + 8)
+                .padding(.bottom, max(AppSpacing.safeBottomMin, geo.safeAreaInsets.bottom) + 12)
+                .frame(maxWidth: AppSpacing.contentMaxWidth + 2 * AppSpacing.screenPadding)
                 .frame(maxWidth: .infinity)
             }
             .ignoresSafeArea()
@@ -92,125 +133,88 @@ struct StartingPointView: View {
     }
 
     private var header: some View {
-        Reveal(delay: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                MetaLabel(text: "Reboot / Calibration")
-                Text("Your starting point.", style: .reportTitle)
+        VStack(alignment: .leading, spacing: 0) {
+            MetaLabel(text: L("Reboot / Calibration"))
+            Text(L("Your starting point."), style: .reportTitle)
+                .foregroundStyle(AppColors.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, AppSpacing.sm)
+            Text(
+                L("This is not a verdict. It is where REBOOT starts — and the first week begins replacing these answers with what actually happens."),
+                style: .reportBody
+            )
+            .foregroundStyle(AppColors.inkSoft)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, AppSpacing.xs)
+        }
+    }
+
+    private var whatYouWant: some View {
+        Reveal(delay: 0.06) {
+            VStack(alignment: .leading, spacing: 10) {
+                MetaLabel(text: L("WHAT YOU WANT"), color: AppColors.coral)
+                Text(wantLabel ?? L("Still choosing"), style: .cardTitle)
                     .foregroundStyle(AppColors.ink)
-                    .padding(.top, AppSpacing.sm)
-                Text(
-                    "This is not a verdict. It is where REBOOT starts — and the first week begins replacing these answers with what actually happens.",
-                    style: .reportBody
-                )
-                .foregroundStyle(AppColors.inkSoft)
-                .padding(.top, AppSpacing.xs)
-            }
-            .frame(maxWidth: AppSpacing.contentMaxWidth, alignment: .leading)
-        }
-    }
-
-    private var primaryGoalCard: some View {
-        Reveal(delay: 0.08) {
-            PaperSurface(shadow: .lift, padding: AppSpacing.md) {
-                VStack(alignment: .leading, spacing: 0) {
-                    MetaLabel(text: "You told reboot", color: AppColors.coral)
-                    Text(primary, style: .cardTitle)
-                        .foregroundStyle(AppColors.ink)
-                        .padding(.top, 8)
-                    if (answers["goals"]?.count ?? 0) > 1 {
-                        FlowPills(
-                            labels: DiagnosisModels.answerLabels("goals", answers).filter { $0 != primary },
-                            pill: Pill.goal
-                        )
-                        .padding(.top, AppSpacing.sm)
-                    }
-                }
-            }
-            .frame(maxWidth: AppSpacing.contentMaxWidth, alignment: .leading)
-        }
-    }
-
-    private var statGrid: some View {
-        HStack(alignment: .top, spacing: AppSpacing.gridGap) {
-            Reveal(delay: 0.14) {
-                StatCard(label: "Hardest part", value: hardest, accent: AppColors.coral)
-            }
-            Reveal(delay: 0.18) {
-                StatCard(label: "Focus window", value: window, accent: AppColors.cyan)
-            }
-        }
-        .frame(maxWidth: AppSpacing.contentMaxWidth)
-    }
-
-    private var knownCard: some View {
-        Reveal(delay: 0.30) {
-            PaperSurface(shadow: .soft, padding: AppSpacing.md) {
-                VStack(alignment: .leading, spacing: 0) {
-                    MetaLabel(text: "What you told us")
-                    VStack(spacing: 14) {
-                        ForEach(knownRows, id: \.label) { row in
-                            HStack(alignment: .firstTextBaseline, spacing: 24) {
-                                Text(row.label, style: .hint)
-                                    .foregroundStyle(AppColors.inkSoft)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                Text(row.value, style: .statValue)
-                                    .foregroundStyle(AppColors.ink)
-                                    .multilineTextAlignment(.trailing)
-                            }
+                    .fixedSize(horizontal: false, vertical: true)
+                if !extraGoalLabels.isEmpty {
+                    FlowLayout(spacing: 8) {
+                        ForEach(extraGoalLabels, id: \.self) { label in
+                            Pill.goal(label)
                         }
                     }
-                    .padding(.top, AppSpacing.sm)
+                    .padding(.top, 4)
                 }
             }
-            .frame(maxWidth: AppSpacing.contentMaxWidth, alignment: .leading)
-        }
-    }
-
-    private var learnCard: some View {
-        Reveal(delay: 0.36) {
-            PaperSurface(shadow: .soft, padding: AppSpacing.md) {
-                VStack(alignment: .leading, spacing: 10) {
-                    MetaLabel(text: "What reboot will learn instead")
-                    Text("Your real focus window, measured across sessions.", style: .hint)
-                        .foregroundStyle(AppColors.inkSoft)
-                    Text("Whether the phone actually pulls you, or something else does.", style: .hint)
-                        .foregroundStyle(AppColors.inkSoft)
-                    Text("How quickly you return — and what makes returning easier.", style: .hint)
-                        .foregroundStyle(AppColors.inkSoft)
-                    Text("Which conditions hold your deeper work.", style: .hint)
-                        .foregroundStyle(AppColors.inkSoft)
-                    Text("None of these stay fixed. Observed evidence outweighs every answer above.", style: .hint)
-                        .foregroundStyle(AppColors.inkFaint)
-                        .padding(.top, 4)
-                }
-            }
-            .frame(maxWidth: AppSpacing.contentMaxWidth, alignment: .leading)
-        }
-    }
-
-    private var statusCard: some View {
-        Reveal(delay: 0.42) {
-            HStack(spacing: 12) {
-                PulsingDot()
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Status: Calibrating", style: .choiceLabel)
-                        .foregroundStyle(AppColors.ink)
-                    Text("Day 1 of 90 · your plan adapts as REBOOT observes you", style: .hint)
-                        .foregroundStyle(AppColors.inkSoft)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 20)
-            .padding(.horizontal, AppSpacing.screenPadding)
-            .frame(maxWidth: AppSpacing.contentMaxWidth, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 18)
+            .padding(.horizontal, 20)
             .background(AppColors.statusTint)
-            .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
-            .appShadow(.soft)
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.secondary, style: .continuous))
+        }
+    }
+
+    private var hypothesesSection: some View {
+        Reveal(delay: 0.16) {
+            VStack(alignment: .leading, spacing: 0) {
+                MetaLabel(text: L("STARTING HYPOTHESES"))
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(hypotheses) { hypothesis in
+                        Text(hypothesis.text, style: .reportBody)
+                            .foregroundStyle(AppColors.inkSoft)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.top, 14)
+            }
+        }
+    }
+
+    private var willMeasureSection: some View {
+        Reveal(delay: 0.26) {
+            VStack(alignment: .leading, spacing: 0) {
+                MetaLabel(text: L("WHAT REBOOT WILL MEASURE"))
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(willMeasure.enumerated()), id: \.offset) { _, line in
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Circle()
+                                .fill(AppColors.coral.opacity(0.7))
+                                .frame(width: 5, height: 5)
+                            Text(line, style: .hint)
+                                .foregroundStyle(AppColors.inkSoft)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .padding(.top, 14)
+                Text(L("Observed evidence outweighs every answer above."), style: .footnote)
+                    .foregroundStyle(AppColors.inkFaint)
+                    .padding(.top, 18)
+            }
         }
     }
 
     private var actions: some View {
-        Reveal(delay: 0.5) {
+        Reveal(delay: 0.36) {
             VStack(spacing: 12) {
                 PrimaryButton(title: L("Start day one")) {
                     // Canonical program initialization: installs the diagnosis
@@ -234,7 +238,7 @@ struct StartingPointView: View {
                 }
 
                 Text(
-                    "REBOOT trains attention behaviors. It doesn't diagnose anything or measure your brain.",
+                    L("REBOOT trains attention behaviors. It doesn't diagnose anything or measure your brain."),
                     style: .footnote
                 )
                 .foregroundStyle(AppColors.inkFaint)
@@ -243,120 +247,6 @@ struct StartingPointView: View {
                 .padding(.top, 8)
             }
             .frame(maxWidth: .infinity)
-        }
-    }
-}
-
-private enum DiagnosisModelss {
-    static func bestTimeLabel(_ value: String?) -> String {
-        switch value {
-        case "early": return "Early morning"
-        case "morning": return "Mid-morning"
-        case "afternoon": return "Afternoon"
-        case "evening": return "Evening"
-        case "night": return "Late night"
-        default: return ""
-        }
-    }
-}
-
-/// Compact chip flow used by goal cards.
-struct FlowPills: View {
-    let labels: [String]
-    let pill: (String) -> Pill
-
-    var body: some View {
-        FlowLayout(spacing: 8) {
-            ForEach(labels, id: \.self) { label in
-                pill(label)
-            }
-        }
-    }
-}
-
-/// Simple left-aligned wrapping layout for chips (flex-wrap equivalent).
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? .infinity
-        let itemProposal = width.isFinite
-            ? ProposedViewSize(width: width, height: nil)
-            : .unspecified
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var maxWidth: CGFloat = 0
-        for sub in subviews {
-            let size = sub.sizeThatFits(itemProposal)
-            if x + size.width > width, x > 0 {
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-            maxWidth = max(maxWidth, x)
-        }
-        return CGSize(width: min(width, maxWidth), height: y + rowHeight)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let itemProposal = ProposedViewSize(width: bounds.width, height: nil)
-        var x = bounds.minX
-        var y = bounds.minY
-        var rowHeight: CGFloat = 0
-        for sub in subviews {
-            let size = sub.sizeThatFits(itemProposal)
-            if x + size.width > bounds.maxX, x > bounds.minX {
-                x = bounds.minX
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            sub.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-    }
-}
-
-struct StatCard: View {
-    let label: String
-    let value: String
-    let accent: Color
-
-    var body: some View {
-        PaperSurface(shadow: .soft, padding: AppSpacing.statPadding) {
-            VStack(alignment: .leading, spacing: 8) {
-                MetaLabel(text: label, color: accent)
-                Text(value, style: .statValue)
-                    .foregroundStyle(AppColors.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-}
-
-/// Coral pulsing status dot.
-struct PulsingDot: View {
-    @State private var pulsing = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(AppColors.coral)
-                .frame(width: 10, height: 10)
-                .scaleEffect(pulsing ? 2.1 : 1)
-                .opacity(pulsing ? 0 : 0.6)
-            Circle()
-                .fill(AppColors.coral)
-                .frame(width: 10, height: 10)
-        }
-        .onAppear {
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 1.4).repeatForever(autoreverses: false)) {
-                pulsing = true
-            }
         }
     }
 }

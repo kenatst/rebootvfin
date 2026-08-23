@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Soft editorial choice row with a check circle. Selected state morphs to the
-/// ink pill. Lighter than a card: tonal fill, secondary radius, minimal shadow.
+/// Flat editorial choice row. Selected: warm tonal fill + coral check.
+/// Unselected: quiet paper row, no shadow, hairline presence only.
+/// Deliberately NOT a floating pill island.
 struct ChoiceCard: View {
     let label: String
     let isSelected: Bool
@@ -10,33 +11,41 @@ struct ChoiceCard: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 16) {
+            HStack(spacing: 14) {
                 Text(label)
                     .type(.choiceLabel)
-                    .foregroundStyle(isSelected ? AppColors.paper : AppColors.ink)
+                    .foregroundStyle(isSelected ? AppColors.ink : AppColors.inkSoft)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
 
                 ZStack {
                     Circle()
-                        .fill(isSelected ? AppColors.paper.opacity(0.22) : AppColors.ink.opacity(0.05))
+                        .strokeBorder(
+                            isSelected ? AppColors.coral : AppColors.hairline,
+                            lineWidth: isSelected ? 1.6 : 1.2
+                        )
+                        .background(Circle().fill(isSelected ? AppColors.coral.opacity(0.08) : .clear))
                     if isSelected {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 13, weight: .heavy))
-                            .foregroundStyle(AppColors.paper)
+                        Circle()
+                            .fill(AppColors.coral)
+                            .frame(width: 9, height: 9)
                     }
                 }
-                .frame(width: 24, height: 24)
+                .frame(width: 22, height: 22)
             }
-            .padding(.vertical, 15)
-            .padding(.horizontal, 18)
-            .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
-            .background(isSelected ? AppColors.ink : AppColors.paperRaised.opacity(0.85))
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .appShadow(isSelected ? .lift : .soft)
+            .padding(.vertical, 13)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+            .background(isSelected ? AppColors.statusTint : AppColors.paperRaised.opacity(0.55))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(isSelected ? AppColors.coral.opacity(0.35) : AppColors.hairline.opacity(0.6),
+                                  lineWidth: isSelected ? 1.2 : 0.8)
+            )
             .animation(reduceMotion ? nil : .easeOut(duration: AppMotion.selectMorph), value: isSelected)
-            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(PressScaleStyle())
         .accessibilityAddTraits(isSelected ? .isSelected : [])

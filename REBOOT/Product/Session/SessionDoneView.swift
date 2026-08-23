@@ -53,16 +53,58 @@ struct SessionDoneView: View {
 
     private var completionIntro: some View {
         VStack(alignment: .leading, spacing: 0) {
-            MetaLabel(text: record?.completed == true ? "Session complete" : "Session ended", color: AppColors.coral)
-            EditorialHeadline(text: record?.completed == true ? "Done." : "That still tells us something.")
+            MetaLabel(text: record?.completed == true ? L("Session complete") : L("Session ended"), color: AppColors.coral)
+            EditorialHeadline(text: completionHeadline)
                 .padding(.top, 16)
             Text(introCopy, style: .todaySentence)
                 .foregroundStyle(AppColors.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 14)
-            PrimaryPillButton(title: "Continue") {
+            if let truth = sessionTruth {
+                Text(truth)
+                    .type(.footnote)
+                    .foregroundStyle(AppColors.inkFaint)
+                    .padding(.top, 10)
+            }
+            PrimaryPillButton(title: isDayOne ? L("See what REBOOT noticed") : L("Continue")) {
                 withAnimation(.reboot(duration: 0.35)) { stage = 1 }
             }
             .padding(.top, 30)
+        }
+    }
+
+    /// Day 1 gets the "the app has started learning me" framing — the CTA
+    /// names what actually happened instead of just moving forward.
+    private var isDayOne: Bool {
+        guard let record else { return false }
+        return record.origin == .protocol && record.day == 1 && record.completed
+    }
+
+    private var completionHeadline: String {
+        guard let record else { return L("That still tells us something.") }
+        if record.completed {
+            return isDayOne ? L("Your baseline exists now.") : L("Done.")
+        }
+        return L("That still tells us something.")
+    }
+
+    /// One context-specific true sentence about the session that just ended.
+    private var sessionTruth: String? {
+        guard let record, record.completed else { return nil }
+        let minutes = max(1, record.actualMinutes)
+        switch record.mode {
+        case .observe:
+            return isDayOne
+                ? String(format: L("You stayed for %d minutes. Nothing was optimized first."), minutes)
+                : String(format: L("You observed for %d minutes."), minutes)
+        case .stay:
+            return String(format: L("You stayed with one task for %d minutes."), minutes)
+        case .recall:
+            return String(format: L("%d minutes of reading, then the source closed."), record.targetMinutes)
+        case .explain:
+            return String(format: L("You spent %d minutes and explained where it got hard."), minutes)
+        case .nothing:
+            return String(format: L("%d minutes without adding anything new."), minutes)
         }
     }
 

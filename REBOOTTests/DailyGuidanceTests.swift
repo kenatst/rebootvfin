@@ -270,7 +270,12 @@ final class DailyGuidanceTests: XCTestCase {
 
         XCTAssertEqual(guidance.bottleneck, .energyContext)
         XCTAssertLessThanOrEqual(guidance.primaryAction.targetMinutes, 15)
-        XCTAssertTrue(guidance.explanation.lowercased().contains("energy is low"))
+        // Mode-aware explanation: an energy-short STAY day names the shorter
+        // session explicitly (see DailyGuidanceEngine.modeAwareStayExplanation).
+        XCTAssertTrue(
+            guidance.explanation.lowercased().contains("energy is low")
+                || guidance.explanation.lowercased().contains("session gets shorter"),
+            "explanation should mention reduced load, got: \(guidance.explanation)")
     }
 
     // MARK: - 8. Day 90 Operating Manual Generation
