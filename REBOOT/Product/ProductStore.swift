@@ -10,6 +10,7 @@ enum ProductPhase: Equatable {
     case running(SessionRecord)
     case recovery(SessionRecord)
     case done(SessionRecord)
+    case firstValue
     case weeklyReview(Int)
     case phaseTransition(ProgramPhaseID)
     case programCompletion
@@ -31,6 +32,17 @@ enum ProductTab: String, CaseIterable, Identifiable {
         case .profile: return "person"
         }
     }
+
+    /// Localized tab label. `rawValue` remains the stable identifier used by
+    /// QA routing and persistence; only the rendered label is localized.
+    var displayLabel: String {
+        switch self {
+        case .today: return L("Today")
+        case .train: return L("Train")
+        case .program: return L("Program")
+        case .profile: return L("Profile")
+        }
+    }
 }
 
 @MainActor
@@ -49,6 +61,9 @@ final class ProductStore: ObservableObject {
     @Published var digitalEnvironmentState: DigitalEnvironmentState = .empty
     @Published var guidanceDecisions: [GuidanceDecision] = []
     @Published var ownModeState: OwnModeState = OwnModeState()
+    /// Set once when the free Day-1 baseline completes: the single legitimate
+    /// automatic paywall moment (first genuine insight → continue offer).
+    @Published var pendingFirstValueMoment = false
 
     var onObservationSaved: ((EnvironmentObservation) -> Void)?
 
@@ -61,6 +76,11 @@ final class ProductStore: ObservableObject {
     private static let v2StorageKey = "reboot.product.v2"
     private static let v1StorageKey = "reboot.product.v1"
     private let defaults: UserDefaults
+
+    /// Set when DEBUG QA tooling diverts this store to an isolated scratch
+    /// defaults domain. While set, nothing this store writes can reach the
+    /// user's real persistence.
+    private(set) var isQADiverted = false
 
     var allSessions: [SessionRecord] { sessions }
     var protocolSessions: [SessionRecord] { sessions.filter { $0.origin == .protocol } }
@@ -156,8 +176,20 @@ final class ProductStore: ObservableObject {
     }
 
     init(diagnosisAnswers: Answers, defaults: UserDefaults = .standard) {
+        #if DEBUG
+        if Self.isQAProcess {
+            // QA launch: divert every read and write to an isolated scratch
+            // domain so seeded demo state can never survive into a normal
+            // launch (the historical "fresh install landed on Day 90" bug).
+            self.defaults = Self.qaScratchDefaults()
+            isQADiverted = true
+        } else {
+            self.defaults = defaults
+        }
+        #else
         self.defaults = defaults
-        let loaded = Self.load(defaults: defaults)
+        #endif
+        let loaded = Self.load(defaults: self.defaults)
         if let stored = loaded.state {
             profile = stored.profile
             sessions = stored.sessions
@@ -191,13 +223,13 @@ final class ProductStore: ObservableObject {
             }
             if loaded.migrated {
                 persist()
-                defaults.removeObject(forKey: Self.v7StorageKey)
-                defaults.removeObject(forKey: Self.v6StorageKey)
-                defaults.removeObject(forKey: Self.v5StorageKey)
-                defaults.removeObject(forKey: Self.v4StorageKey)
-                defaults.removeObject(forKey: Self.v3StorageKey)
-                defaults.removeObject(forKey: Self.v2StorageKey)
-                defaults.removeObject(forKey: Self.v1StorageKey)
+                self.defaults.removeObject(forKey: Self.v7StorageKey)
+                self.defaults.removeObject(forKey: Self.v6StorageKey)
+                self.defaults.removeObject(forKey: Self.v5StorageKey)
+                self.defaults.removeObject(forKey: Self.v4StorageKey)
+                self.defaults.removeObject(forKey: Self.v3StorageKey)
+                self.defaults.removeObject(forKey: Self.v2StorageKey)
+                self.defaults.removeObject(forKey: Self.v1StorageKey)
             }
         } else {
             profile = ProfileBuilder.build(from: diagnosisAnswers)
@@ -238,7 +270,13 @@ final class ProductStore: ObservableObject {
         if ProcessInfo.processInfo.arguments.contains("-qaLabPrepare") {
             prepareStandaloneLabSession()
         }
-#endif
+        if isQADiverted {
+            // Leave the production domain exactly as a fresh install: scrub
+            // anything earlier QA runs wrote there so the next NORMAL launch
+            // (no QA arguments) can only ever start at Day 1.
+            purgeProductionProductState()
+        }
+        #endif
         if case .today = phase {
             let wasReturningToFlowLab = flowState.returnToLabAfterProgramFlow
             routePendingProgramFlow()
@@ -306,6 +344,88 @@ final class ProductStore: ObservableObject {
 #endif
             return nil
         }
+    }
+
+    // MARK: - QA process isolation
+
+#if DEBUG
+    /// True when this launch is a QA/screenshot run (any `-qa*` launch argument).
+    static var isQAProcess: Bool {
+        ProcessInfo.processInfo.arguments.contains { $0.hasPrefix("-qa") }
+    }
+
+    /// Ephemeral in-memory scratch domain for QA runs. Volatile — it dies with
+    /// the process, so seeded state cannot survive into any later launch.
+    private static func qaScratchDefaults() -> UserDefaults {
+        UserDefaults(suiteName: "reboot.qa.scratch.\(UUID().uuidString)") ?? .standard
+    }
+
+    /// Removes every REBOOT product key from the production domain. Called only
+    /// when a QA launch detects leftover state from earlier un-isolated runs.
+    private func purgeProductionProductState() {
+        let standard = UserDefaults.standard
+        standard.removeObject(forKey: Self.storageKey)
+        standard.removeObject(forKey: Self.v7StorageKey)
+        standard.removeObject(forKey: Self.v6StorageKey)
+        standard.removeObject(forKey: Self.v5StorageKey)
+        standard.removeObject(forKey: Self.v4StorageKey)
+        standard.removeObject(forKey: Self.v3StorageKey)
+        standard.removeObject(forKey: Self.v2StorageKey)
+        standard.removeObject(forKey: Self.v1StorageKey)
+    }
+#endif
+
+    /// One canonical Program creation point. A fresh user who finishes the
+    /// diagnosis must always land on Day 1 of an active program with no
+    /// completion state, no Own Mode and no pending required flow. Stale or
+    /// impossible persisted state is rebuilt from the diagnosis priors.
+    func initializeProgramIfNeeded() {
+        var needsFresh = true
+        if programState.status == .active,
+           programState.currentDay == 1,
+           sessions.isEmpty,
+           !programState.hasPendingRequiredFlow {
+            needsFresh = false
+        }
+        if needsFresh {
+            programState = .fresh
+            environmentPreparation = nil
+            ownModeState = OwnModeState()
+            flowState.activeBlockID = nil
+            phase = .today
+            tab = .today
+        }
+        persist(activeSession: nil)
+    }
+
+    /// Rebuilds the entire product world from the given diagnosis answers:
+    /// a fresh Day-1 program, a prior-initialized profile and an empty
+    /// evidence history. Called when the user finishes (or retakes) the
+    /// diagnosis. Never wipes Screen Time authorization or notification
+    /// permissions — those are OS grants, not REBOOT data.
+    func rebuildFromDiagnosis(_ answers: Answers? = nil) {
+        profile = ProfileBuilder.build(from: answers ?? Answers())
+        sessions = []
+        programState = .fresh
+        environmentPreparation = nil
+        personalRules = []
+        observations = []
+        labState = .empty
+        fuelState = .empty
+        flowState = .empty
+        digitalEnvironmentState = DigitalEnvironmentState.empty
+        guidanceDecisions = []
+        ownModeState = OwnModeState()
+        tab = .today
+        phase = .today
+        persist(activeSession: nil)
+    }
+
+    /// Canonical entry from the diagnosis flow: installs the diagnosis priors
+    /// into the live profile AND guarantees Day 1 of an active program.
+    func applyDiagnosis(_ answers: Answers) {
+        profile = ProfileBuilder.build(from: answers)
+        initializeProgramIfNeeded()
     }
 
     // MARK: - Personal Rules actions
@@ -1878,6 +1998,14 @@ final class ProductStore: ObservableObject {
         tab = record.flowParticipation != nil
             ? .profile
             : (record.origin == .freeTraining ? .train : .today)
+        // First-value conversion moment: the free Day-1 baseline just completed.
+        // Exactly once per install, only for a genuinely completed protocol
+        // session, and only if no purchase is already active in this store.
+        if record.origin == .protocol, record.completed, record.day == 1,
+           programState.currentDay == 2,
+           !pendingFirstValueMoment {
+            pendingFirstValueMoment = true
+        }
         if record.origin == .protocol, record.completed, programState.hasPendingRequiredFlow {
             flowState.returnToLabAfterProgramFlow = record.flowParticipation != nil
             routePendingProgramFlow()
@@ -1887,10 +2015,39 @@ final class ProductStore: ObservableObject {
             phase = .flowLab
         } else if record.origin == .freeTraining || record.origin == .experiment || !record.completed {
             phase = .today
+        } else if pendingFirstValueMoment,
+                  subscriptionGateAllowsAutoPaywall {
+            phase = .firstValue
         } else {
             routePendingProgramFlow()
         }
         persist(activeSession: nil)
+    }
+
+    /// The automatic first-value paywall may only appear for a free
+    /// entitlement AND when no automatic presentation happened recently. When
+    /// the gate declines, Today simply continues — Settings always offers the
+    /// paywall deliberately.
+    private var subscriptionGateAllowsAutoPaywall: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-qaSkipPaywall") { return false }
+        #endif
+        return !isEntitlementPremium && PaywallRules.mayPresentAutomatically()
+    }
+
+    /// Mirrors SubscriptionStore.status.isPremium. Set by the app layer so
+    /// ProductStore routing respects real entitlement truth without owning a
+    /// StoreKit dependency.
+    var isEntitlementPremium = false
+
+    /// Called by the presentation layer when the first-value moment should be
+    /// surfaced as a full screen.
+    func presentFirstValueMomentIfEligible() {
+        guard pendingFirstValueMoment, subscriptionGateAllowsAutoPaywall else {
+            pendingFirstValueMoment = false
+            return
+        }
+        phase = .firstValue
     }
 
     private func recordFlowEvidence(
@@ -2168,11 +2325,28 @@ final class ProductStore: ObservableObject {
         labState = .empty
         fuelState = .empty
         flowState = .empty
+        digitalEnvironmentState = .empty
         guidanceDecisions = []
         ownModeState = OwnModeState()
         tab = .today
         phase = .today
         persist(activeSession: nil)
+    }
+
+    /// Erase-all support: removes every persisted REBOOT key this store owns
+    /// from its defaults domain, returning it to a true first-launch state.
+    /// Callers remain responsible for EnvironmentStore, NotificationService,
+    /// SubscriptionStore cached metadata and AppState.
+    func erasePersistedData() {
+        defaults.removeObject(forKey: Self.storageKey)
+        defaults.removeObject(forKey: Self.v7StorageKey)
+        defaults.removeObject(forKey: Self.v6StorageKey)
+        defaults.removeObject(forKey: Self.v5StorageKey)
+        defaults.removeObject(forKey: Self.v4StorageKey)
+        defaults.removeObject(forKey: Self.v3StorageKey)
+        defaults.removeObject(forKey: Self.v2StorageKey)
+        defaults.removeObject(forKey: Self.v1StorageKey)
+        reset()
     }
 
     func restartProgram() {

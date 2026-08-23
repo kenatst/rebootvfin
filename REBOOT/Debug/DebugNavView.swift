@@ -92,6 +92,9 @@ struct DebugNavView: View {
 
                 Section {
                     Button("Reset to first onboarding screen", role: .destructive) {
+                        // Clear BOTH state machines so a debug reset can't leave
+                        // half-seeded product state behind.
+                        product.reset()
                         state.reset()
                         dismiss()
                     }

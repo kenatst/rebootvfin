@@ -39,6 +39,14 @@ struct ProductRootView: View {
             case .done:
                 SessionDoneView(product: product)
                     .transition(.opacity)
+            case .firstValue:
+                Day1ContinuationView(
+                    product: product,
+                    subscriptionStore: subscriptionStore ?? SubscriptionStore()
+                ) {
+                    product.phase = .today
+                }
+                .transition(.opacity)
             case .weeklyReview(let checkpointDay):
                 WeeklyReviewView(product: product, checkpointDay: checkpointDay)
                     .transition(.opacity)

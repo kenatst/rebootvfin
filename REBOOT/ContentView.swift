@@ -29,7 +29,7 @@ struct ContentView: View {
                 }
                 .transition(.opacity)
             case .report:
-                StartingPointView(state: state)
+                StartingPointView(state: state, product: product)
                     .transition(.opacity)
             case .today:
                 ProductRootView(

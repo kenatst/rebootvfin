@@ -205,6 +205,28 @@ final class EnvironmentStore: ObservableObject {
         persist()
     }
 
+    /// Erase-all support: stops every scheduled DeviceActivity monitor, removes
+    /// any active protection, clears the shared threshold-event file and wipes
+    /// this store's persisted state. Screen Time authorization itself is an OS
+    /// grant and cannot be revoked by the app.
+    func eraseAllData() {
+        provider.removeProtection()
+        activeSessionProtection = false
+        let names = windows.map { DeviceActivityName($0.deviceActivityName) }
+        if !names.isEmpty {
+            center.stopMonitoring(names)
+        }
+        windows = []
+        selection = nil
+        thresholdApproved = false
+        observations = []
+        if let url = sharedContainerURL?.appendingPathComponent("threshold-events.json") {
+            try? FileManager.default.removeItem(at: url)
+        }
+        UserDefaults.standard.removeObject(forKey: Self.storageKey)
+        refreshCapability()
+    }
+
     var sharedContainerURL: URL? {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.kenatst.reboot")
     }

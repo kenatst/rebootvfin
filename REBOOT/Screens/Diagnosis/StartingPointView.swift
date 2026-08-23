@@ -6,6 +6,7 @@ import SwiftUI
 /// will replace them with through observation. Nothing here is a verdict.
 struct StartingPointView: View {
     @ObservedObject var state: AppState
+    var product: ProductStore? = nil
 
     private var answers: Answers { state.answers }
     private var primary: String {
@@ -37,12 +38,13 @@ struct StartingPointView: View {
     }
 
     private static let focusCopy: [String: String] = [
-        "lt5": "Under 5 min",
-        "5_15": "5 – 15 minutes",
-        "15_30": "15 – 30 minutes",
-        "30_60": "30 – 60 minutes",
-        "usually_60_plus": "60+ minutes",
-        "gt60": "60+ minutes",
+        // localized values:
+        "lt5": L("Under 5 min"),
+        "5_15": L("5 – 15 minutes"),
+        "15_30": L("15 – 30 minutes"),
+        "30_60": L("30 – 60 minutes"),
+        "usually_60_plus": L("60+ minutes"),
+        "gt60": L("60+ minutes"),
     ]
 
     /// Priors the report renders as rows. Goals and primary live in their own
@@ -210,13 +212,23 @@ struct StartingPointView: View {
     private var actions: some View {
         Reveal(delay: 0.5) {
             VStack(spacing: 12) {
-                PrimaryButton(title: "Start day one") {
+                PrimaryButton(title: L("Start day one")) {
+                    // Canonical program initialization: installs the diagnosis
+                    // priors and guarantees Day 1 of an active program
+                    // regardless of any stale persisted state.
+                    product?.applyDiagnosis(state.answers)
                     state.patch(phase: .today)
                 }
                     .frame(maxWidth: AppSpacing.contentMaxWidth)
 
-                Button(action: { state.reset() }) {
-                    Text("Retake the diagnosis", style: .footnote)
+                Button(action: {
+                    // Clear any stale program/evidence state BEFORE the user
+                    // retakes the questions; the rebuilt profile is created
+                    // from the new answers when they finish.
+                    product?.rebuildFromDiagnosis()
+                    state.patch(phase: .diagnosis)
+                }) {
+                    Text(L("Retake the diagnosis"), style: .footnote)
                         .foregroundStyle(AppColors.inkFaint)
                         .padding(.vertical, 8)
                 }
